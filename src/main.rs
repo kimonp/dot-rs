@@ -1,4 +1,4 @@
-mod graph;
+pub mod graph;
 
 use graph::Graph;
 
