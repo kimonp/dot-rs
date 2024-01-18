@@ -1,15 +1,28 @@
+/// Implement a graph that can be drawn using the algorithm described in the 1993 paper:
+/// "A Technique for Drawing Directed Graphs" by Gansner, Koutsofios, North and Vo
+/// 
+/// This paper is referred to as simply "the paper" below.
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
 };
 
+/// Minimum allowed edge length.  In future implementations, user could set this.
+/// See function of edge length below: edge_length()
 const MIN_EDGE_LENGTH: u32 = 1;
+/// Minimum allowed edge weight.  In future implementations, user could set this.
+/// Edge weight could be used when drawing to deletemine the stroke width of an edge.
 const MIN_EDGE_WEIGHT: u32 = 1;
 
 /// Simplist posible representation of a graph until more is needed.
 ///
-/// Chose to use indexed arrays to avoid interior mutability for now,
-/// as well as maps or sets.  Both could change when I see the need.
+/// I chose to use indexed arrays to avoid interior mutability for now,
+/// as well as requiring any maps or sets, because initially it was unclear to me what
+/// would be optimal.  Both could be addressed on a future refactor.
+/// 
+/// TODO:
+/// * Add an error type and remove all unwrap(), expect() and panic() code.
+/// * Make runtime effecient
 #[derive(Debug)]
 pub struct Graph {
     /// All nodes in the graph.
@@ -29,9 +42,7 @@ enum CutSet {
 }
 
 impl Default for Graph {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 #[allow(unused)]
@@ -43,18 +54,30 @@ impl Graph {
         }
     }
 
+    /// The graph function described in "A Technique for Drawing Directed Graphs"
+    pub fn draw_graph(&mut self) {
+        self.rank();
+        self.ordering();
+        self.position();
+        self.make_splines()
+    }
+
+    /// Return the node indexed by node_idx.
     pub fn get_node(&self, node_idx: usize) -> &Node {
         &self.nodes[node_idx]
     }
 
+    /// Return a mutable node indexed by node_idx.
     pub fn get_node_mut(&mut self, node_idx: usize) -> &mut Node {
         &mut self.nodes[node_idx]
     }
 
+    /// Return the edge indexed by edge_idx.
     pub fn get_edge(&self, edge_idx: usize) -> &Edge {
         &self.edges[edge_idx]
     }
 
+    /// Return mutable edge indexed by edge_idx.
     pub fn get_edge_mut(&mut self, edge_idx: usize) -> &mut Edge {
         &mut self.edges[edge_idx]
     }
@@ -101,21 +124,12 @@ impl Graph {
         idx
     }
 
-    #[allow(unused)]
-    pub fn draw_graph(&mut self) {
-        self.rank();
-        self.ordering();
-        self.position();
-        self.make_splines()
-    }
-
     /// Rank nodes in the graph using the network simplex algorithm described in [TSE93].
     pub fn rank(&mut self) {
         self.merge_edges_and_ignore_loops();
 
         self.set_feasible_tree();
         while let Some(neg_cut_edge_idx) = self.leave_edge() {
-            println!("not ranked yet:\n{self}");
             let non_tree_edge_idx = self
                 .enter_edge(neg_cut_edge_idx)
                 .expect("No negative cut values found!");
@@ -178,7 +192,7 @@ impl Graph {
 
     /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
     ///
-    /// Documentation from the paper:
+    /// Documentation from the paper: pages 8-9
     /// * The while loop code below ﬁnds an edge to a non-tree node that is adjacent to the tree, and adjusts the ranks of
     ///   the tree nodes to make this edge tight.
     ///   * As the edge was picked to have minimal slack, the resulting ranking is still feasible.
@@ -192,6 +206,24 @@ impl Graph {
     /// * In graph theory, an "edge incident on a tree" refers to an edge that connects a vertex of the tree to a vertex outside the tree.
     /// * A tree is a specific type of graph that is connected and acyclic, meaning it doesn't contain any cycles.
     ///   * The edges in a tree connect the vertices (nodes) in such a way that there is exactly one path between any two vertices.
+    ///
+    /// Additional papar details: page 7
+    /// * A feasible ranking is one satisfying the length constraints l(e) ≥ δ(e) for all e.
+    ///   * Thus, a ranking where the all edge rankings are > min_length().  Thus no rank < 1
+    ///   * l(e) = length(e) = rank(e1)-rank(e2) = rank_diff(e)
+    ///     * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
+    ///     * λ(w) − λ(v) = rank(w) - rank(v)
+    ///   * δ(e) = min_length(e) = 1 unless requested by user
+    /// * Given any ranking, not necessarily feasible, the "slack" of an edge is the difference of its length and its
+    ///   minimum length.
+    ///   * QUESTION: Is "its minimum length" == MIN_EDGE_LENGTH or just the minmum it can be in a tree?
+    ///   * A(0) -> B(1) -> C(2)
+    ///      \--------------/
+    ///   * vs:
+    ///   * A(0) -> B(1) -> C(1)
+    ///      \--------------/
+    /// * Thus, a ranking is feasible if the slack of every edge is non-negative.
+    /// * An edge is "tight" if its slack is zero.
     ///
     fn set_feasible_tree(&mut self) {
         self.init_rank();
@@ -228,12 +260,17 @@ impl Graph {
                 .expect("Edge is not incident");
             self.get_node_mut(node_idx).feasible_tree_member = true;
             self.get_edge_mut(edge_idx).feasible_tree_member = true;
-
-            // println!("Set edge to tree: {}", self.display_edge(edge_idx));
         }
         self.init_cutvalues();
     }
 
+    /// Calculate the cutvalues of all edges that are part of the current feasible tree.
+    ///
+    /// Documentation from the paper:
+    /// * The init_cutvalues function computes the cut values of the tree edges.
+    ///   * For each tree edge, this is computed by marking the nodes as belonging to the head or tail component,
+    ///   * and then performing the sum of the signed weights of all edges whose head and tail are in different components,
+    ///     * the sign being negative for those edges going from the head to the tail component
     fn init_cutvalues(&mut self) {
         for edge_idx in 0..self.edges.len() {
             let edge = self.get_edge(edge_idx);
@@ -242,7 +279,6 @@ impl Graph {
                 let cut_value = self.transition_weight_sum(&head_nodes, &tail_nodes);
 
                 self.get_edge_mut(edge_idx).cut_value = Some(cut_value);
-
                 // println!(
                 //     "Set cut value for {}: {cut_value}\n  heads: {}\n  tails: {}",
                 //     self.display_edge(edge_idx),
@@ -253,6 +289,9 @@ impl Graph {
         }
     }
 
+    /// Get the head an tail components needed to calculate edge cut values.
+    ///
+    /// Documentation from the paper: page 8
     /// Given a feasible spanning tree, we can associate an integer cut value with each tree edge as follows.
     /// * If the tree edge is deleted, the tree breaks into two connected components:
     ///   * the tail component containing the tail node of the edge,
@@ -266,6 +305,7 @@ impl Graph {
         (head_component, tail_component)
     }
 
+    #[cfg(test)]
     fn display_component(&self, comp: &HashSet<usize>) -> String {
         let mut node_names = vec![];
         for node_idx in comp {
@@ -276,6 +316,11 @@ impl Graph {
         format!("{node_names:?}",)
     }
 
+    /// Collect a head or tail cutset component.
+    ///
+    /// * Given an initial node, consider all edges which are in the feasible tree
+    ///   * ignore the cut edge
+    ///   * if the edge is not yet in this cut set or the opposite cut set, add it.
     fn collect_component_set(
         &self,
         cut_edge_idx: usize,
@@ -296,23 +341,21 @@ impl Graph {
             while let Some(node_idx) = candidate_queue.pop() {
                 let node = self.get_node(node_idx);
 
-                if node.feasible_tree_member {
-                    component_set.insert(node_idx);
+                component_set.insert(node_idx);
 
-                    for edge_idx in node.get_all_edges() {
-                        let edge = self.get_edge(*edge_idx);
+                for edge_idx in node.get_all_edges().filter(|edge_idx| {
+                    let edge_idx = **edge_idx;
 
-                        if edge.feasible_tree_member && *edge_idx != cut_edge_idx {
-                            let candidate_node_idx = self
-                                .get_connected_node(node_idx, *edge_idx)
-                                .expect("edge not connected");
+                    edge_idx != cut_edge_idx && self.get_edge(edge_idx).feasible_tree_member
+                }) {
+                    let candidate_node_idx = self
+                        .get_connected_node(node_idx, *edge_idx)
+                        .expect("edge not connected");
 
-                            if !component_set.contains(&candidate_node_idx)
-                                && !opposite.contains(&candidate_node_idx)
-                            {
-                                candidate_queue.push(candidate_node_idx);
-                            }
-                        }
+                    if !component_set.contains(&candidate_node_idx)
+                        && !opposite.contains(&candidate_node_idx)
+                    {
+                        candidate_queue.push(candidate_node_idx);
                     }
                 }
             }
@@ -362,6 +405,12 @@ impl Graph {
         }
     }
 
+    /// Return the count of nodes that are in the current feasible tree under consideration.
+    ///
+    /// tight_tree is used during the node ranking phase.
+    ///
+    /// TODO: make this O(1) by keeping track of the count of nodes which are currently "feasible".
+    ///
     /// Documentation from the paper:
     /// * The function tight_tree() ﬁnds a maximal tree of tight edges containing some ﬁxed node.
     ///   * tight_tree() returns the number of nodes in the tree.
@@ -379,30 +428,6 @@ impl Graph {
     ///   number of edges while still being a tree.
     ///   * A spanning tree of a graph is a subgraph that is a tree and includes all the vertices of the original graph.
     ///   * A spanning tree is said to be "maximal" if no additional edges can be added to it without creating a cycle.
-    ///
-    /// Additional papar details:
-    /// * A feasible ranking is one satisfying the length constraints l(e) ≥ δ(e) for all e.
-    ///   * Thus, a ranking where the all edge rankings are > min_length().  Thus no rank < 1
-    ///   * l(e) = length(e) = rank(e1)-rank(e2) = rank_diff(e)
-    ///     * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
-    ///     * λ(w) − λ(v) = rank(w) - rank(v)
-    ///   * δ(e) = min_length(e) = 1 unless requested by user
-    /// * Given any ranking, not necessarily feasible, the "slack" of an edge is the difference of its length and its
-    ///   minimum length.
-    ///   * QUESTION: Is "its minimum length" == MIN_EDGE_LENGTH or just the minmum it can be in a tree?
-    ///   * A(0) -> B(1) -> C(2)
-    ///      \--------------/
-    ///   * vs:
-    ///   * A(0) -> B(1) -> C(1)
-    ///      \--------------/
-    /// * Thus, a ranking is feasible if the slack of every edge is non-negative.
-    /// * An edge is "tight" if its slack is zero.
-    ///
-    /// Return the count of nodes that are in the current feasible tree under consideration.
-    ///
-    /// tight_tree is used durint the node ranking phase.
-    ///
-    /// TODO: make this O(1) by keeping track of the count of nodes which are currently "feasible".
     fn tight_tree(&self) -> usize {
         self.nodes
             .iter()
@@ -647,7 +672,8 @@ impl Graph {
     ///   * The purpose is to reduce crowding and improve the aspect ratio of the drawing, following principle A4.
     ///   * The adjustment does not change the cost of the rank assignment.
     ///   * Nodes are adjusted in a greedy fashion, which works sufﬁciently well.
-    ///   * Globally balancing ranks is considered in a forthcoming paper [GNV2].
+    ///   * Globally balancing ranks is considered in a forthcoming paper [GNV2]: "On the Rank Assignment Problem"
+    ///     * Unclear if this paper was ever created or submitted
     fn balance(&mut self) {
         todo!();
     }
@@ -684,7 +710,11 @@ impl Display for Graph {
     }
 }
 
-// Node of a graph.  Sometimes called a vertice.
+// Represents the node element of a graph.  Sometimes called a vertice.
+//
+// Nodes are connected together via Edges.  Each node has a list of edges coming in and edges
+// going out of this node.  Note that this means that each edge is represented twice: Once in
+// the outgoing node, and once in the incoming node.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Node {
     // Arbitrary name set by the user.  Duplicates are possible, and up to the user to control.
@@ -700,7 +730,7 @@ pub struct Node {
     feasible_tree_member: bool,
 }
 
-// Whether a edge is incoming our outgoing with respect to a particular node.
+// EdgeDisposition indicates whether a edge is incoming our outgoing with respect to a particular node.
 #[derive(Eq, PartialEq)]
 enum EdgeDisposition {
     In,
@@ -708,6 +738,7 @@ enum EdgeDisposition {
 }
 
 impl Node {
+    /// Return a new node which is not yet connected to a graph.
     pub fn new(name: &str) -> Self {
         Node {
             name: name.to_string(),
@@ -829,7 +860,7 @@ mod tests {
     use super::*;
     use std::ops::Range;
 
-    /// Additional test only functions for Graph.
+    /// Additional test only functions for Graph to make graph construction testing easier.
     impl Graph {
         /// Add multiple nodes with names given from a range of characters.
         ///
