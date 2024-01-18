@@ -6,12 +6,20 @@ use std::{
 const MIN_EDGE_LENGTH: u32 = 1;
 const MIN_EDGE_WEIGHT: u32 = 1;
 
+/// Simplist posible representation of a graph until more is needed.
+/// 
+/// Chose to use indexed arrays to avoid interior mutability for now,
+/// as well as maps or sets.  Both could change when I see the need.
 #[derive(Debug)]
 pub struct Graph {
+    /// All nodes in the graph.
     nodes: Vec<Node>,
+    /// All edges in the graph.
     edges: Vec<Edge>,
 }
 
+/// Enum used for calculating cut values for edges.
+/// To do so, graph nodes need to be placed in either a head or tail component.
 #[derive(Eq, PartialEq)]
 enum CutSet {
     /// Head component of a cut set
@@ -607,21 +615,23 @@ impl Display for Graph {
     }
 }
 
+// Node of a graph.  Sometimes called a vertice.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Node {
     // Arbitrary name set by the user.  Duplicates are possible, and up to the user to control.
     name: String,
     // Rank is computed as part of the graphing process.
     rank: Option<u32>,
-    // Edges incoming to this node.  Each entry is a node index.
+    // Edges incoming to this node.  Each entry is a edge index into the graph's edges list.
     in_edges: Vec<usize>,
-    // Edges outcoming from this node.  Each entry is a node index.
+    // Edges outcoming from this node.  Each entry is a edge index into the graph's edges list.
     out_edges: Vec<usize>,
 
     // True if this node is part of the "feasible" tree under consideration.  Used during ranking.
     feasible_tree_member: bool,
 }
 
+// Whether a edge is incoming our outgoing with respect to a particular node.
 #[derive(Eq, PartialEq)]
 enum EdgeDisposition {
     In,
@@ -655,6 +665,7 @@ impl Node {
         }
     }
 
+    /// Return all in and out edges associated with a node.
     fn get_all_edges(&self) -> impl Iterator<Item = &usize> {
         self.out_edges.iter().chain(self.in_edges.iter())
     }
@@ -671,14 +682,20 @@ impl Node {
         true
     }
 
+    /// True if there are no incoming edges to a node.
     fn no_in_edges(&self) -> bool {
         self.get_edges(EdgeDisposition::In).is_empty()
     }
 
+    /// True if there are no outgoing edges to a node.
     fn no_out_edges(&self) -> bool {
         self.get_edges(EdgeDisposition::Out).is_empty()
     }
 
+    /// Sets the rank of a node.
+    /// 
+    /// Rank corresponds to the vertical placement of a node.  The greater the rank,
+    /// the lower the placement on a canvas.
     fn set_rank(&mut self, rank: Option<u32>) {
         self.rank = rank;
     }
@@ -690,13 +707,12 @@ impl Display for Node {
     }
 }
 
-/// An edge connects to nodes in a graph, and points from one node
-/// to another.
+/// An edge connects to nodes in a graph, and points from src_node to dst_node.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Edge {
-    /// Node that this edge points from.
+    /// Node that this edge points from.  This is an index into graph.nodes.
     src_node: usize,
-    /// Node that this edge points to.
+    /// Node that this edge points to.  This is an index into graph.nodes.
     dst_node: usize,
 
     /// The following fields are used for rank calculation:
