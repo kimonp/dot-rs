@@ -735,10 +735,10 @@ mod tests {
     /// Additional test only functions for Graph.
     impl Graph {
         /// Add multiple nodes with names given from a range of characters.
-        /// 
+        ///
         /// Returns a HashMap of the created node names and node indexes to be
         /// used with add_edges().
-        /// 
+        ///
         /// * Nodes must be named after a single character.
         /// * The range is inclusive only of the left side.  So 'a'..'d' incluses: a, b, c but NOT d.
         fn add_nodes(&mut self, range: Range<char>) -> HashMap<String, usize> {
@@ -752,7 +752,7 @@ mod tests {
         }
 
         /// Add a list of edges to the graph, given a map of node names to node indexes.
-        /// 
+        ///
         /// To be used with add_nodes().
         fn add_edges(&mut self, edges: &[(&str, &str)], node_map: &HashMap<String, usize>) {
             for (src_node, dst_node) in edges {
@@ -764,7 +764,7 @@ mod tests {
         }
 
         /// Returns a node index given a node name.
-        /// 
+        ///
         /// Expensive for large data sets: O(n)
         fn name_to_node_idx(&self, name: &str) -> Option<usize> {
             for (node_idx, node) in self.nodes.iter().enumerate() {
@@ -776,7 +776,7 @@ mod tests {
         }
 
         /// Configures the named node by setting the rank and making the node a feasible tree member.
-        /// 
+        ///
         /// Expensive for large data sets: O(n)
         fn configure_node(&mut self, name: &str, rank: u32) {
             let node_idx = self.name_to_node_idx(name).unwrap();
@@ -787,7 +787,7 @@ mod tests {
         }
 
         /// Get the edge that has src_node == src_name, dst_node == dst_name.
-        /// 
+        ///
         /// Expensive for large data sets: O(e*n)
         fn get_named_edge(&self, src_name: &str, dst_name: &str) -> &Edge {
             for edge in &self.edges {
@@ -799,6 +799,86 @@ mod tests {
                 }
             }
             panic!("Could not find requested edge: {src_name} -> {dst_name}");
+        }
+
+        // Set the ranks given in example 2-3 (a)
+        fn configure_example_2_3_a() -> (Graph, Vec<(&'static str, &'static str, i32)>) {
+            let mut graph = example_graph_from_paper_2_3();
+            graph.configure_node("a", 0);
+            graph.configure_node("b", 1);
+            graph.configure_node("c", 2);
+            graph.configure_node("d", 3);
+            graph.configure_node("h", 4);
+
+            graph.configure_node("e", 2);
+            graph.configure_node("f", 2);
+            graph.configure_node("g", 3);
+
+            // Set feasible edges given in example 2-3 (a)
+            let e_idx = graph.name_to_node_idx("e").unwrap();
+            let f_idx = graph.name_to_node_idx("f").unwrap();
+            for edge in graph.edges.iter_mut() {
+                if edge.dst_node != e_idx && edge.dst_node != f_idx {
+                    edge.feasible_tree_member = true;
+                }
+            }
+
+            // cutvalues expected in example 2-3 (a)
+            (
+                graph,
+                vec![
+                    ("a", "b", 3),
+                    ("b", "c", 3),
+                    ("c", "d", 3),
+                    ("d", "h", 3),
+                    ("e", "g", 0),
+                    ("f", "g", 0),
+                    ("g", "h", -1),
+                ],
+            )
+        }
+
+        // Set the ranks given in example 2-3 (b)
+        fn configure_example_2_3_b() -> (Graph, Vec<(&'static str, &'static str, i32)>) {
+            let mut graph = example_graph_from_paper_2_3();
+            graph.configure_node("a", 0);
+            graph.configure_node("b", 1);
+            graph.configure_node("c", 2);
+            graph.configure_node("d", 3);
+            graph.configure_node("h", 4);
+
+            graph.configure_node("e", 1);
+            graph.configure_node("f", 1);
+            graph.configure_node("g", 2);
+
+            // Set feasible edges given in example 2-3 (b)
+            let g_idx = graph.name_to_node_idx("g").unwrap();
+            let f_idx = graph.name_to_node_idx("f").unwrap();
+            for edge in graph.edges.iter_mut() {
+                edge.feasible_tree_member = !(edge.src_node == g_idx || edge.dst_node == f_idx);
+            }
+
+            // cutvalues expected in example 2-3 (b)
+            (
+                graph,
+                vec![
+                    ("a", "b", 2),
+                    ("b", "c", 2),
+                    ("c", "d", 2),
+                    ("d", "h", 2),
+                    ("a", "e", 1),
+                    ("e", "g", 1),
+                    ("f", "g", 0),
+                ],
+            )
+        }
+
+        fn assert_expected_cutvals(&self, expected_cutvals: Vec<(&str, &str, i32)>) {
+            for (src_name, dst_name, cut_val) in expected_cutvals {
+                let edge = self.get_named_edge(src_name, dst_name);
+
+                assert_eq!(edge.cut_value, Some(cut_val), "unexpected cut_value");
+            }
         }
     }
 
@@ -1069,88 +1149,20 @@ mod tests {
 
     #[test]
     fn test_init_cut_values_2_3_a() {
-        let mut graph = example_graph_from_paper_2_3();
-        // Set the ranks given in example 2-3 (a)
-        graph.configure_node("a", 0);
-        graph.configure_node("b", 1);
-        graph.configure_node("c", 2);
-        graph.configure_node("d", 3);
-        graph.configure_node("h", 4);
-
-        graph.configure_node("e", 2);
-        graph.configure_node("f", 2);
-        graph.configure_node("g", 3);
-
-        // Set feasible edges given in example 2-3 (a)
-        let e_idx = graph.name_to_node_idx("e").unwrap();
-        let f_idx = graph.name_to_node_idx("f").unwrap();
-        for edge in graph.edges.iter_mut() {
-            if edge.dst_node != e_idx && edge.dst_node != f_idx {
-                edge.feasible_tree_member = true;
-            }
-        }
+        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a();
 
         graph.init_cutvalues();
         println!("{graph}");
-
-        // cutvalues expected in example 2-3 (a)
-        let expected_result = vec![
-            ("a", "b", 3),
-            ("b", "c", 3),
-            ("c", "d", 3),
-            ("d", "h", 3),
-            ("e", "g", 0),
-            ("f", "g", 0),
-            ("g", "h", -1),
-        ];
-
-        for (src_name, dst_name, cut_val) in expected_result {
-            let edge = graph.get_named_edge(src_name, dst_name);
-
-            assert_eq!(edge.cut_value, Some(cut_val), "unexpected cut_value");
-        }
+        graph.assert_expected_cutvals(expected_cutvals);
     }
 
     #[test]
     fn setup_init_cut_values_2_3_b() {
-        let mut graph = example_graph_from_paper_2_3();
-
-        // Set the ranks given in example 2-3 (b)
-        graph.configure_node("a", 0);
-        graph.configure_node("b", 1);
-        graph.configure_node("c", 2);
-        graph.configure_node("d", 3);
-        graph.configure_node("h", 4);
-
-        graph.configure_node("e", 1);
-        graph.configure_node("f", 1);
-        graph.configure_node("g", 2);
-
-        // Set feasible edges given in example 2-3 (b)
-        let g_idx = graph.name_to_node_idx("g").unwrap();
-        let f_idx = graph.name_to_node_idx("f").unwrap();
-        for edge in graph.edges.iter_mut() {
-            edge.feasible_tree_member = !(edge.src_node == g_idx || edge.dst_node == f_idx);
-        }
+        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_b();
 
         graph.init_cutvalues();
         println!("{graph}");
-
-        // cutvalues expected in example 2-3 (b)
-        let expected_result = vec![
-            ("a", "b", 2),
-            ("b", "c", 2),
-            ("c", "d", 2),
-            ("d", "h", 2),
-            ("a", "e", 1),
-            ("e", "g", 1),
-            ("f", "g", 0),
-        ];
-        for (src_name, dst_name, cut_val) in expected_result {
-            let edge = graph.get_named_edge(src_name, dst_name);
-
-            assert_eq!(edge.cut_value, Some(cut_val), "unexpected cut_value");
-        }
+        graph.assert_expected_cutvals(expected_cutvals);
     }
 
     #[test]
