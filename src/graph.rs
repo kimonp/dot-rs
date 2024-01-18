@@ -1070,16 +1070,7 @@ mod tests {
     #[test]
     fn test_init_cut_values_2_3_a() {
         let mut graph = example_graph_from_paper_2_3();
-        let expected_result = vec![
-            ("a", "b", 3),
-            ("b", "c", 3),
-            ("c", "d", 3),
-            ("d", "h", 3),
-            ("e", "g", 0),
-            ("f", "g", 0),
-            ("g", "h", -1),
-        ];
-
+        // Set the ranks given in example 2-3 (a)
         graph.configure_node("a", 0);
         graph.configure_node("b", 1);
         graph.configure_node("c", 2);
@@ -1090,9 +1081,9 @@ mod tests {
         graph.configure_node("f", 2);
         graph.configure_node("g", 3);
 
+        // Set feasible edges given in example 2-3 (a)
         let e_idx = graph.name_to_node_idx("e").unwrap();
         let f_idx = graph.name_to_node_idx("f").unwrap();
-
         for edge in graph.edges.iter_mut() {
             if edge.dst_node != e_idx && edge.dst_node != f_idx {
                 edge.feasible_tree_member = true;
@@ -1101,6 +1092,17 @@ mod tests {
 
         graph.init_cutvalues();
         println!("{graph}");
+
+        // cutvalues expected in example 2-3 (a)
+        let expected_result = vec![
+            ("a", "b", 3),
+            ("b", "c", 3),
+            ("c", "d", 3),
+            ("d", "h", 3),
+            ("e", "g", 0),
+            ("f", "g", 0),
+            ("g", "h", -1),
+        ];
 
         for (src_name, dst_name, cut_val) in expected_result {
             let edge = graph.get_named_edge(src_name, dst_name);
@@ -1112,16 +1114,8 @@ mod tests {
     #[test]
     fn setup_init_cut_values_2_3_b() {
         let mut graph = example_graph_from_paper_2_3();
-        let expected_result = vec![
-            ("a", "b", 2),
-            ("b", "c", 2),
-            ("c", "d", 2),
-            ("d", "h", 2),
-            ("a", "e", 1),
-            ("e", "g", 1),
-            ("f", "g", 0),
-        ];
 
+        // Set the ranks given in example 2-3 (b)
         graph.configure_node("a", 0);
         graph.configure_node("b", 1);
         graph.configure_node("c", 2);
@@ -1132,12 +1126,9 @@ mod tests {
         graph.configure_node("f", 1);
         graph.configure_node("g", 2);
 
+        // Set feasible edges given in example 2-3 (b)
         let g_idx = graph.name_to_node_idx("g").unwrap();
         let f_idx = graph.name_to_node_idx("f").unwrap();
-        let a_idx = graph.name_to_node_idx("a").unwrap();
-
-        println!("a:{a_idx} f:{f_idx} g:{g_idx}");
-
         for edge in graph.edges.iter_mut() {
             edge.feasible_tree_member = !(edge.src_node == g_idx || edge.dst_node == f_idx);
         }
@@ -1145,6 +1136,16 @@ mod tests {
         graph.init_cutvalues();
         println!("{graph}");
 
+        // cutvalues expected in example 2-3 (b)
+        let expected_result = vec![
+            ("a", "b", 2),
+            ("b", "c", 2),
+            ("c", "d", 2),
+            ("d", "h", 2),
+            ("a", "e", 1),
+            ("e", "g", 1),
+            ("f", "g", 0),
+        ];
         for (src_name, dst_name, cut_val) in expected_result {
             let edge = graph.get_named_edge(src_name, dst_name);
 
