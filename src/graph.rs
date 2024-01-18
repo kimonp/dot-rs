@@ -242,24 +242,25 @@ impl Graph {
             let edge_idx = self
                 .get_min_incident_edge()
                 .expect("No incident edges left!");
-            let mut delta = self.slack(edge_idx).expect("Can't calculate slack on edge");
-
-            if self.edge_head_is_incident(edge_idx) {
-                delta = -delta;
-            }
-
-            for node in self.nodes.iter_mut() {
-                if node.feasible_tree_member {
-                    let cur_rank = node.rank.expect("Node does not have rank");
-                    node.rank = Some(cur_rank + delta as u32)
+            let mut delta = if let Some(delta) = self.slack(edge_idx) {
+                if self.edge_head_is_incident(edge_idx) {
+                    -delta
+                } else {
+                    delta
                 }
+            } else {
+                panic!("Can't calculate slack on edge {edge_idx}");
+            };
+
+            for node in self.nodes.iter_mut().filter(|node| node.feasible_tree_member) {
+                let cur_rank = node.rank.expect("Node does not have rank");
+                node.rank = Some(cur_rank + delta as u32)
             }
 
             let node_idx = self
                 .get_incident_node(edge_idx)
                 .expect("Edge is not incident");
             self.get_node_mut(node_idx).feasible_tree_member = true;
-            self.get_edge_mut(edge_idx).feasible_tree_member = true;
         }
         self.init_cutvalues();
     }
@@ -271,6 +272,26 @@ impl Graph {
     ///   * For each tree edge, this is computed by marking the nodes as belonging to the head or tail component,
     ///   * and then performing the sum of the signed weights of all edges whose head and tail are in different components,
     ///     * the sign being negative for those edges going from the head to the tail component
+    /// 
+    /// Optimization TODOs from the paper:
+    /// * In a naive implementation, initial cut values can be found by taking every tree edge in turn,
+    ///   breaking it, labeling each node according to whether it belongs to the head or tail component,
+    ///   and performing the sum.
+    ///   * This takes O(V E) time.
+    ///   * To reduce this cost, we note that the cut values can be computed using information local to an edge
+    ///     if the search is ordered from the leaves of the feasible tree inward.
+    ///     * It is trivial to compute the cut value of a tree edge with one of its endpoints a leaf in the tree,
+    ///       since either the head or the tail component consists of a single node.
+    ///     * Now, assuming the cut values are known for all the edges incident on a given node except one, the
+    ///       cut value of the remaining edge is the sum of the known cut values plus a term dependent only on
+    ///       the edges incident to the given node.
+    /// 
+    /// * Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder traversal
+    ///   of the tree, starting from some ﬁxed root node v root, and labeling each node v with its postorder traversal
+    ///   number lim(v), the least number low(v) of any descendant in the search, and the edge parent(v) by which the
+    ///   node was reached (see ﬁgure 2-5).
+    ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
+    ///     and thus whether a non-tree edge crosses between the two components. 
     fn init_cutvalues(&mut self) {
         for edge_idx in 0..self.edges.len() {
             let edge = self.get_edge(edge_idx);
@@ -441,6 +462,11 @@ impl Graph {
     /// and the other point points to a node that it not within the tree.
     ///
     /// TODO: Make more effecient by keeping a list of incident nodes
+    /// 
+    /// Optimization TODO from the paper:
+    /// * The network simplex is also very sensitive to the choice of the negative edge to replace.
+    /// * We observed that searching cyclically through all the tree edges, instead of searching from the
+    ///   beginning of the list of tree edges every time, can save many iterations.
     fn get_min_incident_edge(&self) -> Option<usize> {
         let mut candidate = None;
         let mut candidate_slack = i32::MAX;
@@ -667,7 +693,7 @@ impl Graph {
         }
     }
 
-    /// Documentation from paper:
+    /// Documentation from paper: page 9
     /// * Nodes having equal in- and out-edge weights and multiple feasible ranks are moved to a feasible rank with the fewest nodes.
     ///   * The purpose is to reduce crowding and improve the aspect ratio of the drawing, following principle A4.
     ///   * The adjustment does not change the cost of the rank assignment.
