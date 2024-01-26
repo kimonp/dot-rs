@@ -1,11 +1,18 @@
-/// Implement a graph that can be drawn using the algorithm described in the 1993 paper:
-/// "A Technique for Drawing Directed Graphs" by Gansner, Koutsofios, North and Vo
-/// 
-/// This paper is referred to as simply "the paper" below.
+//! Implement a graph that can be drawn using the algorithm described in the 1993 paper:
+//! "A Technique for Drawing Directed Graphs" by Gansner, Koutsofios, North and Vo
+//!
+//! This paper is referred to as simply "the paper" below.
+
+mod rank_orderings;
+
+use rank_orderings::RankOrderings;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fmt::Display,
+    mem::replace,
 };
+
+use self::rank_orderings::AdjacentRank;
 
 /// Minimum allowed edge length.  In future implementations, user could set this.
 /// See function of edge length below: edge_length()
@@ -19,8 +26,14 @@ const MIN_EDGE_WEIGHT: u32 = 1;
 /// I chose to use indexed arrays to avoid interior mutability for now,
 /// as well as requiring any maps or sets, because initially it was unclear to me what
 /// would be optimal.  Both could be addressed on a future refactor.
-/// 
+///
 /// TODO:
+/// * Does not handle disconnected nodes, and does not enforce that all nodes must
+///   be connected.  Thus, if you add nodes that are not connected, only the connected
+///   nodes will be graphed in graph_node.
+/// * Individual edge node loops are set to "ignore", and edges are merged to add weight,
+/// * with the other edge set to ignore, but the graph_node() does not take into account
+///   ignored nodes.
 /// * Add an error type and remove all unwrap(), expect() and panic() code.
 /// * Make runtime effecient
 #[derive(Debug)]
@@ -42,7 +55,9 @@ enum CutSet {
 }
 
 impl Default for Graph {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[allow(unused)]
@@ -95,11 +110,66 @@ impl Graph {
         }
     }
 
+    fn get_rank_adjacent_edges(&self, node_idx: usize) -> impl Iterator<Item=(usize, AdjacentRank)> + '_ {
+        let node = self.get_node(node_idx);
+        let node_rank = node.rank;
+
+        node.get_all_edges().cloned().filter_map(move |edge_idx| {
+            if let Some(other_node_idx) = self.get_connected_node(node_idx, edge_idx) {
+                let other_node = self.get_node(other_node_idx);
+
+                if let (Some(n1), Some(n2)) = (node_rank, other_node.rank) {
+                    let diff = n1 as i64 - n2 as i64;
+
+                    if diff == -1  {
+                        Some((edge_idx, AdjacentRank::Below))
+                    } else if diff == 1 {
+                        Some((edge_idx, AdjacentRank::Above))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+    }
+
+    fn get_rank_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
+        let mut above_nodes = vec![];
+        let mut below_nodes = vec![];
+
+        for (edge_idx, direction) in self.get_rank_adjacent_edges(node_idx) {
+            let edge = self.get_edge(edge_idx);
+            let adj_node_idx = if edge.src_node == node_idx {
+                edge.dst_node
+            } else {
+                edge.src_node
+            };
+
+            match direction {
+                AdjacentRank::Above => above_nodes.push(adj_node_idx),
+                AdjacentRank::Below => below_nodes.push(adj_node_idx),
+            }
+        }
+        (above_nodes, below_nodes)
+    }
+
     /// Add a new node identified by name, and return the node's index in the graph.
     pub fn add_node(&mut self, name: &str) -> usize {
         let new_node = Node::new(name);
         let idx = self.nodes.len();
         self.nodes.push(new_node);
+
+        idx
+    }
+
+    /// Add a new node (marked as virtual=true)
+    pub fn add_virtual_node(&mut self) -> usize {
+        let idx = self.add_node("V");
+        self.get_node_mut(idx).virtual_node = true;
 
         idx
     }
@@ -126,7 +196,8 @@ impl Graph {
 
     /// Rank nodes in the graph using the network simplex algorithm described in [TSE93].
     pub fn rank(&mut self) {
-        self.merge_edges_and_ignore_loops();
+        self.merge_edges();
+        self.make_asyclic();
 
         self.set_feasible_tree();
         while let Some(neg_cut_edge_idx) = self.leave_edge() {
@@ -139,21 +210,129 @@ impl Graph {
         // self.balance();
     }
 
-    /// TODO: This does not make the graph asyclic by using the "reverse" field in nodes, and it should.
+    /// make_asyclic() removes cycles from the graph.
+    /// * starting with "source nodes" (nodes with only outgoing edges) it does a depth first search (DFS).
+    ///   * "visited" nodes have their "tree_member" attribute set
+    ///   * when the DFS finds an edge pointing to a visited node, it reverses the direction of the edge,
+    ///     and sets the "reversed" attribute of the edge (so it can be depicted as it was originally)
+    ///     * Trying to reverse an already reversed edge is an error
+    /// * Before finishing, all nodes are checked to see if they have been visited.
+    ///   * If one is found, start a new DFS using this node.
+    ///   * Repeat until all nodes have been visited
     ///
-    /// Right now it only sets edges with the same src and dst to ignore.
-    fn merge_edges_and_ignore_loops(&mut self) {
-        self.merge_edges();
-        self.ignore_self_loops();
+    /// Documentation from the paper: page 6: 2.1: Making the graph asyclic
+    /// * A graph must be acyclic to have a consistent rank assignment.
+    /// * Because the input graph may contain cycles, a preprocessing step detects cycles and
+    ///   breaks them by reversing certain edges [RDM].
+    ///   * Of course these edges are only reversed internally; arrowheads in the drawing show
+    ///     the original direction.
+    /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
+    ///   * Edges are searched in the "natural order" of the graph input, starting from some
+    ///     source or sink nodes if any exist.
+    ///     - a source node is a node in a directed graph that has no incoming edges.
+    ///     - a sink node is a node in a directed graph that has no outgoing edges.
+    ///   * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree edges [AHU].
+    ///     * The tree deﬁnes a partial order on nodes.
+    ///     * Given this partial order, the non-tree edges further partition into three sets:
+    ///       cross edges, forward edges, and back edges.
+    ///       * Cross edges connect unrelated nodes in the partial order.
+    ///       * Forward edges connect a node to some of its descendants.
+    ///       * Back edges connect a descendant to some of its ancestors.
+    ///    * It is clear that adding forward and cross edges to the partial order does not create cycles.
+    ///    * Because reversing back edges makes them into forward edges, all cycles are broken by this procedure.
+    fn make_asyclic(&mut self) {
+        self.ignore_node_loops();
+
+        let mut queue = self.get_source_nodes();
+        self.set_asyclic_tree(&mut queue);
+
+        let mut start = 0;
+        while let Some(non_tree_node_idx) = self.get_next_non_tree_node_idx(start) {
+            queue.push_front(non_tree_node_idx);
+            self.set_asyclic_tree(&mut queue);
+
+            start = non_tree_node_idx + 1;
+        }
     }
 
-    /// TODO: Consider doing this when the edge is added...
-    fn ignore_self_loops(&mut self) {
-        for edge in self.edges.iter_mut() {
-            if edge.src_node == edge.dst_node {
-                edge.ignored = true;
+    /// Ignore individual edges that loop to and from the same node.
+    fn ignore_node_loops(&mut self) {
+        self.edges
+            .iter_mut()
+            .filter(|edge| edge.src_node == edge.dst_node)
+            .for_each(|edge| edge.ignored = true);
+    }
+
+    /// Beginning with start, return the first index that is not yet marked as part of the tree.
+    fn get_next_non_tree_node_idx(&self, start: usize) -> Option<usize> {
+        for (index, node) in self.nodes.iter().skip(start).enumerate() {
+            let node_idx = start + index;
+            if !node.tree_node {
+                return Some(node_idx);
             }
         }
+        None
+    }
+
+    /// Return a queue of nodes that don't have incoming edges (source nodes).
+    fn get_source_nodes(&self) -> VecDeque<usize> {
+        let mut queue = VecDeque::new();
+
+        for (node_idx, node) in self
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(i, n)| n.no_in_edges())
+        {
+            queue.push_back(node_idx);
+        }
+        queue
+    }
+
+    /// Given a queue of source nodes, mark a tree of asyclic nodes.
+    /// * Do a depth first search starting fron the source nodes
+    /// * Mark any nodes visited as "tree_node"
+    /// * If any edges point to a previously visted node, reverse those edges.
+    fn set_asyclic_tree(&mut self, queue: &mut VecDeque<usize>) {
+        while let Some(node_idx) = queue.pop_front() {
+            let node = self.get_node_mut(node_idx);
+            node.tree_node = true;
+
+            let node = self.get_node(node_idx);
+            let mut edges_to_reverse = Vec::new();
+            for edge_idx in node.out_edges.iter().cloned() {
+                let edge = self.get_edge(edge_idx);
+                let dst_node = self.get_node(edge.dst_node);
+
+                if !dst_node.tree_node {
+                    queue.push_back(edge.dst_node);
+                } else {
+                    edges_to_reverse.push(edge_idx);
+                }
+            }
+            for edge_idx in edges_to_reverse {
+                self.reverse_edge(edge_idx);
+            }
+        }
+    }
+
+    fn reverse_edge(&mut self, edge_idx_to_reverse: usize) {
+        let (src_node_idx, dst_node_idx) = {
+            let edge = self.get_edge(edge_idx_to_reverse);
+
+            (edge.src_node, edge.dst_node)
+        };
+
+        // Swap the references in src and dst nodes
+        self.get_node_mut(src_node_idx)
+            .swap_edge_in_list(edge_idx_to_reverse, EdgeDisposition::Out);
+        self.get_node_mut(dst_node_idx)
+            .swap_edge_in_list(edge_idx_to_reverse, EdgeDisposition::In);
+
+        // Reverse the edge itself and set it to "reversed"
+        let edge = self.get_edge_mut(edge_idx_to_reverse);
+        edge.src_node = replace(&mut edge.dst_node, edge.src_node);
+        edge.reversed = true;
     }
 
     /// Merge any redundant edges by marking them ignored and adding their weight to the matching edge.
@@ -229,9 +408,7 @@ impl Graph {
         self.init_rank();
 
         for node in self.nodes.iter_mut() {
-            if node.no_out_edges() {
-                node.feasible_tree_member = true;
-            }
+            node.tree_node = node.no_out_edges();
         }
 
         while self.tight_tree() < self.node_count() {
@@ -252,7 +429,7 @@ impl Graph {
                 panic!("Can't calculate slack on edge {edge_idx}");
             };
 
-            for node in self.nodes.iter_mut().filter(|node| node.feasible_tree_member) {
+            for node in self.nodes.iter_mut().filter(|node| node.tree_node) {
                 let cur_rank = node.rank.expect("Node does not have rank");
                 node.rank = Some(cur_rank + delta as u32)
             }
@@ -260,7 +437,8 @@ impl Graph {
             let node_idx = self
                 .get_incident_node(edge_idx)
                 .expect("Edge is not incident");
-            self.get_node_mut(node_idx).feasible_tree_member = true;
+            self.get_node_mut(node_idx).tree_node = true;
+            self.get_edge_mut(edge_idx).feasible_tree_member = true;
         }
         self.init_cutvalues();
     }
@@ -272,7 +450,7 @@ impl Graph {
     ///   * For each tree edge, this is computed by marking the nodes as belonging to the head or tail component,
     ///   * and then performing the sum of the signed weights of all edges whose head and tail are in different components,
     ///     * the sign being negative for those edges going from the head to the tail component
-    /// 
+    ///
     /// Optimization TODOs from the paper:
     /// * In a naive implementation, initial cut values can be found by taking every tree edge in turn,
     ///   breaking it, labeling each node according to whether it belongs to the head or tail component,
@@ -285,13 +463,13 @@ impl Graph {
     ///     * Now, assuming the cut values are known for all the edges incident on a given node except one, the
     ///       cut value of the remaining edge is the sum of the known cut values plus a term dependent only on
     ///       the edges incident to the given node.
-    /// 
+    ///
     /// * Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder traversal
     ///   of the tree, starting from some ﬁxed root node v root, and labeling each node v with its postorder traversal
     ///   number lim(v), the least number low(v) of any descendant in the search, and the edge parent(v) by which the
     ///   node was reached (see ﬁgure 2-5).
     ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
-    ///     and thus whether a non-tree edge crosses between the two components. 
+    ///     and thus whether a non-tree edge crosses between the two components.
     fn init_cutvalues(&mut self) {
         for edge_idx in 0..self.edges.len() {
             let edge = self.get_edge(edge_idx);
@@ -407,7 +585,7 @@ impl Graph {
         let src_node = self.get_node(edge.src_node);
         let dst_node = self.get_node(edge.dst_node);
 
-        !src_node.feasible_tree_member && dst_node.feasible_tree_member
+        !src_node.tree_node && dst_node.tree_node
     }
 
     /// edge_index is expected to span two nodes, one of which is in the tree, one of which is not.
@@ -417,9 +595,9 @@ impl Graph {
         let src_node = self.get_node(edge.src_node);
         let dst_node = self.get_node(edge.dst_node);
 
-        if !src_node.feasible_tree_member && dst_node.feasible_tree_member {
+        if !src_node.tree_node && dst_node.tree_node {
             Some(edge.src_node)
-        } else if src_node.feasible_tree_member && !dst_node.feasible_tree_member {
+        } else if src_node.tree_node && !dst_node.tree_node {
             Some(edge.dst_node)
         } else {
             None
@@ -450,10 +628,7 @@ impl Graph {
     ///   * A spanning tree of a graph is a subgraph that is a tree and includes all the vertices of the original graph.
     ///   * A spanning tree is said to be "maximal" if no additional edges can be added to it without creating a cycle.
     fn tight_tree(&self) -> usize {
-        self.nodes
-            .iter()
-            .filter(|node| node.feasible_tree_member)
-            .count()
+        self.nodes.iter().filter(|node| node.tree_node).count()
     }
 
     /// Return an edge with the smallest slack of any edge which is incident to the tree.
@@ -462,7 +637,7 @@ impl Graph {
     /// and the other point points to a node that it not within the tree.
     ///
     /// TODO: Make more effecient by keeping a list of incident nodes
-    /// 
+    ///
     /// Optimization TODO from the paper:
     /// * The network simplex is also very sensitive to the choice of the negative edge to replace.
     /// * We observed that searching cyclically through all the tree edges, instead of searching from the
@@ -472,13 +647,13 @@ impl Graph {
         let mut candidate_slack = i32::MAX;
 
         for (node_idx, node) in self.nodes.iter().enumerate() {
-            if node.feasible_tree_member {
+            if node.tree_node {
                 for edge_idx in node.get_all_edges() {
                     let connected_node_idx = self
                         .get_connected_node(node_idx, *edge_idx)
                         .expect("Edge not connected");
 
-                    if !self.get_node(connected_node_idx).feasible_tree_member {
+                    if !self.get_node(connected_node_idx).tree_node {
                         let slack = self.slack(*edge_idx).expect("Can't calculate slack");
 
                         if candidate.is_none() || slack < candidate_slack {
@@ -495,11 +670,11 @@ impl Graph {
     /// Get an edge that spans a node which is in the feasible tree with another node that is not.
     fn get_next_feasible_edge(&self) -> Option<usize> {
         for node in self.nodes.iter() {
-            if node.feasible_tree_member {
+            if node.tree_node {
                 for edge_idx in &node.out_edges {
                     let dst_node = self.get_edge(*edge_idx).dst_node;
 
-                    if !self.get_node(dst_node).feasible_tree_member {
+                    if !self.get_node(dst_node).tree_node {
                         return Some(*edge_idx);
                     }
                 }
@@ -521,8 +696,13 @@ impl Graph {
     ///
     /// An edge is "tight" if it's slack is zero.
     fn slack(&self, edge_idx: usize) -> Option<i32> {
-        self.edge_length(edge_idx)
-            .map(|len| len - (MIN_EDGE_LENGTH as i32))
+        self.edge_length(edge_idx).map(|len| {
+            if len > 0 {
+                len - (MIN_EDGE_LENGTH as i32)
+            } else {
+                len + (MIN_EDGE_LENGTH as i32)
+            }
+        })
     }
 
     /// edge_length() is the rank difference between src and dst nodes of the edge.
@@ -549,7 +729,7 @@ impl Graph {
 
     /// Documentation from the paper:
     /// * Nodes with no unscanned in-edges are placed in a queue.
-    ///   * CLARIFICATION: Frist place all nodes with no in-edges in a queue.
+    ///   * CLARIFICATION: First place all nodes with no in-edges in a queue.
     /// * As nodes are taken off the queue, they are assigned the least rank
     ///   that satisfies their in-edges, and their out-edges are marked as scanned.
     /// * In the simplist case, where minLength() == 1 for all edges, this corresponds
@@ -557,8 +737,8 @@ impl Graph {
     ///   the minimal elements to rank 0.  These nodes are removed from the poset and the
     ///   new set of minimal elements are assigned rank 1, etc.
     ///
-    //// TODO: Don't we have to remove redundant edges and ensure the graph is
-    ///        not circular to befor we even start this?
+    //// TODO: Don't we have to remove redundant edges and ensure the graph is not circular
+    ///  before we even start this?
     ///
     ///   * In my implementation:
     ///     * Initialize:
@@ -585,7 +765,7 @@ impl Graph {
         // are scanned yet)
         for (index, node) in self.nodes.iter_mut().enumerate() {
             node.set_rank(None);
-            node.feasible_tree_member = false;
+            node.tree_node = false;
 
             if node.no_in_edges() {
                 nodes_to_rank.push(index);
@@ -704,8 +884,212 @@ impl Graph {
         todo!();
     }
 
-    fn ordering(&mut self) {
-        todo!();
+    /// Documentation from paper: page 14
+    ///
+    /// * TODO: In an actual implementation, one might prefer an adaptive strategy that
+    ///   iterates as long as the solution has improved at least a few percent
+    ///   over the last several iterations.
+    /// ordering {
+    ///     order = init_order();
+    ///     best = order;
+    ///     for i=0 to max_iterations {
+    ///         wmedian(order, i)
+    ///         transpose(order)
+    ///         if crossing(order) < crossing(best) {
+    ///             best = order;
+    ///         }
+    ///     }
+    ///     return best
+    /// }
+    fn ordering(&mut self) -> RankOrderings {
+        const MAX_ITERATIONS: usize = 24;
+        let order = self.init_order();
+        let best = order.clone();
+
+        for i in 0..MAX_ITERATIONS {
+            order.weighted_median(i)
+            // transpose(order)
+            // if crossing(order) < crossing(best) {
+            //     best = order;
+            // }
+        }
+
+        best
+    }
+
+    /// Set the initial ordering of the nodes, and return a RankOrderings object to optimize node orderings.
+    fn init_order(&mut self) -> RankOrderings {
+        let order = self.get_initial_ordering();
+
+        self.fill_rank_gaps(&order);
+        self.set_adjacent_nodes_in_ranks(&order);
+
+        order
+    }
+
+    /// Edges between nodes more than one rank apart are replaced by chains of virtual nodes.
+    ///
+    /// After runing, no edge spans more than one rank.
+    ///
+    /// Documentation from paper: page 13
+    /// * After rank assignment, edges between nodes more than one rank apart are
+    ///   replaced by chains of unit length edges between temporary or ‘‘virtual’’ nodes.
+    /// * The virtual nodes are placed on the intermediate ranks, converting the original
+    ///   graph into one whose edges connect only nodes on adjacent ranks.
+    /// * Self- edges are ignored in this pass, and multi-edges are merged as in the previous pass
+    fn fill_rank_gaps(&mut self, order: &RankOrderings) {
+        // let new_virtual_nodes = HashMap<u32, Hash
+        for (rank, rank_order) in order.iter() {
+            for node_idx in rank_order.iter() {
+                let node_edges = self
+                    .get_node(*node_idx)
+                    .get_all_edges()
+                    .cloned()
+                    .collect::<Vec<usize>>();
+
+                for edge_idx in node_edges {
+                    if let Some(slack) = self.slack(edge_idx) {
+                        if slack != 0 {
+                            self.replace_edge_with_virtual_chain(edge_idx, *rank, slack);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn replace_edge_with_virtual_chain(&mut self, edge_idx: usize, rank: u32, slack: i32) {
+        let mut remaining_slack = slack;
+        let reverse_edge = slack < 0;
+
+        let mut cur_edge_idx = edge_idx;
+        let mut new_rank = rank;
+        while remaining_slack != 0 {
+            new_rank = if reverse_edge {
+                new_rank - 1
+            } else {
+                new_rank + 1
+            };
+
+            let virt_node_idx = self.add_virtual_node();
+            self.get_node_mut(virt_node_idx).rank = Some(new_rank);
+
+            let old_edge = self.get_edge_mut(cur_edge_idx);
+            let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
+
+            cur_edge_idx = self.add_edge(virt_node_idx, orig_dst);
+
+            remaining_slack += if reverse_edge { 1 } else { -1 };
+        }
+    }
+
+    /// Return an initial ordering of the graph ranks.
+    ///
+    /// * The initial ordering is a map of ranks.
+    /// * Each rank is a set of NodePositions.
+    ///   * The position of each node in the rank is in the NodePosition, as well
+    ///     as the node_idx.
+    ///
+    /// * Start with the nodes in the minimal rank (presumably rank 0)
+    ///  * Do a depth first seach by following edges that point to nodes that
+    ///    have not yet been assigned an ordering
+    ///    * When we find a node that has no edges that have not been assigned
+    ///      * Add it to the rank_order BTreeMap under it's given rank
+    ///      * Mark it assigned
+    ///    * When we find a node that has edges that have not yet been assigned
+    ///      * push the found node back onto the front of the queue.
+    ///      * push the all the unassinged nodes the node's edges point to on the front of the queue
+    /// * Continue until the queue in empty and return the rank order.
+    ///
+    /// Documentation from paper: page 14
+    /// init_order initially orders the nodes in each rank.
+    /// * This may be done by a depth-ﬁrst or breadth-ﬁrst search starting with vertices of minimum rank.
+    ///   * Vertices are assigned positions in their ranks in left-to-right order as the search progresses.
+    ///     * This strategy ensures that the initial ordering of a tree has no crossings.
+    ///     * This is important because such crossings are obvious, easily- avoided "mistakes."
+    fn get_initial_ordering(&mut self) -> RankOrderings {
+        let mut rank_order = RankOrderings::new();
+        let mut dfs_queue = self.get_min_rank_nodes();
+        let mut assigned = HashSet::new();
+
+        while let Some(node_idx) = dfs_queue.pop_front() {
+            let node = self.get_node(node_idx);
+            let unassigned_dst_nodes = node
+                .out_edges
+                .iter()
+                .cloned()
+                .filter_map(|edge_idx| {
+                    let edge = self.get_edge(edge_idx);
+
+                    if assigned.get(&edge.dst_node).is_none() {
+                        Some(edge.dst_node)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<usize>>();
+
+            if unassigned_dst_nodes.is_empty() {
+                if let Some(rank) = node.rank {
+                    assigned.insert(node_idx);
+                    rank_order.add_node_idx_to_rank(rank, node_idx);
+                }
+            } else {
+                dfs_queue.push_front(node_idx);
+                for node_idx in unassigned_dst_nodes {
+                    dfs_queue.push_front(node_idx);
+                }
+            }
+        }
+        rank_order
+    }
+
+    /// The graph is reponsible for setting adjacent nodes in the rank_order once all nodes have been added to it.
+    fn set_adjacent_nodes_in_ranks(&self, rank_order: &RankOrderings) {
+        for (node_idx, node_position) in rank_order.iter_nodes() {
+            let (above_adj, below_adj) = self.get_rank_adjacent_nodes(*node_idx);
+
+            rank_order.set_adjacent_nodes(*node_idx, &above_adj, &below_adj);
+        }
+    }
+
+    /// Return a VecDequeue of nodes which have minimum rank.
+    ///
+    /// * Assumes that the graph has been ranked
+    fn get_min_rank_nodes(&self) -> VecDeque<usize> {
+        let mut min_rank_nodes = VecDeque::new();
+        let min_rank = self.nodes.iter().min().and_then(|min_node| min_node.rank);
+
+        for (node_idx, node) in self.nodes.iter().enumerate() {
+            if node.rank == min_rank {
+                min_rank_nodes.push_back(node_idx);
+            }
+        }
+        min_rank_nodes
+    }
+
+    /// Return a hash map of rank -> vec<node_idx> as well as the minimum rank
+    fn get_rank_map(&self) -> (Option<u32>, HashMap<u32, Vec<usize>>) {
+        let mut ranks: HashMap<u32, Vec<usize>> = HashMap::new();
+        let mut min_rank = None;
+
+        for (node_idx, node) in self.nodes.iter().enumerate() {
+            if let Some(rank) = node.rank {
+                if let Some(level) = ranks.get_mut(&rank) {
+                    level.push(node_idx);
+                } else {
+                    ranks.insert(rank, vec![node_idx]);
+                }
+
+                min_rank = if let Some(min_rank) = min_rank {
+                    Some(u32::min(min_rank, rank))
+                } else {
+                    Some(rank)
+                };
+            }
+        }
+
+        (min_rank, ranks)
     }
 
     fn position(&mut self) {
@@ -753,11 +1137,13 @@ pub struct Node {
     out_edges: Vec<usize>,
 
     // True if this node is part of the "feasible" tree under consideration.  Used during ranking.
-    feasible_tree_member: bool,
+    tree_node: bool,
+    // Added as a placeholder node during position assignement or other part of graphinc
+    virtual_node: bool,
 }
 
 // EdgeDisposition indicates whether a edge is incoming our outgoing with respect to a particular node.
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum EdgeDisposition {
     In,
     Out,
@@ -771,7 +1157,8 @@ impl Node {
             rank: None,
             in_edges: vec![],
             out_edges: vec![],
-            feasible_tree_member: false,
+            tree_node: false,
+            virtual_node: false,
         }
     }
 
@@ -794,6 +1181,50 @@ impl Node {
     /// Return all in and out edges associated with a node.
     fn get_all_edges(&self) -> impl Iterator<Item = &usize> {
         self.out_edges.iter().chain(self.in_edges.iter())
+    }
+
+    /// Swap an edge from in_edges to out_edges or vice versa, depending on disposition.
+    fn swap_edge_in_list(&mut self, edge_idx: usize, disposition: EdgeDisposition) {
+        let local_idx =
+            if let Some(local_idx) = self.find_internal_edge_index(edge_idx, disposition) {
+                local_idx
+            } else {
+                panic!("Could not find edge {disposition:?}:{edge_idx} to reverse in src node.");
+            };
+
+        match disposition {
+            EdgeDisposition::In => {
+                self.in_edges.remove(local_idx);
+                self.out_edges.push(edge_idx);
+            }
+            EdgeDisposition::Out => {
+                self.out_edges.remove(local_idx);
+                self.in_edges.push(edge_idx);
+            }
+        }
+    }
+
+    fn find_internal_edge_index(
+        &self,
+        edge_idx_to_find: usize,
+        disposition: EdgeDisposition,
+    ) -> Option<usize> {
+        let edge_list = self.get_edge_list(disposition);
+
+        for (internal_idx, edge_idx) in edge_list.iter().enumerate() {
+            if edge_idx_to_find == *edge_idx {
+                return Some(internal_idx);
+            }
+        }
+
+        None
+    }
+
+    fn get_edge_list(&self, disposition: EdgeDisposition) -> &Vec<usize> {
+        match disposition {
+            EdgeDisposition::In => &self.in_edges,
+            EdgeDisposition::Out => &self.out_edges,
+        }
     }
 
     // Return true if none of the incoming edges to node are in the set scanned_edges.
@@ -841,7 +1272,7 @@ impl Ord for Node {
 
 impl PartialOrd for Node {
     fn partial_cmp(&self, other: &Node) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
@@ -857,7 +1288,9 @@ pub struct Edge {
 
     /// Weight of the edge,
     weight: u32,
+
     /// If this edge is ignored internally while calculating node ranks.
+    /// TODO: NOTHING CURRENTLY TAKES IGNORED INTO ACCOUNT
     ignored: bool,
     /// If this edge is reversed internally while calculating node ranks.
     reversed: bool,
@@ -884,7 +1317,7 @@ impl Edge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ops::Range;
+    use std::ops::RangeInclusive;
 
     /// Additional test only functions for Graph to make graph construction testing easier.
     impl Graph {
@@ -895,7 +1328,7 @@ mod tests {
         ///
         /// * Nodes must be named after a single character.
         /// * The range is inclusive only of the left side.  So 'a'..'d' incluses: a, b, c but NOT d.
-        fn add_nodes(&mut self, range: Range<char>) -> HashMap<String, usize> {
+        fn add_nodes(&mut self, range: RangeInclusive<char>) -> HashMap<String, usize> {
             let mut index_map = HashMap::new();
 
             for name in range {
@@ -937,7 +1370,7 @@ mod tests {
             let node = self.get_node_mut(node_idx);
 
             node.rank = Some(rank);
-            node.feasible_tree_member = true;
+            node.tree_node = true;
         }
 
         /// Get the edge that has src_node == src_name, dst_node == dst_name.
@@ -1141,15 +1574,15 @@ mod tests {
 
         println!("{graph}");
 
-        graph.get_node_mut(a_idx).feasible_tree_member = true;
+        graph.get_node_mut(a_idx).tree_node = true;
         let min_edge_idx = graph.get_min_incident_edge();
         assert_eq!(min_edge_idx, Some(e1));
 
-        graph.get_node_mut(b_idx).feasible_tree_member = true;
+        graph.get_node_mut(b_idx).tree_node = true;
         let min_edge_idx = graph.get_min_incident_edge();
         assert_eq!(min_edge_idx, Some(e2));
 
-        graph.get_node_mut(c_idx).feasible_tree_member = true;
+        graph.get_node_mut(c_idx).tree_node = true;
         let min_edge_idx = graph.get_min_incident_edge();
         assert_eq!(min_edge_idx, None);
     }
@@ -1170,7 +1603,7 @@ mod tests {
 
         println!("{graph}");
 
-        graph.get_node_mut(a_idx).feasible_tree_member = true;
+        graph.get_node_mut(a_idx).tree_node = true;
         // Graph:(A) <-> B
         //         |    |
         //         |    v
@@ -1242,7 +1675,7 @@ mod tests {
 
     fn example_graph_from_paper_2_3() -> Graph {
         let mut graph = Graph::new();
-        let node_map = graph.add_nodes('a'..'i');
+        let node_map = graph.add_nodes('a'..='h');
         let edges = vec![
             ("a", "b"),
             ("b", "c"),
@@ -1275,6 +1708,95 @@ mod tests {
         graph.init_cutvalues();
         println!("{graph}");
         graph.assert_expected_cutvals(expected_cutvals);
+    }
+
+    #[test]
+    fn test_get_source_nodes_single() {
+        let mut graph = Graph::new();
+        let node_map = graph.add_nodes('a'..='d');
+        let edges = vec![("a", "b"), ("c", "d"), ("d", "c")];
+        graph.add_edges(&edges, &node_map);
+
+        let source_nodes = graph.get_source_nodes();
+        let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
+
+        assert_eq!(source_nodes, vec![0]);
+    }
+
+    #[test]
+    fn test_get_source_nodes_double() {
+        let mut graph = Graph::new();
+        let node_map = graph.add_nodes('a'..='c');
+        let edges = vec![("a", "b"), ("c", "b")];
+        graph.add_edges(&edges, &node_map);
+
+        let source_nodes = graph.get_source_nodes();
+        let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
+
+        assert_eq!(source_nodes, vec![0, 2]);
+    }
+
+    /// Test that two simple cyclic graphs are both made asyclic.
+    #[test]
+    fn test_make_asyclic() {
+        let mut graph = Graph::new();
+
+        let node_map = graph.add_nodes('a'..='d');
+        let edges = vec![("a", "b"), ("b", "a"), ("c", "d"), ("d", "c")];
+        graph.add_edges(&edges, &node_map);
+
+        graph.make_asyclic();
+
+        println!("{graph}");
+
+        let a_b = graph.get_edge(0);
+        let b_a = graph.get_edge(1);
+        let c_d = graph.get_edge(2);
+        let d_c = graph.get_edge(3);
+
+        assert!(!a_b.reversed);
+        assert!(b_a.reversed);
+        assert!(!c_d.reversed);
+        assert!(d_c.reversed);
+
+        assert_eq!(a_b.src_node, *node_map.get("a").unwrap());
+        assert_eq!(a_b.dst_node, *node_map.get("b").unwrap());
+        assert_eq!(b_a.src_node, *node_map.get("a").unwrap());
+        assert_eq!(b_a.dst_node, *node_map.get("b").unwrap());
+    }
+
+    #[test]
+    fn test_get_min_rank() {
+        let mut graph = Graph::new();
+        let node_map = graph.add_nodes('a'..='d');
+        let edges = vec![("a", "b"), ("b", "a"), ("c", "d"), ("c", "a")];
+        graph.add_edges(&edges, &node_map);
+
+        graph.rank();
+
+        let min_rank = graph.get_min_rank_nodes();
+        let min_rank = min_rank.iter().cloned().collect::<Vec<usize>>();
+
+        assert_eq!(
+            min_rank,
+            vec![*node_map.get("c").unwrap()],
+            "min node should be 'c'"
+        );
+    }
+
+    #[test]
+    fn test_get_initial_ordering() {
+        let mut graph = Graph::new();
+        let node_map = graph.add_nodes('a'..='e');
+        let edges = vec![("a", "b"), ("b", "c"), ("b", "d"), ("c", "e"), ("d", "e")];
+        graph.add_edges(&edges, &node_map);
+
+        graph.rank();
+
+        println!("{graph}");
+        let order = graph.get_initial_ordering();
+
+        println!("{order:?}");
     }
 
     #[test]
@@ -1327,4 +1849,19 @@ mod tests {
     //     assert_eq!(graph.nodes[b_idx].rank, Some(1));
     //     assert_eq!(graph.nodes[c_idx].rank, Some(2));
     // }
+    
+    #[test]
+    fn test_fill_rank_gaps() {
+        let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a();
+        graph.init_cutvalues();
+        let order = graph.get_initial_ordering();
+
+        graph.fill_rank_gaps(&order);
+
+        for (edge_idx, _edge) in graph.edges.iter().enumerate() {
+            if let Some(len) = graph.edge_length(edge_idx) {
+                assert!(len.abs() <= MIN_EDGE_LENGTH as i32)
+            }
+        }
+    }
 }
