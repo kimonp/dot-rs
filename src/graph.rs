@@ -110,7 +110,10 @@ impl Graph {
         }
     }
 
-    fn get_rank_adjacent_edges(&self, node_idx: usize) -> impl Iterator<Item=(usize, AdjacentRank)> + '_ {
+    fn get_rank_adjacent_edges(
+        &self,
+        node_idx: usize,
+    ) -> impl Iterator<Item = (usize, AdjacentRank)> + '_ {
         let node = self.get_node(node_idx);
         let node_rank = node.rank;
 
@@ -121,7 +124,7 @@ impl Graph {
                 if let (Some(n1), Some(n2)) = (node_rank, other_node.rank) {
                     let diff = n1 as i64 - n2 as i64;
 
-                    if diff == -1  {
+                    if diff == -1 {
                         Some((edge_idx, AdjacentRank::Below))
                     } else if diff == 1 {
                         Some((edge_idx, AdjacentRank::Above))
@@ -919,9 +922,9 @@ impl Graph {
 
     /// Set the initial ordering of the nodes, and return a RankOrderings object to optimize node orderings.
     fn init_order(&mut self) -> RankOrderings {
-        let order = self.get_initial_ordering();
+        let mut order = self.get_initial_ordering();
 
-        self.fill_rank_gaps(&order);
+        self.fill_rank_gaps(&mut order);
         self.set_adjacent_nodes_in_ranks(&order);
 
         order
@@ -933,14 +936,13 @@ impl Graph {
     ///
     /// Documentation from paper: page 13
     /// * After rank assignment, edges between nodes more than one rank apart are
-    ///   replaced by chains of unit length edges between temporary or ‘‘virtual’’ nodes.
+    ///   replaced by chains of unit length edges between temporary or "virtual" nodes.
     /// * The virtual nodes are placed on the intermediate ranks, converting the original
     ///   graph into one whose edges connect only nodes on adjacent ranks.
     /// * Self- edges are ignored in this pass, and multi-edges are merged as in the previous pass
     fn fill_rank_gaps(&mut self, order: &RankOrderings) {
-        // let new_virtual_nodes = HashMap<u32, Hash
         for (rank, rank_order) in order.iter() {
-            for node_idx in rank_order.iter() {
+            for node_idx in rank_order.borrow().iter() {
                 let node_edges = self
                     .get_node(*node_idx)
                     .get_all_edges()
@@ -950,7 +952,7 @@ impl Graph {
                 for edge_idx in node_edges {
                     if let Some(slack) = self.slack(edge_idx) {
                         if slack != 0 {
-                            self.replace_edge_with_virtual_chain(edge_idx, *rank, slack);
+                            self.replace_edge_with_virtual_chain(edge_idx, *rank, slack, order);
                         }
                     }
                 }
@@ -958,7 +960,13 @@ impl Graph {
         }
     }
 
-    fn replace_edge_with_virtual_chain(&mut self, edge_idx: usize, rank: u32, slack: i32) {
+    fn replace_edge_with_virtual_chain(
+        &mut self,
+        edge_idx: usize,
+        rank: u32,
+        slack: i32,
+        order: &RankOrderings,
+    ) {
         let mut remaining_slack = slack;
         let reverse_edge = slack < 0;
 
@@ -978,6 +986,7 @@ impl Graph {
             let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
 
             cur_edge_idx = self.add_edge(virt_node_idx, orig_dst);
+            order.add_node_idx_to_existing_rank(new_rank, virt_node_idx);
 
             remaining_slack += if reverse_edge { 1 } else { -1 };
         }
@@ -1046,7 +1055,7 @@ impl Graph {
 
     /// The graph is reponsible for setting adjacent nodes in the rank_order once all nodes have been added to it.
     fn set_adjacent_nodes_in_ranks(&self, rank_order: &RankOrderings) {
-        for (node_idx, node_position) in rank_order.iter_nodes() {
+        for (node_idx, node_position) in rank_order.nodes().borrow().iter() {
             let (above_adj, below_adj) = self.get_rank_adjacent_nodes(*node_idx);
 
             rank_order.set_adjacent_nodes(*node_idx, &above_adj, &below_adj);
@@ -1353,7 +1362,7 @@ mod tests {
         /// Returns a node index given a node name.
         ///
         /// Expensive for large data sets: O(n)
-        fn name_to_node_idx(&self, name: &str) -> Option<usize> {
+        pub fn name_to_node_idx(&self, name: &str) -> Option<usize> {
             for (node_idx, node) in self.nodes.iter().enumerate() {
                 if name == node.name {
                     return Some(node_idx);
@@ -1673,7 +1682,7 @@ mod tests {
         // assert_eq!(graph.edge_length(c_a), Some(-2));
     }
 
-    fn example_graph_from_paper_2_3() -> Graph {
+    pub fn example_graph_from_paper_2_3() -> Graph {
         let mut graph = Graph::new();
         let node_map = graph.add_nodes('a'..='h');
         let edges = vec![
@@ -1849,14 +1858,16 @@ mod tests {
     //     assert_eq!(graph.nodes[b_idx].rank, Some(1));
     //     assert_eq!(graph.nodes[c_idx].rank, Some(2));
     // }
-    
+
     #[test]
     fn test_fill_rank_gaps() {
         let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a();
         graph.init_cutvalues();
-        let order = graph.get_initial_ordering();
+        let mut order = graph.get_initial_ordering();
 
-        graph.fill_rank_gaps(&order);
+        println!("{graph}");
+        graph.fill_rank_gaps(&mut order);
+        println!("{graph}");
 
         for (edge_idx, _edge) in graph.edges.iter().enumerate() {
             if let Some(len) = graph.edge_length(edge_idx) {
