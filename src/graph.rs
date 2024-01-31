@@ -3,8 +3,8 @@
 //!
 //! This paper is referred to as simply "the paper" below.
 
-mod rank_orderings;
 mod crossing_lines;
+mod rank_orderings;
 
 use rank_orderings::RankOrderings;
 use std::{
@@ -911,15 +911,15 @@ impl Graph {
         let mut best = order.clone();
 
         for i in 0..MAX_ITERATIONS {
-            println!("Ordering: {i}");
+            println!("Ordering: {i}, cross count: {}", order.crossing_count());
             order.weighted_median(i);
-            println!("{order}");
 
             // transpose(order)
             if order.crossing_count() < best.crossing_count() {
                 best = order.clone();
             }
         }
+        println!("Final order ({} crosses): {best}", best.crossing_count());
 
         best
     }
@@ -1878,5 +1878,14 @@ mod tests {
                 assert!(len.abs() <= MIN_EDGE_LENGTH as i32)
             }
         }
+    }
+
+    #[test]
+    fn test_draw_graph() {
+        let mut graph = example_graph_from_paper_2_3();
+
+        println!("{graph}");
+        graph.draw_graph();
+        println!("{graph}");
     }
 }
