@@ -4,6 +4,7 @@
 //! This paper is referred to as simply "the paper" below.
 
 mod rank_orderings;
+mod crossing_lines;
 
 use rank_orderings::RankOrderings;
 use std::{
@@ -73,8 +74,8 @@ impl Graph {
     pub fn draw_graph(&mut self) {
         self.rank();
         self.ordering();
-        self.position();
-        self.make_splines()
+        // self.position();
+        // self.make_splines()
     }
 
     /// Return the node indexed by node_idx.
@@ -907,14 +908,17 @@ impl Graph {
     fn ordering(&mut self) -> RankOrderings {
         const MAX_ITERATIONS: usize = 24;
         let order = self.init_order();
-        let best = order.clone();
+        let mut best = order.clone();
 
         for i in 0..MAX_ITERATIONS {
-            order.weighted_median(i)
+            println!("Ordering: {i}");
+            order.weighted_median(i);
+            println!("{order}");
+
             // transpose(order)
-            // if crossing(order) < crossing(best) {
-            //     best = order;
-            // }
+            if order.crossing_count() < best.crossing_count() {
+                best = order.clone();
+            }
         }
 
         best
@@ -924,7 +928,7 @@ impl Graph {
     fn init_order(&mut self) -> RankOrderings {
         let mut order = self.get_initial_ordering();
 
-        self.fill_rank_gaps(&mut order);
+        self.fill_rank_gaps(&order);
         self.set_adjacent_nodes_in_ranks(&order);
 
         order
@@ -1863,10 +1867,10 @@ mod tests {
     fn test_fill_rank_gaps() {
         let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a();
         graph.init_cutvalues();
-        let mut order = graph.get_initial_ordering();
+        let order = graph.get_initial_ordering();
 
         println!("{graph}");
-        graph.fill_rank_gaps(&mut order);
+        graph.fill_rank_gaps(&order);
         println!("{graph}");
 
         for (edge_idx, _edge) in graph.edges.iter().enumerate() {
