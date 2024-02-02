@@ -911,15 +911,30 @@ impl Graph {
         let mut best = order.clone();
 
         for i in 0..MAX_ITERATIONS {
-            println!("Ordering: {i}, cross count: {}", order.crossing_count());
-            order.weighted_median(i);
+            // println!("Ordering pass {i}: cross count: {}", order.crossing_count());
 
-            // transpose(order)
-            if order.crossing_count() < best.crossing_count() {
+            order.weighted_median(i);
+            // println!(
+            //     "  After weighed_median: {}\n{order}",
+            //     order.crossing_count()
+            // );
+
+            order.transpose();
+            // println!("  After transpose: {}\n{order}", order.crossing_count());
+
+            let new_crossing_count = order.crossing_count();
+            if new_crossing_count < best.crossing_count() {
                 best = order.clone();
+
+                if new_crossing_count == 0 {
+                    break;
+                }
             }
         }
-        println!("Final order ({} crosses): {best}", best.crossing_count());
+        // println!(
+        //     "-- Final order (crosses: {}): --\n{best}",
+        //     best.crossing_count()
+        // );
 
         best
     }
