@@ -4,6 +4,7 @@
 //! This paper is referred to as simply "the paper" below.
 
 mod crossing_lines;
+mod edge;
 mod node;
 mod rank_orderings;
 
@@ -14,14 +15,7 @@ use std::{
     mem::replace,
 };
 
-use self::{node::Node, rank_orderings::AdjacentRank};
-
-/// Minimum allowed edge length.  In future implementations, user could set this.
-/// See function of edge length below: edge_length()
-const MIN_EDGE_LENGTH: u32 = 1;
-/// Minimum allowed edge weight.  In future implementations, user could set this.
-/// Edge weight could be used when drawing to deletemine the stroke width of an edge.
-const MIN_EDGE_WEIGHT: u32 = 1;
+use self::{edge::{Edge, EdgeDisposition, MIN_EDGE_LENGTH}, node::Node, rank_orderings::AdjacentRank};
 
 /// Simplist posible representation of a graph until more is needed.
 ///
@@ -1293,53 +1287,10 @@ impl Display for Graph {
     }
 }
 
-// EdgeDisposition indicates whether a edge is incoming our outgoing with respect to a particular node.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum EdgeDisposition {
-    In,
-    Out,
-}
-
-/// An edge connects to nodes in a graph, and points from src_node to dst_node.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Edge {
-    /// Node that this edge points from.  This is an index into graph.nodes.
-    src_node: usize,
-    /// Node that this edge points to.  This is an index into graph.nodes.
-    dst_node: usize,
-
-    /// The following fields are used for rank calculation:
-
-    /// Weight of the edge,
-    weight: u32,
-
-    /// If this edge is ignored internally while calculating node ranks.
-    /// TODO: NOTHING CURRENTLY TAKES IGNORED INTO ACCOUNT
-    ignored: bool,
-    /// If this edge is reversed internally while calculating node ranks.
-    reversed: bool,
-    /// Used as port of the algorithm to rank the nodes of the graph.
-    cut_value: Option<i32>,
-    /// True if this edge is part of the feasible tree use to calculate cut values.
-    feasible_tree_member: bool,
-}
-
-impl Edge {
-    pub fn new(src_node: usize, dst_node: usize) -> Self {
-        Edge {
-            src_node,
-            dst_node,
-            weight: MIN_EDGE_WEIGHT,
-            ignored: false,
-            reversed: false,
-            cut_value: None,
-            feasible_tree_member: false,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use tests::edge::MIN_EDGE_WEIGHT;
+
     use super::*;
     use std::ops::RangeInclusive;
 
