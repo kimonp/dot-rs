@@ -4,6 +4,7 @@
 //! This paper is referred to as simply "the paper" below.
 
 mod crossing_lines;
+mod node;
 mod rank_orderings;
 
 use rank_orderings::RankOrderings;
@@ -13,7 +14,7 @@ use std::{
     mem::replace,
 };
 
-use self::rank_orderings::AdjacentRank;
+use self::{node::Node, rank_orderings::AdjacentRank};
 
 /// Minimum allowed edge length.  In future implementations, user could set this.
 /// See function of edge length below: edge_length()
@@ -74,7 +75,7 @@ impl Graph {
     pub fn draw_graph(&mut self) {
         self.rank();
         self.ordering();
-        // self.position();
+        self.position();
         // self.make_splines()
     }
 
@@ -198,7 +199,28 @@ impl Graph {
         idx
     }
 
-    /// Rank nodes in the graph using the network simplex algorithm described in [TSE93].
+    /// Rank nodes in the graph using the network simplex algorithm
+    /// Documentation from the paper: pages 8-9
+    /// * described in [TSE93]
+    ///
+    /// * Figure below describes our version of the network simplex algorithm:
+    ///   * leave_edge returns a tree edge with a negative cut value, or nil if there is none,
+    ///     meaning the solution is optimal.  Any edge with a negative cut value may be selected as the
+    ///     edge to remove.
+    ///   * enter_edge ﬁnds a non-tree edge to replace e.  This is done by breaking the edge e, which
+    ///     divides the tree into a head and tail component. All edges going from the head component to
+    ///     the tail are considered, with an edge of minimum slack being chosen.  This is necessary to
+    ///     maintain feasibility.
+    /// fn rank() {
+    ///     feasible_tree();
+    ///     while (e = leave_edge()) ≠ nil {
+    ///         f = enter_edge(e);
+    ///         exchange(e,f);
+    ///     }
+    ///     normalize();
+    ///     balance();
+    /// }
+    ///
     pub fn rank(&mut self) {
         self.merge_edges();
         self.make_asyclic();
@@ -877,12 +899,17 @@ impl Graph {
         }
     }
 
+    /// TODO:
+    ///
     /// Documentation from paper: page 9
-    /// * Nodes having equal in- and out-edge weights and multiple feasible ranks are moved to a feasible rank with the fewest nodes.
-    ///   * The purpose is to reduce crowding and improve the aspect ratio of the drawing, following principle A4.
+    /// * Nodes having equal in- and out-edge weights and multiple feasible ranks are moved to a feasible rank
+    ///   with the fewest nodes.
+    ///   * The purpose is to reduce crowding and improve the aspect ratio of the drawing,
+    ///     following principle A4.
     ///   * The adjustment does not change the cost of the rank assignment.
     ///   * Nodes are adjusted in a greedy fashion, which works sufﬁciently well.
-    ///   * Globally balancing ranks is considered in a forthcoming paper [GNV2]: "On the Rank Assignment Problem"
+    ///   * Globally balancing ranks is considered in a forthcoming paper [GNV2]:
+    ///     "On the Rank Assignment Problem"
     ///     * Unclear if this paper was ever created or submitted
     fn balance(&mut self) {
         todo!();
@@ -893,6 +920,7 @@ impl Graph {
     /// * TODO: In an actual implementation, one might prefer an adaptive strategy that
     ///   iterates as long as the solution has improved at least a few percent
     ///   over the last several iterations.
+    ///   * Also if no position changes, we can break the loop because it will never improve.
     /// ordering {
     ///     order = init_order();
     ///     best = order;
@@ -1120,12 +1148,129 @@ impl Graph {
         (min_rank, ranks)
     }
 
+    /// Generic Network simplex:
+    ///
+    /// fn network_simplex_example() {
+    ///     network.init()
+    ///     while network.not_optimized(network.optimization_value()) {
+    ///         iterate();
+    ///     }
+    ///  }
+    ///  
+    /// Documentation from paper: 4.2 Optimal Node Placement page 20
+    /// * The method involves constructing an auxiliary graph as illustrated in ﬁgure 4-2.
+    /// * This transformation is the graphical analogue of the algebraic transformation mentioned above
+    ///   for removing the absolute values from the optimization problem.
+    /// * The nodes of the auxiliary graph G′ are the nodes of the original graph G plus,
+    ///   for every edge e in G, there is a new node n.  There are two kinds of edges in G′:
+    ///    * One edge class encodes the cost of the original edges.
+    ///      Every edge e=(u,v) in G is replaced by two edges (new_v_node, u) and (new_v_node, v)
+    ///      with δ=0 and ω=ω(e) Ω(e).
+    ///      * δ(e) = MinLen(edge(v, w)) = minimum length
+    ///      * ω(e) = weight of edge e
+    ///      * Ω(e) = function to bias for straighter long lines (see below)
+    ///    * The other class of edges separates nodes in the same rank.  If v is the left neighbor of w,
+    ///      then G′ has an edge f=e(v,w) with δ(f)=ρ(v,w) and ω(f)=0.
+    ///      * This edge forces the nodes to be sufﬁciently separated but does not affect the cost of the layout.
+    /// * We can now consider the level assignment problem on G′, which can be solved using the network
+    ///   simplex method.
+    ///   * Any solution of the positioning problem on G corresponds to a solution of the level assignment
+    ///     problem on G′ with the same cost. This is achieved by assigning each new_v_node the value
+    ///     min (x_u, x_v), using the notation of ﬁgure 4-2 and where x_u and x_v are the X coordinates assigned
+    ///     to u and v in G.
+    ///   * Conversely, any level assignment in G′ induces a valid positioning in G. In addition, in an optimal
+    ///     level assignment, one of e_u or e_v must have length 0, and the other has length |x_u − x_v|. This
+    ///     means the cost of an original edge (u ,v) in G equals the sum of the cost of the two edges e_u, e_v
+    ///     in G′ and, globally, the two solutions have the same cost.
+    ///   * Thus, optimality of G′ implies optimality for G and solving G′ gives us a solution for G.
     fn position(&mut self) {
-        todo!();
+        // todo!();
+    }
+
+    /// Documentation from paper: 4.2 Optimal Node Placement page 20
+    /// * The method involves constructing an auxiliary graph as illustrated in ﬁgure 4-2.
+    /// * This transformation is the graphical analogue of the algebraic transformation mentioned above
+    ///   for removing the absolute values from the optimization problem.
+    /// * The nodes of the auxiliary graph G′ are the nodes of the original graph G plus,
+    ///   for every edge e in G, there is a new node n.  There are two kinds of edges in G′:
+    ///    * One edge class encodes the cost of the original edges.
+    ///      Every edge e=(u,v) in G is replaced by two edges (new_v_node, u) and (new_v_node, v)
+    ///      with δ=0 and ω=ω(e) Ω(e).
+    ///      * δ(e) = MinLen(edge(v, w)) = minimum length
+    ///      * ω(e) = weight of edge e
+    ///      * Ω(e) = function to bias for straighter long lines (see below)
+    ///    * The other class of edges separates nodes in the same rank.  If v is the left neighbor of w,
+    ///      then G′ has an edge f=e(v,w) with δ(f)=ρ(v,w) and ω(f)=0.
+    ///      * This edge forces the nodes to be sufﬁciently separated but does not affect the cost of the layout.
+    ///      
+    ///  QUESTIONS:
+    ///  * For the new graph G':
+    ///    * Are virtual nodes copied too? (probably yes?)
+    ///  * Are the new nodes in graph G virtual nodes?
+    ///  * Each old edge is replaced by two new edges, so the old edges are not in G'?
+    ///  * It seems the "second" class of edges which connect adjacent edges of the same rank
+    ///
+    fn create_positioning_aux_graph(&self) -> Graph {
+        let mut aux_graph = Graph::new();
+
+        // aux_graph.nodes = self.nodes.clone();
+        // for node in self.nodes.iter() {
+        //     let name = &node.name;
+
+        //     let foo = if node.virtual_node {
+        //         aux_graph.add_virtual_node()
+        //     } else {
+        //         aux_graph.add_node(name)
+        //     };
+        // }
+
+        aux_graph
     }
 
     fn make_splines(&mut self) {
         todo!();
+    }
+
+    /// Return a value for the graph used to optimize the graph for the selection of x coordiantes for nodes.
+    ///
+    /// Documentation from paper: page 17
+    fn graph_coordinate_optimization_value(&self) -> u32 {
+        self.edges
+            .iter()
+            .map(|edge| self.edge_coordinate_optimization_value(edge))
+            .sum()
+    }
+
+    /// Return a value for an edge used to optimize the graph for the selection of x coordiantes for nodes.
+    ///
+    /// Documentation from paper: page 17
+    /// * For edge = (v,w): Ω(e)*ω(e)*|Xw − Xv|
+    /// * Subject to: Xb − Xa ≥ ρ(a,b)
+    ///   * ρ is a function on pairs of adjacent nodes in the same rank giving the minimum separation
+    ///     between their center points
+    fn edge_coordinate_optimization_value(&self, edge: &Edge) -> u32 {
+        let src_node = self.get_node(edge.src_node);
+        let dst_node = self.get_node(edge.dst_node);
+        let omega = match (src_node.virtual_node, dst_node.virtual_node) {
+            (false, false) => 0_u32,
+            (true, false) => 2,
+            (false, true) => 2,
+            (true, true) => 8,
+        };
+        let weight = edge.weight;
+        let w_x = src_node.coordinates.unwrap().x();
+        let v_x = dst_node.coordinates.unwrap().y();
+        let x_diff = w_x.abs_diff(v_x);
+
+        self.min_node_distance().max(omega * weight * x_diff)
+    }
+
+    /// TODO: min_node_distance should be determined by graph context, and perhaps the specific nodes
+    ///       involved
+    fn min_node_distance(&self) -> u32 {
+        const MIN_NODE_DISTANCE: u32 = 100; // pixels...
+
+        MIN_NODE_DISTANCE
     }
 }
 
@@ -1148,160 +1293,11 @@ impl Display for Graph {
     }
 }
 
-// Represents the node element of a graph.  Sometimes called a vertice.
-//
-// Nodes are connected together via Edges.  Each node has a list of edges coming in and edges
-// going out of this node.  Note that this means that each edge is represented twice: Once in
-// the outgoing node, and once in the incoming node.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Node {
-    // Arbitrary name set by the user.  Duplicates are possible, and up to the user to control.
-    name: String,
-    // Rank is computed as part of the graphing process.
-    rank: Option<u32>,
-    // Edges incoming to this node.  Each entry is a edge index into the graph's edges list.
-    in_edges: Vec<usize>,
-    // Edges outcoming from this node.  Each entry is a edge index into the graph's edges list.
-    out_edges: Vec<usize>,
-
-    // True if this node is part of the "feasible" tree under consideration.  Used during ranking.
-    tree_node: bool,
-    // Added as a placeholder node during position assignement or other part of graphinc
-    virtual_node: bool,
-}
-
 // EdgeDisposition indicates whether a edge is incoming our outgoing with respect to a particular node.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum EdgeDisposition {
+pub enum EdgeDisposition {
     In,
     Out,
-}
-
-impl Node {
-    /// Return a new node which is not yet connected to a graph.
-    pub fn new(name: &str) -> Self {
-        Node {
-            name: name.to_string(),
-            rank: None,
-            in_edges: vec![],
-            out_edges: vec![],
-            tree_node: false,
-            virtual_node: false,
-        }
-    }
-
-    /// Add either an in our out edge to the node.
-    fn add_edge(&mut self, edge: usize, disposition: EdgeDisposition) {
-        match disposition {
-            EdgeDisposition::In => &self.in_edges.push(edge),
-            EdgeDisposition::Out => &self.out_edges.push(edge),
-        };
-    }
-
-    /// Return the list of In our Out edges.
-    fn get_edges(&self, disposition: EdgeDisposition) -> &Vec<usize> {
-        match disposition {
-            EdgeDisposition::In => &self.in_edges,
-            EdgeDisposition::Out => &self.out_edges,
-        }
-    }
-
-    /// Return all in and out edges associated with a node.
-    fn get_all_edges(&self) -> impl Iterator<Item = &usize> {
-        self.out_edges.iter().chain(self.in_edges.iter())
-    }
-
-    /// Swap an edge from in_edges to out_edges or vice versa, depending on disposition.
-    fn swap_edge_in_list(&mut self, edge_idx: usize, disposition: EdgeDisposition) {
-        let local_idx =
-            if let Some(local_idx) = self.find_internal_edge_index(edge_idx, disposition) {
-                local_idx
-            } else {
-                panic!("Could not find edge {disposition:?}:{edge_idx} to reverse in src node.");
-            };
-
-        match disposition {
-            EdgeDisposition::In => {
-                self.in_edges.remove(local_idx);
-                self.out_edges.push(edge_idx);
-            }
-            EdgeDisposition::Out => {
-                self.out_edges.remove(local_idx);
-                self.in_edges.push(edge_idx);
-            }
-        }
-    }
-
-    fn find_internal_edge_index(
-        &self,
-        edge_idx_to_find: usize,
-        disposition: EdgeDisposition,
-    ) -> Option<usize> {
-        let edge_list = self.get_edge_list(disposition);
-
-        for (internal_idx, edge_idx) in edge_list.iter().enumerate() {
-            if edge_idx_to_find == *edge_idx {
-                return Some(internal_idx);
-            }
-        }
-
-        None
-    }
-
-    fn get_edge_list(&self, disposition: EdgeDisposition) -> &Vec<usize> {
-        match disposition {
-            EdgeDisposition::In => &self.in_edges,
-            EdgeDisposition::Out => &self.out_edges,
-        }
-    }
-
-    // Return true if none of the incoming edges to node are in the set scanned_edges.
-    // * If any incoming edges are not scanned, return false
-    // * If there are no incoming edges, return true
-    fn no_unscanned_in_edges(&self, scanned_edges: &HashSet<usize>) -> bool {
-        for edge_idx in self.get_edges(EdgeDisposition::In) {
-            if !scanned_edges.contains(edge_idx) {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// True if there are no incoming edges to a node.
-    fn no_in_edges(&self) -> bool {
-        self.get_edges(EdgeDisposition::In).is_empty()
-    }
-
-    /// True if there are no outgoing edges to a node.
-    fn no_out_edges(&self) -> bool {
-        self.get_edges(EdgeDisposition::Out).is_empty()
-    }
-
-    /// Sets the rank of a node.
-    ///
-    /// Rank corresponds to the vertical placement of a node.  The greater the rank,
-    /// the lower the placement on a canvas.
-    fn set_rank(&mut self, rank: Option<u32>) {
-        self.rank = rank;
-    }
-}
-
-impl Display for Node {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(fmt, "{}: {:?}", &self.name, self.rank)
-    }
-}
-
-impl Ord for Node {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.rank.cmp(&other.rank)
-    }
-}
-
-impl PartialOrd for Node {
-    fn partial_cmp(&self, other: &Node) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
 }
 
 /// An edge connects to nodes in a graph, and points from src_node to dst_node.
