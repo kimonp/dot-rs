@@ -15,9 +15,7 @@ const NODE_MIN_SEP_Y: u32 = 100;
 
 impl Point {
     pub fn new(x: u32, y: u32) -> Self {
-        Self {
-            x, y
-        }
+        Self { x, y }
     }
 
     pub fn x(&self) -> u32 {
@@ -49,31 +47,31 @@ impl Point {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Node {
     // Arbitrary name set by the user.  Duplicates are possible, and up to the user to control.
-    pub name: String,
+    pub(super) name: String,
     // Rank is computed using the network simplex algorithm.  Used to determine both vertical_rank
     // and coordianates.x.
-    pub simplex_rank: Option<u32>,
+    pub(super) simplex_rank: Option<u32>,
     /// Relative verticial ranking of this node.  Zero based, greater numbers are lower.
-    pub vertical_rank: Option<u32>,
+    pub(super) vertical_rank: Option<u32>,
     /// Position is the relative horizontal position of this node compared to
     /// other nodes in the same rank.  Zero based, greater numbers are farther right.
-    pub horizontal_position: Option<usize>,
+    pub(super) horizontal_position: Option<usize>,
     /// Coordinates (x,y) of the node within the graph.
-    pub coordinates: Option<Point>,
+    pub(super) coordinates: Option<Point>,
     /// Edges incoming to this node.  Each entry is a edge index into the graph's edges list.
-    pub in_edges: Vec<usize>,
+    pub(super) in_edges: Vec<usize>,
     /// Edges outcoming from this node.  Each entry is a edge index into the graph's edges list.
-    pub out_edges: Vec<usize>,
+    pub(super) out_edges: Vec<usize>,
 
     /// True if this node is part of the "feasible" tree under consideration.  Used during ranking.
-    pub tree_node: bool,
+    pub(super) tree_node: bool,
     /// Added as a placeholder node during position assignement or other part of graphinc
-    pub virtual_node: bool,
+    pub(super) virtual_node: bool,
 }
 
 impl Node {
     /// Return a new node which is not yet connected to a graph.
-    pub fn new(name: &str) -> Self {
+    pub(super) fn new(name: &str) -> Self {
         Node {
             name: name.to_string(),
             simplex_rank: None,
@@ -88,7 +86,7 @@ impl Node {
     }
 
     /// Add either an in our out edge to the node.
-    pub fn add_edge(&mut self, edge: usize, disposition: EdgeDisposition) {
+    pub(super) fn add_edge(&mut self, edge: usize, disposition: EdgeDisposition) {
         match disposition {
             EdgeDisposition::In => &self.in_edges.push(edge),
             EdgeDisposition::Out => &self.out_edges.push(edge),
@@ -99,7 +97,7 @@ impl Node {
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
-    pub fn min_seperation_x(&self) -> u32 {
+    pub(super) fn min_seperation_x(&self) -> u32 {
         NODE_MIN_SEP_X
     }
 
@@ -107,18 +105,18 @@ impl Node {
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
-    pub fn min_seperation_y(&self) -> u32 {
+    pub(super) fn min_seperation_y(&self) -> u32 {
         NODE_MIN_SEP_Y
     }
 
     /// Remove edge indexes from node.
-    pub fn clear_edges(&mut self) {
+    pub(super) fn clear_edges(&mut self) {
         self.in_edges = vec![];
         self.out_edges = vec![];
     }
 
     /// Return the list of In our Out edges.
-    pub fn get_edges(&self, disposition: EdgeDisposition) -> &Vec<usize> {
+    pub(super) fn get_edges(&self, disposition: EdgeDisposition) -> &Vec<usize> {
         match disposition {
             EdgeDisposition::In => &self.in_edges,
             EdgeDisposition::Out => &self.out_edges,
@@ -126,12 +124,12 @@ impl Node {
     }
 
     /// Return all in and out edges associated with a node.
-    pub fn get_all_edges(&self) -> impl Iterator<Item = &usize> {
+    pub(super) fn get_all_edges(&self) -> impl Iterator<Item = &usize> {
         self.out_edges.iter().chain(self.in_edges.iter())
     }
 
     /// Swap an edge from in_edges to out_edges or vice versa, depending on disposition.
-    pub fn swap_edge_in_list(&mut self, edge_idx: usize, disposition: EdgeDisposition) {
+    pub(super) fn swap_edge_in_list(&mut self, edge_idx: usize, disposition: EdgeDisposition) {
         let local_idx =
             if let Some(local_idx) = self.find_internal_edge_index(edge_idx, disposition) {
                 local_idx
@@ -177,7 +175,7 @@ impl Node {
     // Return true if none of the incoming edges to node are in the set scanned_edges.
     // * If any incoming edges are not scanned, return false
     // * If there are no incoming edges, return true
-    pub fn no_unscanned_in_edges(&self, scanned_edges: &HashSet<usize>) -> bool {
+    pub(super) fn no_unscanned_in_edges(&self, scanned_edges: &HashSet<usize>) -> bool {
         for edge_idx in self.get_edges(EdgeDisposition::In) {
             if !scanned_edges.contains(edge_idx) {
                 return false;
@@ -187,12 +185,12 @@ impl Node {
     }
 
     /// True if there are no incoming edges to a node.
-    pub fn no_in_edges(&self) -> bool {
+    pub(super) fn no_in_edges(&self) -> bool {
         self.get_edges(EdgeDisposition::In).is_empty()
     }
 
     /// True if there are no outgoing edges to a node.
-    pub fn no_out_edges(&self) -> bool {
+    pub(super) fn no_out_edges(&self) -> bool {
         self.get_edges(EdgeDisposition::Out).is_empty()
     }
 
@@ -200,23 +198,23 @@ impl Node {
     ///
     /// Rank corresponds to the vertical placement of a node.  The greater the rank,
     /// the lower the placement on a canvas.
-    pub fn set_simplex_rank(&mut self, rank: Option<u32>) {
+    pub(super) fn set_simplex_rank(&mut self, rank: Option<u32>) {
         self.simplex_rank = rank;
     }
-    
-    pub fn assign_simplex_rank(&mut self, target: SimplexNodeTarget) {
-       let simplex_rank = self.simplex_rank.unwrap();
 
-       match target {
-           SimplexNodeTarget::Rank => self.vertical_rank = Some(simplex_rank),
-           SimplexNodeTarget::XCoordinate => {
-             if let Some(mut coords) = self.coordinates {
-                coords.x = simplex_rank as u32;
-             } else {
-                self.coordinates = Some(Point::new(simplex_rank, 0));
-             }
-           }
-       };
+    pub(super) fn assign_simplex_rank(&mut self, target: SimplexNodeTarget) {
+        let simplex_rank = self.simplex_rank.unwrap();
+
+        match target {
+            SimplexNodeTarget::VerticalRank => self.vertical_rank = Some(simplex_rank),
+            SimplexNodeTarget::XCoordinate => {
+                if let Some(mut coords) = self.coordinates {
+                    coords.x = simplex_rank;
+                } else {
+                    self.coordinates = Some(Point::new(simplex_rank, 0));
+                }
+            }
+        };
     }
 }
 

@@ -15,7 +15,7 @@ fn main() {
     graph.add_edge(b_idx, d_idx);
     graph.add_edge(c_idx, d_idx);
 
-    graph.rank();
+    graph.rank_nodes_vertically();
 
     println!("{graph}");
 }

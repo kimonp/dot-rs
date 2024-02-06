@@ -82,7 +82,7 @@ impl NodePosition {
             median: None,
         }
     }
-    
+
     pub fn position(&self) -> usize {
         self.position
     }
@@ -414,7 +414,7 @@ impl RankOrderings {
                             rank_position.swap(position, position + 1);
                             improved = true
                         } else {
-                           //  println!("{_rank}: no exchange for {position}");
+                            //  println!("{_rank}: no exchange for {position}");
                         }
                     }
                 }
@@ -484,20 +484,20 @@ impl RankOrderings {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::graph::tests::example_graph_from_paper_2_3;
+    use crate::graph::{tests::example_graph_from_paper_2_3, SimplexNodeTarget};
 
     #[test]
     fn test_adjacent_position() {
         let mut graph = example_graph_from_paper_2_3();
-        graph.rank();
-        let order = graph.init_order();
+        graph.rank_nodes_vertically();
+        let order = graph.init_horizontal_order();
 
         let node_a = graph.name_to_node_idx("a").unwrap();
         let node_f = graph.name_to_node_idx("f").unwrap();
         let node_g = graph.name_to_node_idx("g").unwrap();
 
-        println!("{graph}");
-        println!("{order}");
+        println!("GRAPH: {graph}");
+        println!("ORDER: {order}");
 
         println!("a:{node_a} f:{node_f} g:{node_g}");
 
@@ -516,8 +516,9 @@ mod test {
         assert_eq!(below_g, vec![1]);
 
         // order.weighted_median(1);
-        graph.ordering();
-        println!("{order}");
+        println!("Calling horizontal_ordering");
+        graph.horizontal_ordering();
+        println!("FINAL ORDER: {order}");
     }
 
     /// Fixture that generates two ranks, with crossing to oppoite lower ranks, e.g:
@@ -629,18 +630,22 @@ mod test {
         assert_eq!(vec[node_idx_b], node_idx_a, "exchange not reflected");
     }
 
-    // Test that the 2_3 example from the paper has zero crosses after ordering. 
+    // Test that the 2_3 example from the paper has zero crosses after ordering.
     #[test]
     fn test_order_example_from_paper_2_3() {
         let mut graph = example_graph_from_paper_2_3();
 
-        graph.init_rank();
-        graph.rank();
-        let order = graph.init_order();
+        graph.init_simplex_rank();
+        graph.assign_simplex_rank(SimplexNodeTarget::VerticalRank);
+        graph.rank_nodes_vertically();
+        let order = graph.init_horizontal_order();
 
         assert_eq!(order.crossing_count(), 1);
+        println!("ORDER: {order}");
+        println!("Nodes: {:?}", order.nodes().borrow().keys().sorted());
+        println!("Node Zero: {:?}", order.nodes().borrow().get(&0));
 
-        let order = graph.ordering();
+        let order = graph.horizontal_ordering();
         assert_eq!(order.crossing_count(), 0);
     }
 }

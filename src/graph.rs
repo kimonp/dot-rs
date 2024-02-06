@@ -25,7 +25,7 @@ use self::{
 #[derive(Debug, Clone, Copy)]
 enum SimplexNodeTarget {
     /// The rank of each node, which corresponds with to the ultimate y position of the node
-    Rank,
+    VerticalRank,
     /// The X coordinate of each node
     XCoordinate,
 }
@@ -80,8 +80,8 @@ impl Graph {
 
     /// The graph function described in "A Technique for Drawing Directed Graphs"
     pub fn draw_graph(&mut self) {
-        self.rank();
-        self.ordering();
+        self.rank_nodes_vertically();
+        self.horizontal_ordering();
         // self.position();
         // self.make_splines()
     }
@@ -119,18 +119,38 @@ impl Graph {
         }
     }
 
-    fn get_rank_adjacent_edges(
+    fn get_vertical_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
+        let mut above_nodes = vec![];
+        let mut below_nodes = vec![];
+
+        for (edge_idx, direction) in self.get_vertical_adjacent_edges(node_idx) {
+            let edge = self.get_edge(edge_idx);
+            let adj_node_idx = if edge.src_node == node_idx {
+                edge.dst_node
+            } else {
+                edge.src_node
+            };
+
+            match direction {
+                AdjacentRank::Above => above_nodes.push(adj_node_idx),
+                AdjacentRank::Below => below_nodes.push(adj_node_idx),
+            }
+        }
+        (above_nodes, below_nodes)
+    }
+
+    fn get_vertical_adjacent_edges(
         &self,
         node_idx: usize,
     ) -> impl Iterator<Item = (usize, AdjacentRank)> + '_ {
         let node = self.get_node(node_idx);
-        let node_rank = node.simplex_rank;
+        let node_rank = node.vertical_rank;
 
         node.get_all_edges().cloned().filter_map(move |edge_idx| {
             if let Some(other_node_idx) = self.get_connected_node(node_idx, edge_idx) {
                 let other_node = self.get_node(other_node_idx);
 
-                if let (Some(n1), Some(n2)) = (node_rank, other_node.simplex_rank) {
+                if let (Some(n1), Some(n2)) = (node_rank, other_node.vertical_rank) {
                     let diff = n1 as i64 - n2 as i64;
 
                     if diff == -1 {
@@ -149,26 +169,6 @@ impl Graph {
         })
     }
 
-    fn get_rank_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
-        let mut above_nodes = vec![];
-        let mut below_nodes = vec![];
-
-        for (edge_idx, direction) in self.get_rank_adjacent_edges(node_idx) {
-            let edge = self.get_edge(edge_idx);
-            let adj_node_idx = if edge.src_node == node_idx {
-                edge.dst_node
-            } else {
-                edge.src_node
-            };
-
-            match direction {
-                AdjacentRank::Above => above_nodes.push(adj_node_idx),
-                AdjacentRank::Below => below_nodes.push(adj_node_idx),
-            }
-        }
-        (above_nodes, below_nodes)
-    }
-
     /// Add a new node identified by name, and return the node's index in the graph.
     pub fn add_node(&mut self, name: &str) -> usize {
         let new_node = Node::new(name);
@@ -179,9 +179,17 @@ impl Graph {
     }
 
     /// Add a new node (marked as virtual=true)
-    pub fn add_virtual_node(&mut self) -> usize {
+    ///
+    /// Virtual nodes are (typically) added after ranking.  Once
+    /// ranking has been done, all nodes must be ranked, so
+    /// a rank must be passed in for the new virtual node.
+    pub fn add_virtual_node(&mut self, rank: u32) -> usize {
         let idx = self.add_node("V");
-        self.get_node_mut(idx).virtual_node = true;
+        let v_node = self.get_node_mut(idx);
+
+        v_node.virtual_node = true;
+        v_node.simplex_rank = Some(rank);
+        v_node.vertical_rank = Some(rank);
 
         idx
     }
@@ -207,10 +215,10 @@ impl Graph {
     }
 
     /// Rank nodes in the tree using the network simplex algorithm.
-    pub fn rank(&mut self) {
+    pub fn rank_nodes_vertically(&mut self) {
         self.merge_edges();
         self.make_asyclic();
-        self.network_simplex_ranking(SimplexNodeTarget::Rank);
+        self.network_simplex_ranking(SimplexNodeTarget::VerticalRank);
     }
 
     /// Rank nodes in the graph using the network simplex algorithm.
@@ -263,19 +271,21 @@ impl Graph {
     /// }
     ///
     fn network_simplex_ranking(&mut self, target: SimplexNodeTarget) {
-        self.set_feasible_tree();
-        while let Some(neg_cut_edge_idx) = self.leave_edge() {
+        self.set_feasible_tree_for_simplex();
+        while let Some(neg_cut_edge_idx) = self.leave_edge_for_simplex() {
             let non_tree_edge_idx = self
-                .enter_edge(neg_cut_edge_idx)
+                .enter_edge_for_simplex(neg_cut_edge_idx)
                 .expect("No negative cut values found!");
             self.exchange(neg_cut_edge_idx, non_tree_edge_idx);
         }
-        self.normalize();
+        self.normalize_simplex_rank();
         // self.balance();
         self.assign_simplex_rank(target);
     }
 
     /// After running the network simplex algorithm, assign the result to each node.
+    ///
+    /// The value assigned to depends on the given target.
     fn assign_simplex_rank(&mut self, target: SimplexNodeTarget) {
         for node in self.nodes.iter_mut() {
             node.assign_simplex_rank(target);
@@ -476,14 +486,14 @@ impl Graph {
     /// * Thus, a ranking is feasible if the slack of every edge is non-negative.
     /// * An edge is "tight" if its slack is zero.
     ///
-    fn set_feasible_tree(&mut self) {
-        self.init_rank();
+    fn set_feasible_tree_for_simplex(&mut self) {
+        self.init_simplex_rank();
 
         for node in self.nodes.iter_mut() {
             node.tree_node = node.no_out_edges();
         }
 
-        while self.tight_tree() < self.node_count() {
+        while self.tight_simplex_tree() < self.node_count() {
             // e = a non-tree edge incident on the tree with a minimal amount of slack
             // delta = slack(e);
             // if includent_node is e.head then delta = -delta
@@ -699,7 +709,7 @@ impl Graph {
     ///   number of edges while still being a tree.
     ///   * A spanning tree of a graph is a subgraph that is a tree and includes all the vertices of the original graph.
     ///   * A spanning tree is said to be "maximal" if no additional edges can be added to it without creating a cycle.
-    fn tight_tree(&self) -> usize {
+    fn tight_simplex_tree(&self) -> usize {
         self.nodes.iter().filter(|node| node.tree_node).count()
     }
 
@@ -835,7 +845,7 @@ impl Graph {
     ///  a - b - c
     ///   \-----/
     /// Should rank: 0:a 2:b 3:c, because c is only ranked on the third round.
-    fn init_rank(&mut self) {
+    fn init_simplex_rank(&mut self) {
         let mut nodes_to_rank = Vec::new();
         let mut scanned_edges = HashSet::new();
 
@@ -881,7 +891,7 @@ impl Graph {
     /// If any edge has a negative cut value, return the first one found.
     ///
     /// Otherwise, return None.
-    fn leave_edge(&self) -> Option<usize> {
+    fn leave_edge_for_simplex(&self) -> Option<usize> {
         for (edge_idx, edge) in self.edges.iter().enumerate() {
             if let Some(cut_value) = edge.cut_value {
                 if cut_value < 0 {
@@ -899,7 +909,7 @@ impl Graph {
     ///   * This is done by breaking the edge e, which divides the tree into a head and tail component.
     ///   * All edges going from the head component to the tail are considered, with an edge of minimum slack being chosen.
     ///   * This is necessary to maintain feasibility.
-    fn enter_edge(&self, neg_cut_edge_idx: usize) -> Option<usize> {
+    fn enter_edge_for_simplex(&self, neg_cut_edge_idx: usize) -> Option<usize> {
         let replacement_edge_idx = 0;
         let (head_nodes, tail_nodes) = self.get_components(neg_cut_edge_idx);
 
@@ -939,7 +949,7 @@ impl Graph {
     ///
     /// Documentation from paper:
     /// The solution is normalized setting the least rank to zero.
-    fn normalize(&mut self) {
+    fn normalize_simplex_rank(&mut self) {
         if let Some(min_node) = self.nodes.iter().min() {
             if let Some(least_rank) = min_node.simplex_rank {
                 for node in self.nodes.iter_mut() {
@@ -985,10 +995,12 @@ impl Graph {
     ///     }
     ///     return best
     /// }
-    fn ordering(&mut self) -> RankOrderings {
+    fn horizontal_ordering(&mut self) -> RankOrderings {
         const MAX_ITERATIONS: usize = 24;
-        let order = self.init_order();
+        let order = self.init_horizontal_order();
         let mut best = order.clone();
+
+        println!("INITAL HO: Node Zero: {:?}", order.nodes().borrow().get(&0));
 
         for i in 0..MAX_ITERATIONS {
             // println!("Ordering pass {i}: cross count: {}", order.crossing_count());
@@ -1010,13 +1022,18 @@ impl Graph {
                     break;
                 }
             }
+            println!(
+                "HO: Nodes: {:?}",
+                itertools::Itertools::sorted(order.nodes().borrow().keys())
+            );
+            println!("HO: Node Zero: {:?}", order.nodes().borrow().get(&0));
 
             self.set_node_positions(&best)
         }
-        // println!(
-        //     "-- Final order (crosses: {}): --\n{best}",
-        //     best.crossing_count()
-        // );
+        println!(
+            "-- Final order (crosses: {}): --\n{best}",
+            best.crossing_count()
+        );
 
         best
     }
@@ -1034,11 +1051,13 @@ impl Graph {
     }
 
     /// Set the initial ordering of the nodes, and return a RankOrderings object to optimize node orderings.
-    fn init_order(&mut self) -> RankOrderings {
-        let mut order = self.get_initial_ordering();
+    fn init_horizontal_order(&mut self) -> RankOrderings {
+        let mut order = self.get_initial_horizontal_orderings();
 
-        self.fill_rank_gaps(&order);
-        self.set_adjacent_nodes_in_ranks(&order);
+        self.fill_vertical_rank_gaps(&order);
+        self.set_adjacent_nodes_in_vertical_ranks(&order);
+
+        println!("INIT_HOR: Node Zero: {:?}", order.nodes().borrow().get(&0));
 
         order
     }
@@ -1053,7 +1072,7 @@ impl Graph {
     /// * The virtual nodes are placed on the intermediate ranks, converting the original
     ///   graph into one whose edges connect only nodes on adjacent ranks.
     /// * Self- edges are ignored in this pass, and multi-edges are merged as in the previous pass
-    fn fill_rank_gaps(&mut self, order: &RankOrderings) {
+    fn fill_vertical_rank_gaps(&mut self, order: &RankOrderings) {
         for (rank, rank_order) in order.iter() {
             for node_idx in rank_order.borrow().iter() {
                 let node_edges = self
@@ -1092,8 +1111,7 @@ impl Graph {
                 new_rank + 1
             };
 
-            let virt_node_idx = self.add_virtual_node();
-            self.get_node_mut(virt_node_idx).simplex_rank = Some(new_rank);
+            let virt_node_idx = self.add_virtual_node(new_rank);
 
             let old_edge = self.get_edge_mut(cur_edge_idx);
             let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
@@ -1105,7 +1123,7 @@ impl Graph {
         }
     }
 
-    /// Return an initial ordering of the graph ranks.
+    /// Return an initial horizontal ordering of each of the graph ranks.
     ///
     /// * The initial ordering is a map of ranks.
     /// * Each rank is a set of NodePositions.
@@ -1129,9 +1147,10 @@ impl Graph {
     ///   * Vertices are assigned positions in their ranks in left-to-right order as the search progresses.
     ///     * This strategy ensures that the initial ordering of a tree has no crossings.
     ///     * This is important because such crossings are obvious, easily- avoided "mistakes."
-    fn get_initial_ordering(&mut self) -> RankOrderings {
+    fn get_initial_horizontal_orderings(&mut self) -> RankOrderings {
         let mut rank_order = RankOrderings::new();
-        let mut dfs_queue = self.get_min_rank_nodes();
+        let mut dfs_queue = self.get_min_vertical_rank_nodes();
+        println!("MIN VRN: {:?}", &dfs_queue);
         let mut assigned = HashSet::new();
 
         while let Some(node_idx) = dfs_queue.pop_front() {
@@ -1152,7 +1171,7 @@ impl Graph {
                 .collect::<Vec<usize>>();
 
             if unassigned_dst_nodes.is_empty() {
-                if let Some(rank) = node.simplex_rank {
+                if let Some(rank) = node.vertical_rank {
                     assigned.insert(node_idx);
                     rank_order.add_node_idx_to_rank(rank, node_idx);
                 }
@@ -1167,9 +1186,9 @@ impl Graph {
     }
 
     /// The graph is reponsible for setting adjacent nodes in the rank_order once all nodes have been added to it.
-    fn set_adjacent_nodes_in_ranks(&self, rank_order: &RankOrderings) {
+    fn set_adjacent_nodes_in_vertical_ranks(&self, rank_order: &RankOrderings) {
         for (node_idx, node_position) in rank_order.nodes().borrow().iter() {
-            let (above_adj, below_adj) = self.get_rank_adjacent_nodes(*node_idx);
+            let (above_adj, below_adj) = self.get_vertical_adjacent_nodes(*node_idx);
 
             rank_order.set_adjacent_nodes(*node_idx, &above_adj, &below_adj);
         }
@@ -1178,45 +1197,45 @@ impl Graph {
     /// Return a VecDequeue of nodes which have minimum rank.
     ///
     /// * Assumes that the graph has been ranked
-    fn get_min_rank_nodes(&self) -> VecDeque<usize> {
+    fn get_min_vertical_rank_nodes(&self) -> VecDeque<usize> {
         let mut min_rank_nodes = VecDeque::new();
         let min_rank = self
             .nodes
             .iter()
             .min()
-            .and_then(|min_node| min_node.simplex_rank);
+            .and_then(|min_node| min_node.vertical_rank);
 
         for (node_idx, node) in self.nodes.iter().enumerate() {
-            if node.simplex_rank == min_rank {
+            if node.vertical_rank == min_rank {
                 min_rank_nodes.push_back(node_idx);
             }
         }
         min_rank_nodes
     }
 
-    /// Return a hash map of rank -> vec<node_idx> as well as the minimum rank
-    fn get_rank_map(&self) -> (Option<u32>, HashMap<u32, Vec<usize>>) {
-        let mut ranks: HashMap<u32, Vec<usize>> = HashMap::new();
-        let mut min_rank = None;
+    // /// Return a hash map of rank -> vec<node_idx> as well as the minimum rank
+    // fn get_rank_map(&self) -> (Option<u32>, HashMap<u32, Vec<usize>>) {
+    //     let mut ranks: HashMap<u32, Vec<usize>> = HashMap::new();
+    //     let mut min_rank = None;
 
-        for (node_idx, node) in self.nodes.iter().enumerate() {
-            if let Some(rank) = node.simplex_rank {
-                if let Some(level) = ranks.get_mut(&rank) {
-                    level.push(node_idx);
-                } else {
-                    ranks.insert(rank, vec![node_idx]);
-                }
+    //     for (node_idx, node) in self.nodes.iter().enumerate() {
+    //         if let Some(rank) = node.simplex_rank {
+    //             if let Some(level) = ranks.get_mut(&rank) {
+    //                 level.push(node_idx);
+    //             } else {
+    //                 ranks.insert(rank, vec![node_idx]);
+    //             }
 
-                min_rank = if let Some(min_rank) = min_rank {
-                    Some(u32::min(min_rank, rank))
-                } else {
-                    Some(rank)
-                };
-            }
-        }
+    //             min_rank = if let Some(min_rank) = min_rank {
+    //                 Some(u32::min(min_rank, rank))
+    //             } else {
+    //                 Some(rank)
+    //             };
+    //         }
+    //     }
 
-        (min_rank, ranks)
-    }
+    //     (min_rank, ranks)
+    // }
 
     /// Generic Network simplex:
     ///
@@ -1284,8 +1303,8 @@ impl Graph {
                     panic!("Node {node_idx}: position not set");
                 }
 
-                if let Some(rank) = node.simplex_rank {
-                    coords.set_y(rank as u32 * min_y);
+                if let Some(rank) = node.vertical_rank {
+                    coords.set_y(rank * min_y);
                 } else {
                     panic!("Node {node_idx}: rank not set");
                 }
@@ -1373,8 +1392,6 @@ impl Graph {
             /// ...assigning each n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
             /// and where x_u and x_v are the X coordinates assigned to u and v in G.
             new_node.coordinates.unwrap().set_x(src_x.min(dst_x));
-
-            new_node.simplex_rank = src_node.simplex_rank; // WHY? Probably rank does not matter because rank is not in the optimization formula
         }
 
         // Add edges between adjacent nodes in a rank, as per figure 4-2 in the paper.
@@ -1497,11 +1514,11 @@ mod tests {
         /// Configures the named node by setting the rank and making the node a feasible tree member.
         ///
         /// Expensive for large data sets: O(n)
-        fn configure_node(&mut self, name: &str, rank: u32) {
+        fn configure_node(&mut self, name: &str, vertical_rank: u32) {
             let node_idx = self.name_to_node_idx(name).unwrap();
             let node = self.get_node_mut(node_idx);
 
-            node.simplex_rank = Some(rank);
+            node.vertical_rank = Some(vertical_rank);
             node.tree_node = true;
         }
 
@@ -1662,7 +1679,7 @@ mod tests {
         graph.add_edge(g_idx, h_idx);
         graph.add_edge(d_idx, h_idx);
 
-        graph.rank();
+        graph.rank_nodes_vertically();
         println!("{graph}");
     }
 
@@ -1702,7 +1719,7 @@ mod tests {
         let e1 = graph.add_edge(a_idx, b_idx);
         let e2 = graph.add_edge(a_idx, c_idx);
 
-        graph.init_rank();
+        graph.init_simplex_rank();
 
         println!("{graph}");
 
@@ -1731,7 +1748,7 @@ mod tests {
         let e3 = graph.add_edge(b_idx, c_idx);
         let e4 = graph.add_edge(b_idx, a_idx);
 
-        graph.init_rank();
+        graph.init_simplex_rank();
 
         println!("{graph}");
 
@@ -1769,7 +1786,7 @@ mod tests {
 
         assert_eq!(graph.simplex_edge_length(a_b), None);
 
-        graph.init_rank();
+        graph.init_simplex_rank();
         println!("{graph}");
 
         assert_eq!(graph.simplex_edge_length(a_b), Some(1));
@@ -1796,7 +1813,7 @@ mod tests {
 
         assert_eq!(graph.simplex_slack(a_b), None);
 
-        graph.init_rank();
+        graph.init_simplex_rank();
         println!("{graph}");
 
         assert_eq!(graph.simplex_slack(a_b), Some(0));
@@ -1904,9 +1921,9 @@ mod tests {
         let edges = vec![("a", "b"), ("b", "a"), ("c", "d"), ("c", "a")];
         graph.add_edges(&edges, &node_map);
 
-        graph.rank();
+        graph.rank_nodes_vertically();
 
-        let min_rank = graph.get_min_rank_nodes();
+        let min_rank = graph.get_min_vertical_rank_nodes();
         let min_rank = min_rank.iter().cloned().collect::<Vec<usize>>();
 
         assert_eq!(
@@ -1923,10 +1940,10 @@ mod tests {
         let edges = vec![("a", "b"), ("b", "c"), ("b", "d"), ("c", "e"), ("d", "e")];
         graph.add_edges(&edges, &node_map);
 
-        graph.rank();
+        graph.rank_nodes_vertically();
 
         println!("{graph}");
-        let order = graph.get_initial_ordering();
+        let order = graph.get_initial_horizontal_orderings();
 
         println!("{order:?}");
     }
@@ -1935,7 +1952,7 @@ mod tests {
     fn test_rank() {
         let mut graph = example_graph_from_paper_2_3();
 
-        graph.rank();
+        graph.rank_nodes_vertically();
 
         println!("{graph}");
     }
@@ -1986,10 +2003,10 @@ mod tests {
     fn test_fill_rank_gaps() {
         let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a();
         graph.init_cutvalues();
-        let order = graph.get_initial_ordering();
+        let order = graph.get_initial_horizontal_orderings();
 
         println!("{graph}");
-        graph.fill_rank_gaps(&order);
+        graph.fill_vertical_rank_gaps(&order);
         println!("{graph}");
 
         for (edge_idx, _edge) in graph.edges.iter().enumerate() {
