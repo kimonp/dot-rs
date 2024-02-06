@@ -82,6 +82,10 @@ impl NodePosition {
             median: None,
         }
     }
+    
+    pub fn position(&self) -> usize {
+        self.position
+    }
 }
 
 impl Display for NodePosition {

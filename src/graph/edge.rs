@@ -1,4 +1,4 @@
-//! Reprecents a edge connecting two nodes within a graph.
+//! Reprecents an edge connecting two nodes within a graph.
 
 /// Minimum allowed edge weight.  In future implementations, user could set this.
 /// Edge weight could be used when drawing to deletemine the stroke width of an edge.
@@ -51,4 +51,14 @@ impl Edge {
             feasible_tree_member: false,
         }
     }
+
+    pub fn edge_omega_value(src_is_virtual: bool, dst_is_virtual: bool) -> u32 {
+        match (src_is_virtual, dst_is_virtual) {
+            (false, false) => 0_u32,
+            (true, false) => 2,
+            (false, true) => 2,
+            (true, true) => 8,
+        }
+    }
+
 }

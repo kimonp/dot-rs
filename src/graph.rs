@@ -15,7 +15,20 @@ use std::{
     mem::replace,
 };
 
-use self::{edge::{Edge, EdgeDisposition, MIN_EDGE_LENGTH}, node::Node, rank_orderings::AdjacentRank};
+use self::{
+    edge::{Edge, EdgeDisposition, MIN_EDGE_LENGTH},
+    node::Node,
+    rank_orderings::AdjacentRank,
+};
+
+/// Determines what variable on each node which is set by the network simplex algorithm.
+#[derive(Debug, Clone, Copy)]
+enum SimplexNodeTarget {
+    /// The rank of each node, which corresponds with to the ultimate y position of the node
+    Rank,
+    /// The X coordinate of each node
+    XCoordinate,
+}
 
 /// Simplist posible representation of a graph until more is needed.
 ///
@@ -69,7 +82,7 @@ impl Graph {
     pub fn draw_graph(&mut self) {
         self.rank();
         self.ordering();
-        self.position();
+        // self.position();
         // self.make_splines()
     }
 
@@ -111,13 +124,13 @@ impl Graph {
         node_idx: usize,
     ) -> impl Iterator<Item = (usize, AdjacentRank)> + '_ {
         let node = self.get_node(node_idx);
-        let node_rank = node.rank;
+        let node_rank = node.simplex_rank;
 
         node.get_all_edges().cloned().filter_map(move |edge_idx| {
             if let Some(other_node_idx) = self.get_connected_node(node_idx, edge_idx) {
                 let other_node = self.get_node(other_node_idx);
 
-                if let (Some(n1), Some(n2)) = (node_rank, other_node.rank) {
+                if let (Some(n1), Some(n2)) = (node_rank, other_node.simplex_rank) {
                     let diff = n1 as i64 - n2 as i64;
 
                     if diff == -1 {
@@ -193,7 +206,41 @@ impl Graph {
         idx
     }
 
-    /// Rank nodes in the graph using the network simplex algorithm
+    /// Rank nodes in the tree using the network simplex algorithm.
+    pub fn rank(&mut self) {
+        self.merge_edges();
+        self.make_asyclic();
+        self.network_simplex_ranking(SimplexNodeTarget::Rank);
+    }
+
+    /// Rank nodes in the graph using the network simplex algorithm.
+    ///
+    /// Note that this general algorithm is used for more than one purpose for layout:
+    /// * Placing the nodes into horizontal ranks
+    /// * Determining the X axis of nodes (when additional auxiliary nodes and edges are added)
+    ///
+    /// Network Simplex Algorithm: From Wikipedia, the free encyclopedia:
+    ///
+    ///   In mathematical optimization, the network simplex algorithm is a graph theoretic
+    ///   specialization of the simplex algorithm. The algorithm is usually formulated in
+    ///   terms of a minimum-cost flow problem. The network simplex method works very well
+    ///   in practice, typically 200 to 300 times faster than the simplex method applied
+    ///   to general linear program of same dimensions.
+    ///     
+    ///   The basis (of network simplex) is represented as a rooted spanning tree of the
+    ///   underlying network, in which variables are represented by arcs (e.g. edges), and the
+    ///   simplex multipliers by node potentials (e.g. any particular node value). At each
+    ///   iteration, an entering variable is selected by some pricing strategy, based on the
+    ///   dual multipliers (node potentials), and forms a cycle with the arcs of the tree.
+    ///   The leaving variable is the arc of the cycle with the least augmenting flow.
+    ///   The substitution of entering for leaving arc, and the reconstruction of the tree
+    ///   is called a pivot. When no non-basic arc remains eligible to enter, the optimal
+    ///   solution has been reached.
+    ///     
+    ///   So for this implementation:
+    ///     * "arcs" are edges
+    ///     * "simplex multipliers" or "node potentials" are "cut values"
+    ///
     /// Documentation from the paper: pages 8-9
     /// * described in [TSE93]
     ///
@@ -205,7 +252,7 @@ impl Graph {
     ///     divides the tree into a head and tail component. All edges going from the head component to
     ///     the tail are considered, with an edge of minimum slack being chosen.  This is necessary to
     ///     maintain feasibility.
-    /// fn rank() {
+    /// fn network_simplex_rank() {
     ///     feasible_tree();
     ///     while (e = leave_edge()) ≠ nil {
     ///         f = enter_edge(e);
@@ -215,10 +262,7 @@ impl Graph {
     ///     balance();
     /// }
     ///
-    pub fn rank(&mut self) {
-        self.merge_edges();
-        self.make_asyclic();
-
+    fn network_simplex_ranking(&mut self, target: SimplexNodeTarget) {
         self.set_feasible_tree();
         while let Some(neg_cut_edge_idx) = self.leave_edge() {
             let non_tree_edge_idx = self
@@ -228,6 +272,14 @@ impl Graph {
         }
         self.normalize();
         // self.balance();
+        self.assign_simplex_rank(target);
+    }
+
+    /// After running the network simplex algorithm, assign the result to each node.
+    fn assign_simplex_rank(&mut self, target: SimplexNodeTarget) {
+        for node in self.nodes.iter_mut() {
+            node.assign_simplex_rank(target);
+        }
     }
 
     /// make_asyclic() removes cycles from the graph.
@@ -439,7 +491,7 @@ impl Graph {
             let edge_idx = self
                 .get_min_incident_edge()
                 .expect("No incident edges left!");
-            let mut delta = if let Some(delta) = self.slack(edge_idx) {
+            let mut delta = if let Some(delta) = self.simplex_slack(edge_idx) {
                 if self.edge_head_is_incident(edge_idx) {
                     -delta
                 } else {
@@ -450,8 +502,8 @@ impl Graph {
             };
 
             for node in self.nodes.iter_mut().filter(|node| node.tree_node) {
-                let cur_rank = node.rank.expect("Node does not have rank");
-                node.rank = Some(cur_rank + delta as u32)
+                let cur_rank = node.simplex_rank.expect("Node does not have rank");
+                node.simplex_rank = Some(cur_rank + delta as u32)
             }
 
             let node_idx = self
@@ -674,7 +726,9 @@ impl Graph {
                         .expect("Edge not connected");
 
                     if !self.get_node(connected_node_idx).tree_node {
-                        let slack = self.slack(*edge_idx).expect("Can't calculate slack");
+                        let slack = self
+                            .simplex_slack(*edge_idx)
+                            .expect("Can't calculate slack");
 
                         if candidate.is_none() || slack < candidate_slack {
                             candidate = Some(*edge_idx);
@@ -705,18 +759,20 @@ impl Graph {
 
     /// An edge is "feasible" if both it's nodes have been ranked, and rank_diff > MIN_EDGE_LEN.
     fn edge_is_feasible(&self, edge_idx: usize) -> bool {
-        if let Some(diff) = self.edge_length(edge_idx) {
+        if let Some(diff) = self.simplex_edge_length(edge_idx) {
             diff > MIN_EDGE_LENGTH as i32
         } else {
             false
         }
     }
 
-    // The slack of an edge is the difference of its length and its minimum length.
+    /// Returns the slack of and edge for the network simplex algorithm.
+    ///
+    /// The slack of an edge is the difference of its length and its minimum length.
     ///
     /// An edge is "tight" if it's slack is zero.
-    fn slack(&self, edge_idx: usize) -> Option<i32> {
-        self.edge_length(edge_idx).map(|len| {
+    fn simplex_slack(&self, edge_idx: usize) -> Option<i32> {
+        self.simplex_edge_length(edge_idx).map(|len| {
             if len > 0 {
                 len - (MIN_EDGE_LENGTH as i32)
             } else {
@@ -725,23 +781,25 @@ impl Graph {
         })
     }
 
-    /// edge_length() is the rank difference between src and dst nodes of the edge.
-    fn edge_length(&self, edge_idx: usize) -> Option<i32> {
-        self.rank_diff(edge_idx)
+    /// Returns the simplex length for an edge in the network simplex algorithm.
+    ///
+    /// simplex_edge_length() is the simplex rank difference between src and dst nodes of the edge.
+    fn simplex_edge_length(&self, edge_idx: usize) -> Option<i32> {
+        self.simplex_rank_diff(edge_idx)
     }
 
-    /// rank_diff returns the difference in rank between the source edge and the dst edge.
+    /// simplex_rank_diff() returns the difference in rank between the source edge and the dst edge.
     ///
     /// Documentation from the paper:
     ///   * l(e) = length(e) = rank(e.dst_node)-rank(e.src_node) = rank_diff(e)
     ///     * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
     ///     * λ(w) − λ(v) = rank(v) - rank(w)
-    fn rank_diff(&self, edge_idx: usize) -> Option<i32> {
+    fn simplex_rank_diff(&self, edge_idx: usize) -> Option<i32> {
         let edge = self.get_edge(edge_idx);
         let src_node = self.get_node(edge.src_node);
         let dst_node = self.get_node(edge.dst_node);
 
-        match (src_node.rank, dst_node.rank) {
+        match (src_node.simplex_rank, dst_node.simplex_rank) {
             (Some(src), Some(dst)) => Some((dst as i32) - (src as i32)),
             _ => None,
         }
@@ -784,7 +842,7 @@ impl Graph {
         // Initialize the queue with all nodes with no incoming edges (since no edges
         // are scanned yet)
         for (index, node) in self.nodes.iter_mut().enumerate() {
-            node.set_rank(None);
+            node.set_simplex_rank(None);
             node.tree_node = false;
 
             if node.no_in_edges() {
@@ -798,8 +856,8 @@ impl Graph {
             while let Some(node_idx) = nodes_to_rank.pop() {
                 let node = self.get_node_mut(node_idx);
 
-                if node.rank.is_none() {
-                    node.set_rank(Some(cur_rank));
+                if node.simplex_rank.is_none() {
+                    node.set_simplex_rank(Some(cur_rank));
 
                     for edge_idx in node.out_edges.clone() {
                         scanned_edges.insert(edge_idx);
@@ -850,7 +908,7 @@ impl Graph {
 
         for (edge_idx, edge) in self.edges.iter().enumerate() {
             if head_nodes.contains(&edge.src_node) && tail_nodes.contains(&edge.dst_node) {
-                let edge_slack = self.slack(edge_idx).expect("Can't calculate slack");
+                let edge_slack = self.simplex_slack(edge_idx).expect("Can't calculate slack");
 
                 if edge_slack < min_slack {
                     replacement_edge_idx = Some(edge_idx)
@@ -883,10 +941,10 @@ impl Graph {
     /// The solution is normalized setting the least rank to zero.
     fn normalize(&mut self) {
         if let Some(min_node) = self.nodes.iter().min() {
-            if let Some(least_rank) = min_node.rank {
+            if let Some(least_rank) = min_node.simplex_rank {
                 for node in self.nodes.iter_mut() {
-                    if let Some(rank) = node.rank {
-                        node.rank = Some(rank - least_rank);
+                    if let Some(rank) = node.simplex_rank {
+                        node.simplex_rank = Some(rank - least_rank);
                     }
                 }
             }
@@ -952,6 +1010,8 @@ impl Graph {
                     break;
                 }
             }
+
+            self.set_node_positions(&best)
         }
         // println!(
         //     "-- Final order (crosses: {}): --\n{best}",
@@ -959,6 +1019,18 @@ impl Graph {
         // );
 
         best
+    }
+
+    /// Set the relative positions of each node from the given orderings.
+    fn set_node_positions(&mut self, orderings: &RankOrderings) {
+        let node_positions = orderings.nodes().borrow();
+        for (node_idx, node) in self.nodes.iter_mut().enumerate() {
+            if let Some(node_pos) = node_positions.get(&node_idx) {
+                node.horizontal_position = Some(node_pos.borrow().position());
+            } else {
+                panic!("Node {node_idx} not found in rank orderings");
+            }
+        }
     }
 
     /// Set the initial ordering of the nodes, and return a RankOrderings object to optimize node orderings.
@@ -991,7 +1063,7 @@ impl Graph {
                     .collect::<Vec<usize>>();
 
                 for edge_idx in node_edges {
-                    if let Some(slack) = self.slack(edge_idx) {
+                    if let Some(slack) = self.simplex_slack(edge_idx) {
                         if slack != 0 {
                             self.replace_edge_with_virtual_chain(edge_idx, *rank, slack, order);
                         }
@@ -1021,7 +1093,7 @@ impl Graph {
             };
 
             let virt_node_idx = self.add_virtual_node();
-            self.get_node_mut(virt_node_idx).rank = Some(new_rank);
+            self.get_node_mut(virt_node_idx).simplex_rank = Some(new_rank);
 
             let old_edge = self.get_edge_mut(cur_edge_idx);
             let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
@@ -1080,7 +1152,7 @@ impl Graph {
                 .collect::<Vec<usize>>();
 
             if unassigned_dst_nodes.is_empty() {
-                if let Some(rank) = node.rank {
+                if let Some(rank) = node.simplex_rank {
                     assigned.insert(node_idx);
                     rank_order.add_node_idx_to_rank(rank, node_idx);
                 }
@@ -1108,10 +1180,14 @@ impl Graph {
     /// * Assumes that the graph has been ranked
     fn get_min_rank_nodes(&self) -> VecDeque<usize> {
         let mut min_rank_nodes = VecDeque::new();
-        let min_rank = self.nodes.iter().min().and_then(|min_node| min_node.rank);
+        let min_rank = self
+            .nodes
+            .iter()
+            .min()
+            .and_then(|min_node| min_node.simplex_rank);
 
         for (node_idx, node) in self.nodes.iter().enumerate() {
-            if node.rank == min_rank {
+            if node.simplex_rank == min_rank {
                 min_rank_nodes.push_back(node_idx);
             }
         }
@@ -1124,7 +1200,7 @@ impl Graph {
         let mut min_rank = None;
 
         for (node_idx, node) in self.nodes.iter().enumerate() {
-            if let Some(rank) = node.rank {
+            if let Some(rank) = node.simplex_rank {
                 if let Some(level) = ranks.get_mut(&rank) {
                     level.push(node_idx);
                 } else {
@@ -1178,7 +1254,43 @@ impl Graph {
     ///     in G′ and, globally, the two solutions have the same cost.
     ///   * Thus, optimality of G′ implies optimality for G and solving G′ gives us a solution for G.
     fn position(&mut self) {
-        // todo!();
+        self.init_node_coordinates();
+        let aux_graph = self.create_positioning_aux_graph();
+
+        let mut improved = false;
+        while !improved {
+            let cur_value = aux_graph.graph_coordinate_optimization_value();
+            // aux_graph.optimize_coordinates();
+            let new_value = aux_graph.graph_coordinate_optimization_value();
+
+            if cur_value < new_value {
+                improved = true;
+            } else {
+                improved = false;
+            }
+        }
+    }
+
+    /// Initialize the x and y coordinates of all nodes.
+    fn init_node_coordinates(&mut self) {
+        for (node_idx, mut node) in self.nodes.iter().enumerate() {
+            let min_x = node.min_seperation_x();
+            let min_y = node.min_seperation_y();
+
+            if let Some(mut coords) = node.coordinates {
+                if let Some(position) = node.horizontal_position {
+                    coords.set_x(position as u32 * min_x);
+                } else {
+                    panic!("Node {node_idx}: position not set");
+                }
+
+                if let Some(rank) = node.simplex_rank {
+                    coords.set_y(rank as u32 * min_y);
+                } else {
+                    panic!("Node {node_idx}: rank not set");
+                }
+            }
+        }
     }
 
     /// Documentation from paper: 4.2 Optimal Node Placement page 20
@@ -1197,26 +1309,76 @@ impl Graph {
     ///      then G′ has an edge f=e(v,w) with δ(f)=ρ(v,w) and ω(f)=0.
     ///      * This edge forces the nodes to be sufﬁciently separated but does not affect the cost of the layout.
     ///      
-    ///  QUESTIONS:
+    ///  QUESTIONS: ☑ ☐ ☒
     ///  * For the new graph G':
-    ///    * Are virtual nodes copied too? (probably yes?)
-    ///  * Are the new nodes in graph G virtual nodes?
-    ///  * Each old edge is replaced by two new edges, so the old edges are not in G'?
+    ///    * Are virtual nodes copied too? (almost certianly yes)
+    ///  * Are the new nodes in graph G virtual nodes? (probably no, otherwise they would have said so)
+    ///    * Are the new nodes in the same rank their source nodes?
+    ///    * Do they have the same positions?
+    ///  * Each old edge is replaced by two new edges, so the old edges are not in G'? (probably yes?)
     ///  * It seems the "second" class of edges which connect adjacent edges of the same rank
     ///
+    /// * We can now consider the level assignment problem on G′, which can be solved using the network
+    ///   simplex method.
+    ///   * Any solution of the positioning problem on G corresponds to a solution of the
+    ///     level assignment problem on G′ with the same cost.
+    ///   * This is achieved by assigning each n_e the value min (x_u, x_v), using the notation of ﬁgure 4-2
+    ///     and where x_u and x_v are the X coordinates assigned to u and v in G.
+    ///   * Conversely, any level assignment in G′ induces a valid positioning in G.
+    ///   * In addition, in an optimal level assignment, one of e_u or e must have length 0, and the other
+    ///     has length |x_u − x_v|. This means the cost of an original edge (u, v) in G equals the sum
+    ///     of the cost of the two edges e_y, e_v in G′ and, globally, the two solutions have the same cost.
+    ///   * Thus, optimality of G′ implies optimality for G and solving G ′ gives us a solution for G.
     fn create_positioning_aux_graph(&self) -> Graph {
         let mut aux_graph = Graph::new();
 
-        // aux_graph.nodes = self.nodes.clone();
-        // for node in self.nodes.iter() {
-        //     let name = &node.name;
+        /// Add all the existing edges to the current graph without edges.
+        for node in self.nodes.iter() {
+            let mut new_node = node.clone();
+            new_node.clear_edges();
 
-        //     let foo = if node.virtual_node {
-        //         aux_graph.add_virtual_node()
-        //     } else {
-        //         aux_graph.add_node(name)
-        //     };
-        // }
+            aux_graph.nodes.push(new_node)
+        }
+
+        // Add the new node and edges between the new node, as per figure 4-2 in paper
+        // Note that we are adding 2 edges and one node for every edge, but not the orignal edge itself.
+        for edge in self.edges.iter() {
+            let src_node_idx = edge.src_node;
+            let dst_node_idx = edge.dst_node;
+            let src_node = self.get_node(src_node_idx);
+            let dst_node = self.get_node(dst_node_idx);
+
+            // QUESTION: Should the new node be a virtual node?  Unclear from text.
+            let new_node_idx =
+                aux_graph.add_node(&format!("{}-{}", &src_node.name, &dst_node.name));
+            let omega = Edge::edge_omega_value(src_node.virtual_node, dst_node.virtual_node);
+            let new_weight = edge.weight * omega;
+
+            let new_edge_idx_1 = aux_graph.add_edge(new_node_idx, src_node_idx);
+            {
+                let new_edge_1 = aux_graph.get_edge_mut(new_edge_idx_1);
+                new_edge_1.weight = new_weight;
+            }
+            let new_edge_idx_2 = aux_graph.add_edge(new_node_idx, dst_node_idx);
+            {
+                let new_edge_2 = aux_graph.get_edge_mut(new_edge_idx_2);
+                new_edge_2.weight = new_weight;
+            }
+
+            /// TODO: deal with unwraps();
+            let new_node = aux_graph.get_node_mut(new_node_idx);
+            let src_x = src_node.coordinates.unwrap().x();
+            let dst_x = dst_node.coordinates.unwrap().x();
+
+            /// ...assigning each n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
+            /// and where x_u and x_v are the X coordinates assigned to u and v in G.
+            new_node.coordinates.unwrap().set_x(src_x.min(dst_x));
+
+            new_node.simplex_rank = src_node.simplex_rank; // WHY? Probably rank does not matter because rank is not in the optimization formula
+        }
+
+        // Add edges between adjacent nodes in a rank, as per figure 4-2 in the paper.
+        // TODO
 
         aux_graph
     }
@@ -1245,12 +1407,7 @@ impl Graph {
     fn edge_coordinate_optimization_value(&self, edge: &Edge) -> u32 {
         let src_node = self.get_node(edge.src_node);
         let dst_node = self.get_node(edge.dst_node);
-        let omega = match (src_node.virtual_node, dst_node.virtual_node) {
-            (false, false) => 0_u32,
-            (true, false) => 2,
-            (false, true) => 2,
-            (true, true) => 8,
-        };
+        let omega = Edge::edge_omega_value(src_node.virtual_node, dst_node.virtual_node);
         let weight = edge.weight;
         let w_x = src_node.coordinates.unwrap().x();
         let v_x = dst_node.coordinates.unwrap().y();
@@ -1344,7 +1501,7 @@ mod tests {
             let node_idx = self.name_to_node_idx(name).unwrap();
             let node = self.get_node_mut(node_idx);
 
-            node.rank = Some(rank);
+            node.simplex_rank = Some(rank);
             node.tree_node = true;
         }
 
@@ -1610,19 +1767,19 @@ mod tests {
         // B: rank(1)
         // C: rank(2)
 
-        assert_eq!(graph.edge_length(a_b), None);
+        assert_eq!(graph.simplex_edge_length(a_b), None);
 
         graph.init_rank();
         println!("{graph}");
 
-        assert_eq!(graph.edge_length(a_b), Some(1));
-        assert_eq!(graph.edge_length(a_c), Some(2));
-        assert_eq!(graph.edge_length(b_c), Some(1));
+        assert_eq!(graph.simplex_edge_length(a_b), Some(1));
+        assert_eq!(graph.simplex_edge_length(a_c), Some(2));
+        assert_eq!(graph.simplex_edge_length(b_c), Some(1));
         // assert_eq!(graph.edge_length(c_a), Some(-2));
     }
 
     #[test]
-    fn test_set_edge_slack() {
+    fn test_set_edge_simplex_slack() {
         let mut graph = Graph::new();
         let a_idx = graph.add_node("A");
         let b_idx = graph.add_node("B");
@@ -1637,14 +1794,14 @@ mod tests {
         // B: rank(1)
         // C: rank(2)
 
-        assert_eq!(graph.slack(a_b), None);
+        assert_eq!(graph.simplex_slack(a_b), None);
 
         graph.init_rank();
         println!("{graph}");
 
-        assert_eq!(graph.slack(a_b), Some(0));
-        assert_eq!(graph.slack(a_c), Some(1));
-        assert_eq!(graph.slack(b_c), Some(0));
+        assert_eq!(graph.simplex_slack(a_b), Some(0));
+        assert_eq!(graph.simplex_slack(a_c), Some(1));
+        assert_eq!(graph.simplex_slack(b_c), Some(0));
         // assert_eq!(graph.edge_length(c_a), Some(-2));
     }
 
@@ -1836,7 +1993,7 @@ mod tests {
         println!("{graph}");
 
         for (edge_idx, _edge) in graph.edges.iter().enumerate() {
-            if let Some(len) = graph.edge_length(edge_idx) {
+            if let Some(len) = graph.simplex_edge_length(edge_idx) {
                 assert!(len.abs() <= MIN_EDGE_LENGTH as i32)
             }
         }
