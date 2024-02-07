@@ -17,7 +17,7 @@ use std::{
 
 use self::{
     edge::{Edge, EdgeDisposition, MIN_EDGE_LENGTH},
-    node::Node,
+    node::{Node, NodeType},
     rank_orderings::AdjacentRank,
 };
 
@@ -81,8 +81,8 @@ impl Graph {
     /// The graph function described in "A Technique for Drawing Directed Graphs"
     pub fn draw_graph(&mut self) {
         self.rank_nodes_vertically();
-        self.horizontal_ordering();
-        // self.position();
+        self.set_horizontal_ordering();
+        self.set_horizontal_coordinates();
         // self.make_splines()
     }
 
@@ -183,11 +183,15 @@ impl Graph {
     /// Virtual nodes are (typically) added after ranking.  Once
     /// ranking has been done, all nodes must be ranked, so
     /// a rank must be passed in for the new virtual node.
-    pub fn add_virtual_node(&mut self, rank: u32) -> usize {
+    pub fn add_virtual_node(&mut self, rank: u32, node_type: NodeType) -> usize {
+        if !node_type.is_virtual() {
+            panic!("Cannot add read node as a virtual node");
+        }
+
         let idx = self.add_node("V");
         let v_node = self.get_node_mut(idx);
 
-        v_node.virtual_node = true;
+        v_node.node_type = node_type;
         v_node.simplex_rank = Some(rank);
         v_node.vertical_rank = Some(rank);
 
@@ -995,12 +999,10 @@ impl Graph {
     ///     }
     ///     return best
     /// }
-    fn horizontal_ordering(&mut self) -> RankOrderings {
+    fn set_horizontal_ordering(&mut self) -> RankOrderings {
         const MAX_ITERATIONS: usize = 24;
         let order = self.init_horizontal_order();
         let mut best = order.clone();
-
-        println!("INITAL HO: Node Zero: {:?}", order.nodes().borrow().get(&0));
 
         for i in 0..MAX_ITERATIONS {
             // println!("Ordering pass {i}: cross count: {}", order.crossing_count());
@@ -1022,18 +1024,13 @@ impl Graph {
                     break;
                 }
             }
-            println!(
-                "HO: Nodes: {:?}",
-                itertools::Itertools::sorted(order.nodes().borrow().keys())
-            );
-            println!("HO: Node Zero: {:?}", order.nodes().borrow().get(&0));
-
-            self.set_node_positions(&best)
         }
-        println!(
-            "-- Final order (crosses: {}): --\n{best}",
-            best.crossing_count()
-        );
+        // println!(
+        //     "-- Final order (crosses: {}): --\n{best}",
+        //     best.crossing_count()
+        // );
+
+        self.set_node_positions(&best);
 
         best
     }
@@ -1056,8 +1053,6 @@ impl Graph {
 
         self.fill_vertical_rank_gaps(&order);
         self.set_adjacent_nodes_in_vertical_ranks(&order);
-
-        println!("INIT_HOR: Node Zero: {:?}", order.nodes().borrow().get(&0));
 
         order
     }
@@ -1111,7 +1106,7 @@ impl Graph {
                 new_rank + 1
             };
 
-            let virt_node_idx = self.add_virtual_node(new_rank);
+            let virt_node_idx = self.add_virtual_node(new_rank, NodeType::RankFiller);
 
             let old_edge = self.get_edge_mut(cur_edge_idx);
             let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
@@ -1150,7 +1145,6 @@ impl Graph {
     fn get_initial_horizontal_orderings(&mut self) -> RankOrderings {
         let mut rank_order = RankOrderings::new();
         let mut dfs_queue = self.get_min_vertical_rank_nodes();
-        println!("MIN VRN: {:?}", &dfs_queue);
         let mut assigned = HashSet::new();
 
         while let Some(node_idx) = dfs_queue.pop_front() {
@@ -1272,43 +1266,43 @@ impl Graph {
     ///     means the cost of an original edge (u ,v) in G equals the sum of the cost of the two edges e_u, e_v
     ///     in G′ and, globally, the two solutions have the same cost.
     ///   * Thus, optimality of G′ implies optimality for G and solving G′ gives us a solution for G.
-    fn position(&mut self) {
+    fn set_horizontal_coordinates(&mut self) {
         self.init_node_coordinates();
-        let aux_graph = self.create_positioning_aux_graph();
+        let mut aux_graph = self.create_positioning_aux_graph();
 
-        let mut improved = false;
-        while !improved {
-            let cur_value = aux_graph.graph_coordinate_optimization_value();
-            // aux_graph.optimize_coordinates();
-            let new_value = aux_graph.graph_coordinate_optimization_value();
+        aux_graph.network_simplex_ranking(SimplexNodeTarget::XCoordinate);
 
-            if cur_value < new_value {
-                improved = true;
-            } else {
-                improved = false;
-            }
+        // Technically, once we find the firs XCoordCalc node, we can exit, since they are all added
+        // after other nodes.  At least, that's true now...
+        for (node_idx, node) in aux_graph
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(idx, node)| node.node_type != NodeType::XCoordCalc)
+        {
+            let x = node.coordinates.unwrap().x();
+
+            self.get_node_mut(node_idx).coordinates.unwrap().set_x(x);
         }
     }
 
     /// Initialize the x and y coordinates of all nodes.
     fn init_node_coordinates(&mut self) {
-        for (node_idx, mut node) in self.nodes.iter().enumerate() {
-            let min_x = node.min_seperation_x();
-            let min_y = node.min_seperation_y();
+        for (node_idx, node) in self.nodes.iter_mut().enumerate() {
+            let min_x = node.min_separation_x();
+            let min_y = node.min_separation_y();
+            let new_x = if let Some(position) = node.horizontal_position {
+                position as u32 * min_x
+            } else {
+                panic!("Node {node_idx}: position not set");
+            };
+            let new_y = if let Some(rank) = node.vertical_rank {
+                rank * min_y
+            } else {
+                panic!("Node {node_idx}: rank not set");
+            };
 
-            if let Some(mut coords) = node.coordinates {
-                if let Some(position) = node.horizontal_position {
-                    coords.set_x(position as u32 * min_x);
-                } else {
-                    panic!("Node {node_idx}: position not set");
-                }
-
-                if let Some(rank) = node.vertical_rank {
-                    coords.set_y(rank * min_y);
-                } else {
-                    panic!("Node {node_idx}: rank not set");
-                }
-            }
+            node.set_coordinates(new_x, new_y);
         }
     }
 
@@ -1369,8 +1363,8 @@ impl Graph {
 
             // QUESTION: Should the new node be a virtual node?  Unclear from text.
             let new_node_idx =
-                aux_graph.add_node(&format!("{}-{}", &src_node.name, &dst_node.name));
-            let omega = Edge::edge_omega_value(src_node.virtual_node, dst_node.virtual_node);
+                aux_graph.add_virtual_node(src_node.vertical_rank.unwrap(), NodeType::XCoordCalc);
+            let omega = Edge::edge_omega_value(src_node.is_virtual(), dst_node.is_virtual());
             let new_weight = edge.weight * omega;
 
             let new_edge_idx_1 = aux_graph.add_edge(new_node_idx, src_node_idx);
@@ -1387,11 +1381,12 @@ impl Graph {
             /// TODO: deal with unwraps();
             let new_node = aux_graph.get_node_mut(new_node_idx);
             let src_x = src_node.coordinates.unwrap().x();
+            let src_y = src_node.coordinates.unwrap().y();
             let dst_x = dst_node.coordinates.unwrap().x();
 
             /// ...assigning each n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
             /// and where x_u and x_v are the X coordinates assigned to u and v in G.
-            new_node.coordinates.unwrap().set_x(src_x.min(dst_x));
+            new_node.set_coordinates(src_x.min(dst_x), src_y);
         }
 
         // Add edges between adjacent nodes in a rank, as per figure 4-2 in the paper.
@@ -1424,7 +1419,7 @@ impl Graph {
     fn edge_coordinate_optimization_value(&self, edge: &Edge) -> u32 {
         let src_node = self.get_node(edge.src_node);
         let dst_node = self.get_node(edge.dst_node);
-        let omega = Edge::edge_omega_value(src_node.virtual_node, dst_node.virtual_node);
+        let omega = Edge::edge_omega_value(src_node.is_virtual(), dst_node.is_virtual());
         let weight = edge.weight;
         let w_x = src_node.coordinates.unwrap().x();
         let v_x = dst_node.coordinates.unwrap().y();
@@ -1447,6 +1442,7 @@ impl Display for Graph {
         for edge in &self.edges {
             let src = &self.nodes[edge.src_node];
             let dst = &self.nodes[edge.dst_node];
+
             let line = if let Some(val) = edge.cut_value {
                 format!(" {:2} ", val)
             } else if edge.feasible_tree_member {

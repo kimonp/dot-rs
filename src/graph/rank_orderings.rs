@@ -517,7 +517,7 @@ mod test {
 
         // order.weighted_median(1);
         println!("Calling horizontal_ordering");
-        graph.horizontal_ordering();
+        graph.set_horizontal_ordering();
         println!("FINAL ORDER: {order}");
     }
 
@@ -645,7 +645,7 @@ mod test {
         println!("Nodes: {:?}", order.nodes().borrow().keys().sorted());
         println!("Node Zero: {:?}", order.nodes().borrow().get(&0));
 
-        let order = graph.horizontal_ordering();
+        let order = graph.set_horizontal_ordering();
         assert_eq!(order.crossing_count(), 0);
     }
 }

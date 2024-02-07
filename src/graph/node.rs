@@ -39,6 +39,27 @@ impl Point {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum NodeType {
+    /// Part of the graph: these are the only nodes that are printed
+    Real,
+    /// Used so that edges never traverse more than one rank.
+    RankFiller,
+    /// Used to help calculate the x coordiante
+    XCoordCalc,
+}
+
+impl NodeType {
+    /// Return true if the node is a virtual node type.
+    pub fn is_virtual(&self) -> bool {
+        match self {
+            NodeType::Real => false,
+            NodeType::RankFiller => true,
+            NodeType::XCoordCalc => true,
+        }
+    }
+}
+
 // Represents the node element of a graph.  Sometimes called a vertice.
 //
 // Nodes are connected together via Edges.  Each node has a list of edges coming in and edges
@@ -66,7 +87,7 @@ pub struct Node {
     /// True if this node is part of the "feasible" tree under consideration.  Used during ranking.
     pub(super) tree_node: bool,
     /// Added as a placeholder node during position assignement or other part of graphinc
-    pub(super) virtual_node: bool,
+    pub(super) node_type: NodeType,
 }
 
 impl Node {
@@ -81,8 +102,17 @@ impl Node {
             in_edges: vec![],
             out_edges: vec![],
             tree_node: false,
-            virtual_node: false,
+            node_type: NodeType::Real,
         }
+    }
+
+    /// Return true of the node is one of the virtual node types.
+    pub(super) fn is_virtual(&self) -> bool {
+        self.node_type.is_virtual()
+    }
+
+    pub(super) fn set_coordinates(&mut self, x: u32, y: u32) {
+        self.coordinates = Some(Point::new(x, y));
     }
 
     /// Add either an in our out edge to the node.
@@ -93,19 +123,19 @@ impl Node {
         };
     }
 
-    /// Minimum separation of x coordiantes from a point to this node.
+    /// Minimum separation of x coordiante from a point to this node.
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
-    pub(super) fn min_seperation_x(&self) -> u32 {
+    pub(super) fn min_separation_x(&self) -> u32 {
         NODE_MIN_SEP_X
     }
 
-    /// Minimum separation of y coordiantes from a point to this node.
+    /// Minimum separation of y coordiante from a point to this node.
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
-    pub(super) fn min_seperation_y(&self) -> u32 {
+    pub(super) fn min_separation_y(&self) -> u32 {
         NODE_MIN_SEP_Y
     }
 
@@ -220,7 +250,22 @@ impl Node {
 
 impl Display for Node {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(fmt, "{}: {:?}", &self.name, self.simplex_rank)
+        let coords = if let Some(coords) = self.coordinates {
+            format!("({:3},{:3})", coords.x(), coords.y())
+        } else {
+            "        ".to_string()
+        };
+        let v_rank = if let Some(v_rank) = self.vertical_rank {
+            format!("vr:{v_rank:2}")
+        } else {
+            "     ".to_string()
+        };
+        let pos = if let Some(h_pos) = self.horizontal_position {
+            format!("pos:{h_pos:2}")
+        } else {
+            "      ".to_string()
+        };
+        write!(fmt, "{}: {v_rank} {coords} {pos}", &self.name)
     }
 }
 
