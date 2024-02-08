@@ -60,5 +60,4 @@ impl Edge {
             (true, true) => 8,
         }
     }
-
 }
