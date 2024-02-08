@@ -119,6 +119,22 @@ impl Graph {
         }
     }
 
+    /// Return the max position in any rank, and the max rank.
+    fn max_positions(&self) -> (u32, u32) {
+        let mut max_pos = 0;
+        let mut max_rank = 0;
+
+        for node in self.nodes.iter() {
+            if let Some(pos) = node.horizontal_position {
+                max_pos = max_pos.max(pos);
+            }
+            if let Some(rank) = node.vertical_rank {
+                max_rank = max_rank.max(rank);
+            }
+        }
+        (max_pos as u32, max_rank)
+    }
+
     fn get_vertical_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
         let mut above_nodes = vec![];
         let mut below_nodes = vec![];
@@ -1435,6 +1451,172 @@ impl Graph {
 
         MIN_NODE_DISTANCE
     }
+
+    fn get_svg(&self, debug: bool) -> String {
+        let (max_pos, max_rank) = self.max_positions();
+        let max_pos = max_pos as f64;
+        let max_rank = max_rank as f64;
+
+        let mult = 200.0;
+        let (x_scale, y_scale) = if max_pos > max_rank {
+            (1.0, max_pos / max_rank)
+        } else {
+            (max_rank / max_pos, 1.0)
+        };
+        let x_scale = x_scale * mult;
+        let y_scale = y_scale * mult;
+
+        let width = max_pos * x_scale;
+        let height = max_rank * y_scale;
+        let px_size = 1_f64 / y_scale * 1.0;
+        let stroke = px_size * 1_f64;
+
+        let vb_width = max_pos + 0.5 + 0.5;
+        let vb_height = max_rank + 0.5 + 0.5;
+
+        // To set the coordinates within the svg We set the viewbox's height and width
+        let mut svg = vec![
+            format!(
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}"
+                    viewBox="-0.5 -0.5 {vb_width} {vb_height}"
+                    preserveAspectRatio="xMinYMin meet"
+                    >"#
+            ),
+            format!(
+                r#"<defs>
+                    <marker
+                        id="arrow-head"
+                        orient="auto"
+                        viewBox="0 0 10 10"
+                        refX="10" refY="5"
+                        markerWidth="10" markerHeight="10"
+                    >
+                        <path d="M0,0 L10,5 L0,10 Z" fill="black"/>
+                    </marker>
+                </defs>"#
+            ),
+        ];
+
+        let rect_width = 0.8;
+        let rect_height = 0.5;
+        let real_radius = 0.2;
+        let virtual_radius = if debug { real_radius } else { 0.0 };
+
+        for edge in self.edges.iter() {
+            let reversed = edge.reversed;
+            let (src_node_idx, dst_node_idx) = if reversed {
+                (edge.dst_node, edge.src_node)
+            } else {
+                (edge.src_node, edge.dst_node)
+            };
+            let src_node = self.get_node(src_node_idx);
+            let src_x = src_node.horizontal_position.unwrap() as f64;
+            let src_y = src_node.vertical_rank.unwrap() as f64;
+
+            let dst_node = self.get_node(dst_node_idx);
+            let mut dst_x = dst_node.horizontal_position.unwrap() as f64;
+            let mut dst_y = dst_node.vertical_rank.unwrap() as f64;
+
+            let slope = (src_y - dst_y) / (src_x - dst_x); // # TODO
+            let theta = slope.atan();
+            let show_dst = !dst_node.is_virtual() || debug;
+            let node_radius = if show_dst {
+                real_radius
+            } else {
+                virtual_radius
+            };
+
+            let y_offset = theta.sin() * node_radius;
+            let x_offset = theta.cos() * node_radius;
+
+            if (slope < 0.0 && !reversed) || (slope > 0.0 && reversed) {
+                dst_x += x_offset;
+                dst_y += y_offset;
+            } else {
+                dst_x -= x_offset;
+                dst_y -= y_offset;
+            }
+
+            let dashed = if !debug || edge.feasible_tree_member {
+                ""
+            } else {
+                r#"stroke-dasharray="0.015""#
+            };
+            let marker = if show_dst {
+                r#"marker-end="url(#arrow-head)""#
+            } else {
+                ""
+            };
+
+            svg.push(format!(
+                r#"<path {marker} d="M{src_x} {src_y} L{dst_x} {dst_y}" stroke="black" {dashed} stroke-width="{px_size}px"/>"#
+            ));
+
+            if debug {
+                let font_size = 0.1;
+                let font_style = format!("font-size:{font_size}; text-anchor: left");
+                let label_x = (src_x + dst_x) / 2.0 + (font_size / 3.0);
+                let label_y = (src_y + dst_y) / 2.0 + (font_size / 3.0);
+                let edge_label = if let Some(cut_value) = edge.cut_value {
+                    format!("{cut_value}")
+                } else {
+                    "Nill".to_string()
+                };
+
+                svg.push(format!(
+                    r#"<text x="{label_x}" y="{label_y}" style="{font_style}">{edge_label}</text>"#
+                ));
+            }
+        }
+
+        for node in self.nodes.iter() {
+            let x = node.horizontal_position.unwrap() as f64;
+            let y = node.vertical_rank.unwrap() as f64;
+            let name = &node.name;
+            let font_size = 0.2;
+            let font_style = format!("font-size:{font_size}; text-anchor: middle");
+            let label_x = x;
+            let label_y = y + (font_size / 3.0);
+
+            let show_node = !node.is_virtual() || debug;
+            let node_radius = if show_node {
+                real_radius
+            } else {
+                virtual_radius
+            };
+            let fill = if node.is_virtual() {
+                "lightgray"
+            } else {
+                "skyblue"
+            };
+            let style = format!("fill: {fill}; stroke: black; stroke-width: {px_size}px;");
+
+            svg.push(format!(
+                r#"<circle cx="{x}" cy="{y}" r="{node_radius}" style="{style}"/>"#
+            ));
+
+            // svg.push(format!(
+            //     r#"<svg viewBox="{rect_x} {rect_y} {rect_width} {rect_height}">"#
+            // ));
+            // svg.push(format!(
+            //     r#"<rect x="0" y="0" height="1" width="1" rx=".001" style="{rect_style}"/>"#
+            // ));
+            if show_node {
+                svg.push(format!(
+                    r#"<text x="{label_x}" y="{label_y}" style="{font_style}">{name}</text>"#
+                ));
+            }
+            // svg.push("</svg>".to_string());
+
+            // if true {
+            //     break;
+            // }
+        }
+
+        svg.push("</svg>".to_string());
+
+        svg.join("\n")
+    }
 }
 
 impl Display for Graph {
@@ -1611,6 +1793,16 @@ mod tests {
 
                 assert_eq!(edge.cut_value, Some(cut_val), "unexpected cut_value");
             }
+        }
+
+        /// Write out the graph as is to the given file name (with an svg suffix).
+        fn write_svg_file(&self, name: &str, debug: bool) {
+            use std::fs::File;
+            use std::io::prelude::*;
+
+            let svg = self.get_svg(debug);
+            let mut file = File::create(format!("{name}.svg")).unwrap();
+            file.write_all(svg.as_bytes()).unwrap();
         }
     }
 
@@ -2019,5 +2211,7 @@ mod tests {
         println!("{graph}");
         graph.draw_graph();
         println!("{graph}");
+
+        graph.write_svg_file("foo", true);
     }
 }

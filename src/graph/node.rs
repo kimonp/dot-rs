@@ -32,6 +32,7 @@ impl Point {
         x
     }
 
+    #[allow(unused)]
     pub fn set_y(&mut self, y: u32) -> u32 {
         self.y = y;
 
