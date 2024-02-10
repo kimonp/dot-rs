@@ -7,5 +7,7 @@ edition = "2021"
 
 [dependencies]
 itertools = "0.12.0"
+pest = "2.7.7"
+pest_derive = "2.7.7"
 [dev-dependencies]
 rstest = "0.18.2"

@@ -1,2 +1,3 @@
 // Needed for firedbg to see unit tests.
-mod graph;
+pub mod graph;
+pub mod dot_parser;

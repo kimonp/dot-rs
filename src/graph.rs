@@ -1452,7 +1452,7 @@ impl Graph {
         MIN_NODE_DISTANCE
     }
 
-    fn get_svg(&self, debug: bool) -> String {
+    pub fn get_svg(&self, debug: bool) -> String {
         let (max_pos, max_rank) = self.max_positions();
         let max_pos = max_pos as f64;
         let max_rank = max_rank as f64;
@@ -2214,4 +2214,5 @@ mod tests {
 
         graph.write_svg_file("foo", true);
     }
+
 }
