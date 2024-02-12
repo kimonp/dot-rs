@@ -78,8 +78,10 @@ impl Graph {
         }
     }
 
-    /// The graph function described in "A Technique for Drawing Directed Graphs"
-    pub fn draw_graph(&mut self) {
+    /// Lays out the nodes in the graph as described in the graphviz dot paper:
+    ///
+    /// "A Technique for Drawing Directed Graphs"
+    pub fn layout_nodes(&mut self) {
         self.rank_nodes_vertically();
         self.set_horizontal_ordering();
         self.set_horizontal_coordinates();
@@ -1457,7 +1459,7 @@ impl Graph {
         let max_pos = max_pos as f64;
         let max_rank = max_rank as f64;
 
-        let mult = 200.0;
+        let mult = 110.0;
         let (x_scale, y_scale) = if max_pos > max_rank {
             (1.0, max_pos / max_rank)
         } else {
@@ -2209,7 +2211,7 @@ mod tests {
         let mut graph = example_graph_from_paper_2_3();
 
         println!("{graph}");
-        graph.draw_graph();
+        graph.layout_nodes();
         println!("{graph}");
 
         graph.write_svg_file("foo", true);
