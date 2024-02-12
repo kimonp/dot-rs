@@ -1,0 +1,13 @@
+[package]
+name = "graphvis_test_app"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dioxus = "0.4.3"
+dioxus-desktop = "0.4.3"
+dot-rs = { path = "../../dot-rs" }
+# petgraph = "0.6.4"
+# petgraph-evcxr = "*"
