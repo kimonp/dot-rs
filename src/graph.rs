@@ -52,7 +52,6 @@ impl Default for Graph {
     }
 }
 
-#[allow(unused)]
 impl Graph {
     pub fn new() -> Self {
         Graph {
@@ -199,14 +198,6 @@ impl Graph {
         idx
     }
 
-    fn display_edge(&mut self, edge_idx: usize) -> String {
-        let edge = self.get_edge(edge_idx);
-        let src = &self.get_node(edge.src_node).name;
-        let dst = &self.get_node(edge.dst_node).name;
-
-        format!("{src} -> {dst}")
-    }
-
     /// Add a new edge between two nodes, and return the edge's index in the graph.
     pub fn add_edge(&mut self, src_node: usize, dst_node: usize) -> usize {
         let new_edge = Edge::new(src_node, dst_node);
@@ -294,11 +285,11 @@ impl Graph {
     fn get_source_nodes(&self) -> VecDeque<usize> {
         let mut queue = VecDeque::new();
 
-        for (node_idx, node) in self
+        for (node_idx, _node) in self
             .nodes
             .iter()
             .enumerate()
-            .filter(|(i, n)| n.no_in_edges())
+            .filter(|(_i, n)| n.no_in_edges())
         {
             queue.push_back(node_idx);
         }
@@ -453,7 +444,7 @@ impl Graph {
 
     /// Set the initial ordering of the nodes, and return a RankOrderings object to optimize node orderings.
     fn init_horizontal_order(&mut self) -> RankOrderings {
-        let mut order = self.get_initial_horizontal_orderings();
+        let order = self.get_initial_horizontal_orderings();
 
         self.fill_vertical_rank_gaps(&order);
         self.set_adjacent_nodes_in_vertical_ranks(&order);
@@ -585,7 +576,7 @@ impl Graph {
 
     /// The graph is reponsible for setting adjacent nodes in the rank_order once all nodes have been added to it.
     fn set_adjacent_nodes_in_vertical_ranks(&self, rank_order: &RankOrderings) {
-        for (node_idx, node_position) in rank_order.nodes().borrow().iter() {
+        for (node_idx, _node_position) in rank_order.nodes().borrow().iter() {
             let (above_adj, below_adj) = self.get_vertical_adjacent_nodes(*node_idx);
 
             rank_order.set_adjacent_nodes(*node_idx, &above_adj, &below_adj);
@@ -682,7 +673,7 @@ impl Graph {
             .nodes
             .iter()
             .enumerate()
-            .filter(|(idx, node)| node.node_type != NodeType::XCoordCalc)
+            .filter(|(_idx, node)| node.node_type != NodeType::XCoordCalc)
         {
             let x = node.coordinates.unwrap().x();
 
@@ -749,7 +740,7 @@ impl Graph {
     fn create_positioning_aux_graph(&self) -> Graph {
         let mut aux_graph = Graph::new();
 
-        /// Add all the existing edges to the current graph without edges.
+        // Add all the existing edges to the current graph without edges.
         for node in self.nodes.iter() {
             let mut new_node = node.clone();
             new_node.clear_edges();
@@ -782,14 +773,14 @@ impl Graph {
                 new_edge_2.weight = new_weight;
             }
 
-            /// TODO: deal with unwraps();
+            // TODO: deal with unwraps();
             let new_node = aux_graph.get_node_mut(new_node_idx);
             let src_x = src_node.coordinates.unwrap().x();
             let src_y = src_node.coordinates.unwrap().y();
             let dst_x = dst_node.coordinates.unwrap().x();
 
-            /// ...assigning each n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
-            /// and where x_u and x_v are the X coordinates assigned to u and v in G.
+            // ...assigning each n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
+            // and where x_u and x_v are the X coordinates assigned to u and v in G.
             new_node.set_coordinates(src_x.min(dst_x), src_y);
         }
 
@@ -799,6 +790,7 @@ impl Graph {
         aux_graph
     }
 
+    #[allow(unused)]
     fn make_splines(&mut self) {
         todo!();
     }
@@ -840,6 +832,16 @@ impl Graph {
         MIN_NODE_DISTANCE
     }
 
+    /// Return an SVG representation of graph.
+    /// * self.layout_nodes() must be called first.
+    /// * debug=true will display additional debugging information on the svg
+    /// 
+    /// For now, this is just quick and dirty to be able to see the graph
+    /// in svg form.
+    ///
+    /// Later, the dot parser of graph should be improved, and the output
+    /// of get_svg() should be generalized and take the parser directives
+    /// into account.
     pub fn get_svg(&self, debug: bool) -> String {
         let (max_pos, max_rank) = self.max_positions();
         let max_pos = max_pos as f64;
@@ -857,7 +859,6 @@ impl Graph {
         let width = max_pos * x_scale;
         let height = max_rank * y_scale;
         let px_size = 1_f64 / y_scale * 1.0;
-        let stroke = px_size * 1_f64;
 
         let vb_width = max_pos + 0.5 + 0.5;
         let vb_height = max_rank + 0.5 + 0.5;
@@ -885,8 +886,6 @@ impl Graph {
             ),
         ];
 
-        let rect_width = 0.8;
-        let rect_height = 0.5;
         let real_radius = 0.2;
         let virtual_radius = if debug { real_radius } else { 0.0 };
 
@@ -948,7 +947,7 @@ impl Graph {
                 let edge_label = if let Some(cut_value) = edge.cut_value {
                     format!("{cut_value}")
                 } else {
-                    "Nill".to_string()
+                    "Null".to_string()
                 };
 
                 svg.push(format!(
