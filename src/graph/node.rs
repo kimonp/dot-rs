@@ -2,7 +2,8 @@
 
 use std::{collections::HashSet, fmt::Display};
 
-use super::{EdgeDisposition, SimplexNodeTarget};
+use super::edge::EdgeDisposition;
+use crate::graph::network_simplex::SimplexNodeTarget;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Point {

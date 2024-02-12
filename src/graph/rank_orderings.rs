@@ -484,7 +484,8 @@ impl RankOrderings {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::graph::{tests::example_graph_from_paper_2_3, SimplexNodeTarget};
+    use crate::graph::tests::example_graph_from_paper_2_3;
+    use crate::graph::network_simplex::SimplexNodeTarget::VerticalRank;
 
     #[test]
     fn test_adjacent_position() {
@@ -636,7 +637,7 @@ mod test {
         let mut graph = example_graph_from_paper_2_3();
 
         graph.init_simplex_rank();
-        graph.assign_simplex_rank(SimplexNodeTarget::VerticalRank);
+        graph.assign_simplex_rank(VerticalRank);
         graph.rank_nodes_vertically();
         let order = graph.init_horizontal_order();
 

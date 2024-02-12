@@ -1,5 +1,5 @@
 //! With Graph::new_from_str(), creates a new graph given a string in the dot language.
-//! 
+//!
 //! For details on dot, see: <https://graphviz.org/doc/info/lang.html>
 use pest::iterators::Pair;
 use pest::iterators::Pairs;
@@ -11,21 +11,21 @@ use std::collections::HashMap;
 #[grammar = "dot.pest"]
 pub struct DotParser;
 
-use pest_derive::Parser;
 use pest::Parser;
+use pest_derive::Parser;
 
 impl Graph {
     /// Given a string in the dot language, build a graph.
-    /// 
+    ///
     /// Uses the Pest crate to do all the parsing.
     /// * A unsucessful parse will cause a panic.
-    ///
-    /// NOTE: Though the full grammer is in the dot.pest grammer file,
-    ///       The only portion of dot that is currently supported is reading
-    ///       in edge statements (e.g. node_1 -> node2;)
+    /// * Going beyond the basic node layout of dot may also cause a panic
+    ///   NOTE: Though the full grammer is in the dot.pest grammer file,
+    ///         The only portion of dot that is currently supported is reading
+    ///         in edge statements (e.g. node_1 -> node2;)
     pub fn new_from_str(dot_str: &str) -> Self {
         let dot_graph = DotParser::parse(Rule::dotgraph, dot_str)
-            .expect("unsuccessful parse")
+            .expect("unsuccessful parse of dot string")
             .next()
             .unwrap();
 
@@ -70,6 +70,12 @@ impl Graph {
             graph.add_edge(src_node_idx, dst_node_idx);
         }
         graph
+    }
+}
+
+impl From<&str> for Graph {
+    fn from(str: &str) -> Self {
+        Self::new_from_str(str)
     }
 }
 
