@@ -87,7 +87,7 @@ impl Graph {
             self.exchange(neg_cut_edge_idx, non_tree_edge_idx);
         }
         self.normalize_simplex_rank();
-        // self.balance();
+        self.balance(target);
         self.assign_simplex_rank(target);
     }
 
@@ -139,7 +139,7 @@ impl Graph {
         self.init_simplex_rank();
 
         for node in self.nodes.iter_mut() {
-            node.tree_node = node.no_out_edges();
+            node.set_tree_node(node.no_out_edges());
         }
 
         while self.tight_simplex_tree() < self.node_count() {
@@ -160,7 +160,7 @@ impl Graph {
                 panic!("Can't calculate slack on edge {edge_idx}");
             };
 
-            for node in self.nodes.iter_mut().filter(|node| node.tree_node) {
+            for node in self.nodes.iter_mut().filter(|node| node.tree_node()) {
                 let cur_rank = node.simplex_rank.expect("Node does not have rank");
                 node.simplex_rank = Some(cur_rank + delta as u32)
             }
@@ -168,7 +168,7 @@ impl Graph {
             let node_idx = self
                 .get_incident_node(edge_idx)
                 .expect("Edge is not incident");
-            self.get_node_mut(node_idx).tree_node = true;
+            self.get_node_mut(node_idx).set_tree_node(true);
             self.get_edge_mut(edge_idx).feasible_tree_member = true;
         }
         self.init_cutvalues();
@@ -305,7 +305,7 @@ impl Graph {
         let src_node = self.get_node(edge.src_node);
         let dst_node = self.get_node(edge.dst_node);
 
-        !src_node.tree_node && dst_node.tree_node
+        !src_node.tree_node() && dst_node.tree_node()
     }
 
     /// edge_index is expected to span two nodes, one of which is in the tree, one of which is not.
@@ -315,9 +315,9 @@ impl Graph {
         let src_node = self.get_node(edge.src_node);
         let dst_node = self.get_node(edge.dst_node);
 
-        if !src_node.tree_node && dst_node.tree_node {
+        if !src_node.tree_node() && dst_node.tree_node() {
             Some(edge.src_node)
-        } else if src_node.tree_node && !dst_node.tree_node {
+        } else if src_node.tree_node() && !dst_node.tree_node() {
             Some(edge.dst_node)
         } else {
             None
@@ -348,7 +348,7 @@ impl Graph {
     ///   * A spanning tree of a graph is a subgraph that is a tree and includes all the vertices of the original graph.
     ///   * A spanning tree is said to be "maximal" if no additional edges can be added to it without creating a cycle.
     fn tight_simplex_tree(&self) -> usize {
-        self.nodes.iter().filter(|node| node.tree_node).count()
+        self.nodes.iter().filter(|node| node.tree_node()).count()
     }
 
     /// Return an edge with the smallest slack of any edge which is incident to the tree.
@@ -367,13 +367,13 @@ impl Graph {
         let mut candidate_slack = i32::MAX;
 
         for (node_idx, node) in self.nodes.iter().enumerate() {
-            if node.tree_node {
+            if node.tree_node() {
                 for edge_idx in node.get_all_edges() {
                     let connected_node_idx = self
                         .get_connected_node(node_idx, *edge_idx)
                         .expect("Edge not connected");
 
-                    if !self.get_node(connected_node_idx).tree_node {
+                    if !self.get_node(connected_node_idx).tree_node() {
                         let slack = self
                             .simplex_slack(*edge_idx)
                             .expect("Can't calculate slack");
@@ -394,11 +394,11 @@ impl Graph {
     #[allow(unused)]
     fn get_next_feasible_edge(&self) -> Option<usize> {
         for node in self.nodes.iter() {
-            if node.tree_node {
+            if node.tree_node() {
                 for edge_idx in &node.out_edges {
                     let dst_node = self.get_edge(*edge_idx).dst_node;
 
-                    if !self.get_node(dst_node).tree_node {
+                    if !self.get_node(dst_node).tree_node() {
                         return Some(*edge_idx);
                     }
                 }
@@ -494,7 +494,7 @@ impl Graph {
         // are scanned yet)
         for (index, node) in self.nodes.iter_mut().enumerate() {
             node.set_simplex_rank(None);
-            node.tree_node = false;
+            node.set_tree_node(false);
 
             if node.no_in_edges() {
                 nodes_to_rank.push(index);
@@ -613,8 +613,63 @@ impl Graph {
     ///   * Globally balancing ranks is considered in a forthcoming paper [GNV2]:
     ///     "On the Rank Assignment Problem"
     ///     * Unclear if this paper was ever created or submitted
-    fn balance(&mut self) {
-        todo!();
+    fn balance(&mut self, target: SimplexNodeTarget) {
+        match target {
+            SimplexNodeTarget::VerticalRank => self.balance_top_bottom(),
+            SimplexNodeTarget::XCoordinate => self.balance_left_right(),
+        }
+    }
+    
+    fn balance_top_bottom(&mut self) {
+        // TODO!
+    }
+
+    ///
+    ///From GraphViz 9.0.0:
+    /// * Initializes DFS range attributes (par, low, lim) over tree nodes such that:
+    /// * ND_par(n) - parent tree edge
+    /// * ND_low(n) - min DFS index for nodes in sub-tree (>= 1)
+    /// * ND_lim(n) - max DFS index for nodes in sub-tree
+    /// 
+    fn balance_left_right(&mut self) {
+    //     for (edge_idx, edge) in self.edges.iter().enumerate() {
+    //         if let Some(cut_val) = edge.cut_value {
+    //             if cut_val == 0 {
+    //                 if let Some(replace_edge_idx) = self.enter_edge_for_simplex(edge_idx) {
+    //                     if let Some(delta) = self.simplex_slack(replace_edge_idx) {
+    //                         if delta > 1 {
+    //                             let edge = self.get_edge(replace_edge_idx);
+    //                             let src_node = self.get_node(edge.src_node);
+    //                             let dst_node = self.get_node(edge.dst_node);
+
+    //                             // ND_lim() is greatest for the root of the tree and 1 for leaves of the tree
+    //                             // So if src_node is farther from the root than dst_node:
+    //                             //   reduce by delta the rank of dst_node and all nodes under it
+    //                             // else 
+    //                             //   increase by delta the rank of dst_node and all nodes under it
+    //                             //
+    //                             if ND_lim(src_node) < ND_lim(dst_node) {
+    //                                 // rerank(n) subtracts delta to the rank of all subtree nodes:
+    //                                 //
+    //                                 // * reduces the rank of src_node by delta
+    //                                 // * for each outgoing edge of the tree from n
+    //                                 //   * if edge is not heading to the parent of n
+    //                                 //      * call rerank(e.dst_node, delta)
+    //                                 // * for each incoming edge of the tree from n
+    //                                 //   * if edge is not heading to the parent of n
+    //                                 //      * call rerank(e.src_node, delta)
+    //                                 rerank(src_node, delta / 2);
+    //                             } else {
+    //                                 rerank(dst_node, -delta / 2)
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+
+    //             }
+    //         }
+
+    //     }
     }
 }
 
@@ -659,15 +714,15 @@ mod tests {
 
         println!("{graph}");
 
-        graph.get_node_mut(a_idx).tree_node = true;
+        graph.get_node_mut(a_idx).set_tree_node(true);
         let min_edge_idx = graph.get_min_incident_edge();
         assert_eq!(min_edge_idx, Some(e1));
 
-        graph.get_node_mut(b_idx).tree_node = true;
+        graph.get_node_mut(b_idx).set_tree_node(true);
         let min_edge_idx = graph.get_min_incident_edge();
         assert_eq!(min_edge_idx, Some(e2));
 
-        graph.get_node_mut(c_idx).tree_node = true;
+        graph.get_node_mut(c_idx).set_tree_node(true);
         let min_edge_idx = graph.get_min_incident_edge();
         assert_eq!(min_edge_idx, None);
     }
@@ -688,7 +743,7 @@ mod tests {
 
         println!("{graph}");
 
-        graph.get_node_mut(a_idx).tree_node = true;
+        graph.get_node_mut(a_idx).set_tree_node(true);
         // Graph:(A) <-> B
         //         |    |
         //         |    v

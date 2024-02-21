@@ -87,7 +87,7 @@ pub struct Node {
     pub(super) out_edges: Vec<usize>,
 
     /// True if this node is part of the "feasible" tree under consideration.  Used during ranking.
-    pub(super) tree_node: bool,
+    tree_node: bool,
     /// Added as a placeholder node during position assignement or other part of graphinc
     pub(super) node_type: NodeType,
 }
@@ -111,6 +111,14 @@ impl Node {
     /// Return true of the node is one of the virtual node types.
     pub(super) fn is_virtual(&self) -> bool {
         self.node_type.is_virtual()
+    }
+    
+    pub(super) fn tree_node(&self) -> bool {
+        self.tree_node
+    }
+
+    pub(super) fn set_tree_node(&mut self, tree_node: bool) {
+        self.tree_node = tree_node
     }
 
     pub(super) fn set_coordinates(&mut self, x: u32, y: u32) {

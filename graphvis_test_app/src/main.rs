@@ -70,6 +70,10 @@ fn App(cx: Scope) -> Element {
         c -> d; d -> h;
         g -> h;
     }";
+    let dot_str = "digraph {
+        a -> c; b -> c
+    }";
+
     let mut graph = Graph::from(dot_str);
 
     graph.layout_nodes();

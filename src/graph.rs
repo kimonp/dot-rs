@@ -5,9 +5,9 @@
 
 mod crossing_lines;
 mod edge;
+mod network_simplex;
 mod node;
 mod rank_orderings;
-mod network_simplex;
 
 use rank_orderings::RankOrderings;
 use std::{
@@ -18,8 +18,8 @@ use std::{
 
 use self::{
     edge::{Edge, EdgeDisposition},
-    node::{Node, NodeType},
     network_simplex::SimplexNodeTarget::{VerticalRank, XCoordinate},
+    node::{Node, NodeType},
     rank_orderings::AdjacentRank,
 };
 
@@ -274,7 +274,7 @@ impl Graph {
     fn get_next_non_tree_node_idx(&self, start: usize) -> Option<usize> {
         for (index, node) in self.nodes.iter().skip(start).enumerate() {
             let node_idx = start + index;
-            if !node.tree_node {
+            if !node.tree_node() {
                 return Some(node_idx);
             }
         }
@@ -303,7 +303,7 @@ impl Graph {
     fn set_asyclic_tree(&mut self, queue: &mut VecDeque<usize>) {
         while let Some(node_idx) = queue.pop_front() {
             let node = self.get_node_mut(node_idx);
-            node.tree_node = true;
+            node.set_tree_node(true);
 
             let node = self.get_node(node_idx);
             let mut edges_to_reverse = Vec::new();
@@ -311,7 +311,7 @@ impl Graph {
                 let edge = self.get_edge(edge_idx);
                 let dst_node = self.get_node(edge.dst_node);
 
-                if !dst_node.tree_node {
+                if !dst_node.tree_node() {
                     queue.push_back(edge.dst_node);
                 } else {
                     edges_to_reverse.push(edge_idx);
@@ -835,7 +835,7 @@ impl Graph {
     /// Return an SVG representation of graph.
     /// * self.layout_nodes() must be called first.
     /// * debug=true will display additional debugging information on the svg
-    /// 
+    ///
     /// For now, this is just quick and dirty to be able to see the graph
     /// in svg form.
     ///
@@ -908,7 +908,15 @@ impl Graph {
             let theta = slope.atan();
             let show_dst = !dst_node.is_virtual() || debug;
             let node_radius = if show_dst {
-                real_radius
+                // TODO: This is just an approximation if the node
+                //       is shows as an ellipse with x_radius=1.5*y_radius
+                let node_radius_x = real_radius * 1.5 * 0.8;
+                
+                if debug {
+                    node_radius_x
+                } else {
+                    real_radius
+                }
             } else {
                 virtual_radius
             };
@@ -982,9 +990,17 @@ impl Graph {
             };
             let style = format!("fill: {fill}; stroke: black; stroke-width: {px_size}px;");
 
-            svg.push(format!(
-                r#"<circle cx="{x}" cy="{y}" r="{node_radius}" style="{style}"/>"#
-            ));
+            if debug {
+                let node_radius_x = node_radius * 1.5;
+
+                svg.push(format!(
+                    r#"<ellipse cx="{x}" cy="{y}" ry="{node_radius}" rx="{node_radius_x}" style="{style}"/>"#
+                ));
+            } else {
+                svg.push(format!(
+                    r#"<circle cx="{x}" cy="{y}" r="{node_radius}" style="{style}"/>"#
+                ));
+            }
 
             // svg.push(format!(
             //     r#"<svg viewBox="{rect_x} {rect_y} {rect_width} {rect_height}">"#
@@ -1088,7 +1104,7 @@ pub mod tests {
             let node = self.get_node_mut(node_idx);
 
             node.vertical_rank = Some(vertical_rank);
-            node.tree_node = true;
+            node.set_tree_node(true);
         }
 
         /// Get the edge that has src_node == src_name, dst_node == dst_name.
