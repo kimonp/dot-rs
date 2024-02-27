@@ -62,6 +62,42 @@ impl NodeType {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+pub struct SpanningTreeData {
+    // Graph index id of the edge connects to the parent of this node.  None if this node has no tree parent.
+    edge_idx_to_parent: Option<usize>,
+    // The minimal tree index of all nodes for which this node is an ancestor.
+    sub_tree_idx_min: usize,
+    // The maximum tree index of all nodes for which this node is an ancestor.
+    sub_tree_idx_max: usize,
+}
+
+impl SpanningTreeData {
+    fn new(
+        edge_idx_to_parent: Option<usize>,
+        sub_tree_idx_min: usize,
+        sub_tree_idx_max: usize,
+    ) -> SpanningTreeData {
+        SpanningTreeData {
+            edge_idx_to_parent,
+            sub_tree_idx_min,
+            sub_tree_idx_max,
+        }
+    }
+    
+    pub fn edge_idx_to_parent(&self) -> Option<usize> {
+        self.edge_idx_to_parent
+    }
+
+    pub fn sub_tree_idx_min(&self) -> usize {
+        self.sub_tree_idx_min
+    }
+
+    pub fn sub_tree_idx_max(&self) -> usize {
+        self.sub_tree_idx_max
+    }
+}
+
 // Represents the node element of a graph.  Sometimes called a vertice.
 //
 // Nodes are connected together via Edges.  Each node has a list of edges coming in and edges
@@ -86,8 +122,8 @@ pub struct Node {
     /// Edges outcoming from this node.  Each entry is a edge index into the graph's edges list.
     pub(super) out_edges: Vec<usize>,
 
-    /// True if this node is part of the "feasible" tree under consideration.  Used during ranking.
-    tree_node: bool,
+    /// True if this node is part of the "spanning" tree under consideration.  Used during ranking.
+    spanning_tree: Option<SpanningTreeData>,
     /// Added as a placeholder node during position assignement or other part of graphinc
     pub(super) node_type: NodeType,
 }
@@ -103,7 +139,7 @@ impl Node {
             coordinates: None,
             in_edges: vec![],
             out_edges: vec![],
-            tree_node: false,
+            spanning_tree: None,
             node_type: NodeType::Real,
         }
     }
@@ -112,13 +148,48 @@ impl Node {
     pub(super) fn is_virtual(&self) -> bool {
         self.node_type.is_virtual()
     }
-    
-    pub(super) fn tree_node(&self) -> bool {
-        self.tree_node
+
+    pub(super) fn in_spanning_tree(&self) -> bool {
+        self.spanning_tree.is_some()
     }
 
-    pub(super) fn set_tree_node(&mut self, tree_node: bool) {
-        self.tree_node = tree_node
+    pub(super) fn spaning_tree(&self) -> Option<SpanningTreeData> {
+        self.spanning_tree
+    }
+
+    /// If this node is in the tree, return the graph index of the parent.
+    ///
+    /// Note that None is retuned if either this node is not a tree node,
+    /// or it has no parent.
+    pub(super) fn spanning_tree_parent_edge_idx(&self) -> Option<usize> {
+        if let Some(tree_data) = self.spanning_tree {
+            tree_data.edge_idx_to_parent
+        } else {
+            None
+        }
+    }
+
+    /// Set the given node's tree data as a root node of the tree.
+    /// 
+    /// Typically, nodes with no in_edges are set as root nodes.
+    pub(super) fn set_tree_root_node(&mut self) {
+        self.spanning_tree = Some(SpanningTreeData::new(None, 0, 0));
+    }
+
+    pub(super) fn clear_tree_data(&mut self) {
+        self.spanning_tree = None;
+    }
+
+    pub(super) fn set_tree_data(&mut self, parent: Option<usize>, min: usize, max: usize) {
+        self.spanning_tree = Some(SpanningTreeData::new(parent, min, max));
+    }
+
+    /// Set the node as a tree node, but don't set the parent, and set min or max to zero.
+    /// 
+    /// Used by asyclic tree for tree nodes, but does not use the other data.
+    /// This must be cleared by simplex for it runs.
+    pub(super) fn set_empty_tree_node(&mut self) {
+        self.set_tree_data(None, 0, 0);
     }
 
     pub(super) fn set_coordinates(&mut self, x: u32, y: u32) {
@@ -240,6 +311,11 @@ impl Node {
     /// the lower the placement on a canvas.
     pub(super) fn set_simplex_rank(&mut self, rank: Option<u32>) {
         self.simplex_rank = rank;
+    }
+
+    /// Gets the simplex rank of a node.
+    pub(super) fn simplex_rank(&self) -> Option<u32> {
+        self.simplex_rank
     }
 
     pub(super) fn assign_simplex_rank(&mut self, target: SimplexNodeTarget) {

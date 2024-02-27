@@ -484,12 +484,11 @@ impl RankOrderings {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::graph::tests::example_graph_from_paper_2_3;
-    use crate::graph::network_simplex::SimplexNodeTarget::VerticalRank;
+    use crate::graph::{network_simplex::SimplexNodeTarget::VerticalRank, Graph};
 
     #[test]
     fn test_adjacent_position() {
-        let mut graph = example_graph_from_paper_2_3();
+        let mut graph = Graph::example_graph_from_paper_2_3();
         graph.rank_nodes_vertically();
         let order = graph.init_horizontal_order();
 
@@ -634,7 +633,7 @@ mod test {
     // Test that the 2_3 example from the paper has zero crosses after ordering.
     #[test]
     fn test_order_example_from_paper_2_3() {
-        let mut graph = example_graph_from_paper_2_3();
+        let mut graph = Graph::example_graph_from_paper_2_3();
 
         graph.init_simplex_rank();
         graph.assign_simplex_rank(VerticalRank);

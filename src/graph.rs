@@ -4,6 +4,7 @@
 //! This paper is referred to as simply "the paper" below.
 
 mod crossing_lines;
+pub mod dot_parser;
 mod edge;
 mod network_simplex;
 mod node;
@@ -274,7 +275,7 @@ impl Graph {
     fn get_next_non_tree_node_idx(&self, start: usize) -> Option<usize> {
         for (index, node) in self.nodes.iter().skip(start).enumerate() {
             let node_idx = start + index;
-            if !node.tree_node() {
+            if !node.in_spanning_tree() {
                 return Some(node_idx);
             }
         }
@@ -302,8 +303,7 @@ impl Graph {
     /// * If any edges point to a previously visted node, reverse those edges.
     fn set_asyclic_tree(&mut self, queue: &mut VecDeque<usize>) {
         while let Some(node_idx) = queue.pop_front() {
-            let node = self.get_node_mut(node_idx);
-            node.set_tree_node(true);
+            self.get_node_mut(node_idx).set_empty_tree_node();
 
             let node = self.get_node(node_idx);
             let mut edges_to_reverse = Vec::new();
@@ -311,7 +311,7 @@ impl Graph {
                 let edge = self.get_edge(edge_idx);
                 let dst_node = self.get_node(edge.dst_node);
 
-                if !dst_node.tree_node() {
+                if !dst_node.in_spanning_tree() {
                     queue.push_back(edge.dst_node);
                 } else {
                     edges_to_reverse.push(edge_idx);
@@ -843,6 +843,8 @@ impl Graph {
     /// of get_svg() should be generalized and take the parser directives
     /// into account.
     pub fn get_svg(&self, debug: bool) -> String {
+        const DEFAULT_X: usize = 1;
+        const DEFAULT_Y: u32 = 1;
         let (max_pos, max_rank) = self.max_positions();
         let max_pos = max_pos as f64;
         let max_rank = max_rank as f64;
@@ -897,12 +899,12 @@ impl Graph {
                 (edge.src_node, edge.dst_node)
             };
             let src_node = self.get_node(src_node_idx);
-            let src_x = src_node.horizontal_position.unwrap() as f64;
-            let src_y = src_node.vertical_rank.unwrap() as f64;
+            let src_x = src_node.horizontal_position.unwrap_or(DEFAULT_X) as f64;
+            let src_y = src_node.vertical_rank.unwrap_or(DEFAULT_Y) as f64;
 
             let dst_node = self.get_node(dst_node_idx);
-            let mut dst_x = dst_node.horizontal_position.unwrap() as f64;
-            let mut dst_y = dst_node.vertical_rank.unwrap() as f64;
+            let mut dst_x = dst_node.horizontal_position.unwrap_or(DEFAULT_X + 1) as f64;
+            let mut dst_y = dst_node.vertical_rank.unwrap_or(DEFAULT_Y + 1) as f64;
 
             let slope = (src_y - dst_y) / (src_x - dst_x); // # TODO
             let theta = slope.atan();
@@ -911,7 +913,7 @@ impl Graph {
                 // TODO: This is just an approximation if the node
                 //       is shows as an ellipse with x_radius=1.5*y_radius
                 let node_radius_x = real_radius * 1.5 * 0.8;
-                
+
                 if debug {
                     node_radius_x
                 } else {
@@ -932,7 +934,7 @@ impl Graph {
                 dst_y -= y_offset;
             }
 
-            let dashed = if !debug || edge.feasible_tree_member {
+            let dashed = if !debug || edge.in_spanning_tree() {
                 ""
             } else {
                 r#"stroke-dasharray="0.015""#
@@ -965,10 +967,16 @@ impl Graph {
         }
 
         for node in self.nodes.iter() {
-            let x = node.horizontal_position.unwrap() as f64;
-            let y = node.vertical_rank.unwrap() as f64;
+            let x = node.horizontal_position.unwrap_or(DEFAULT_X) as f64;
+            let y = node.vertical_rank.unwrap_or(DEFAULT_Y) as f64;
             let name = if debug {
-                format!("{}: {:?}", node.name, node.coordinates.unwrap().x())
+                format!(
+                    "{}: {:?}",
+                    node.name,
+                    node.coordinates
+                        .unwrap_or(node::Point::new(DEFAULT_Y, DEFAULT_Y))
+                        .x()
+                )
             } else {
                 node.name.to_string()
             };
@@ -1024,6 +1032,17 @@ impl Graph {
 
         svg.join("\n")
     }
+
+    /// Write out the graph as is to the given file name (with an svg suffix).
+    #[allow(unused)]
+    fn write_svg_file(&self, name: &str, debug: bool) {
+        use std::fs::File;
+        use std::io::prelude::*;
+
+        let svg = self.get_svg(debug);
+        let mut file = File::create(format!("{name}.svg")).unwrap();
+        file.write_all(svg.as_bytes()).unwrap();
+    }
 }
 
 impl Display for Graph {
@@ -1034,13 +1053,23 @@ impl Display for Graph {
 
             let line = if let Some(val) = edge.cut_value {
                 format!(" {:2} ", val)
-            } else if edge.feasible_tree_member {
+            } else if edge.in_spanning_tree() {
                 "----".to_string()
             } else {
                 " - -".to_string()
             };
+            let src_rank = if let Some(rank) = src.simplex_rank {
+                format!("r:{:2}", rank)
+            } else {
+                "r: -".to_string()
+            };
+            let dst_rank = if let Some(rank) = dst.simplex_rank {
+                format!("r:{:2}", rank)
+            } else {
+                "r: -".to_string()
+            };
 
-            let _ = writeln!(fmt, "{src} -{line}> {dst}");
+            let _ = writeln!(fmt, "{src}({src_rank}) -{line}> {dst}({dst_rank})",);
         }
         Ok(())
     }
@@ -1104,27 +1133,52 @@ pub mod tests {
             let node = self.get_node_mut(node_idx);
 
             node.vertical_rank = Some(vertical_rank);
-            node.set_tree_node(true);
+            node.set_tree_root_node();
         }
 
         /// Get the edge that has src_node == src_name, dst_node == dst_name.
         ///
         /// Expensive for large data sets: O(e*n)
-        pub fn get_named_edge(&self, src_name: &str, dst_name: &str) -> &Edge {
-            for edge in &self.edges {
+        pub fn get_named_edge(&self, src_name: &str, dst_name: &str) -> (&Edge, usize) {
+            for (edge_idx, edge) in self.edges.iter().enumerate() {
                 let src_node = self.get_node(edge.src_node);
                 let dst_node = self.get_node(edge.dst_node);
 
                 if src_node.name == src_name && dst_node.name == dst_name {
-                    return edge;
+                    return (edge, edge_idx);
                 }
             }
             panic!("Could not find requested edge: {src_name} -> {dst_name}");
         }
 
-        // Set the ranks given in example 2-3 (a)
+        pub fn example_graph_from_paper_2_3() -> Graph {
+            Graph::from(
+                "digraph {
+                    a -> b; a -> e; a -> f;
+                    e -> g; f -> g; b -> c;
+                    c -> d; d -> h;
+                    g -> h;
+                }",
+            )
+        }
+
+        pub fn example_graph_from_paper_2_3_extended() -> Graph {
+            Graph::from(
+                "digraph {
+                    a -> b; a -> e; a -> f;
+                    e -> g; f -> g; b -> c;
+                    c -> d; d -> h;
+                    g -> h;
+                    a -> i; a -> j; a -> k;
+                    i -> l; j -> l; k -> l;
+                    l -> h;
+                }",
+            )
+        }
+
+        // Set the ranks /ngiven in example 2-3 (a)
         pub fn configure_example_2_3_a() -> (Graph, Vec<(&'static str, &'static str, i32)>) {
-            let mut graph = example_graph_from_paper_2_3();
+            let mut graph = Graph::example_graph_from_paper_2_3();
             graph.configure_node("a", 0);
             graph.configure_node("b", 1);
             graph.configure_node("c", 2);
@@ -1140,7 +1194,7 @@ pub mod tests {
             let f_idx = graph.name_to_node_idx("f").unwrap();
             for edge in graph.edges.iter_mut() {
                 if edge.dst_node != e_idx && edge.dst_node != f_idx {
-                    edge.feasible_tree_member = true;
+                    edge.set_in_spanning_tree(true);
                 }
             }
 
@@ -1161,7 +1215,7 @@ pub mod tests {
 
         // Set the ranks given in example 2-3 (b)
         pub fn configure_example_2_3_b() -> (Graph, Vec<(&'static str, &'static str, i32)>) {
-            let mut graph = example_graph_from_paper_2_3();
+            let mut graph = Graph::example_graph_from_paper_2_3();
             graph.configure_node("a", 0);
             graph.configure_node("b", 1);
             graph.configure_node("c", 2);
@@ -1176,7 +1230,7 @@ pub mod tests {
             let g_idx = graph.name_to_node_idx("g").unwrap();
             let f_idx = graph.name_to_node_idx("f").unwrap();
             for edge in graph.edges.iter_mut() {
-                edge.feasible_tree_member = !(edge.src_node == g_idx || edge.dst_node == f_idx);
+                edge.set_in_spanning_tree(!(edge.src_node == g_idx || edge.dst_node == f_idx));
             }
 
             // cutvalues expected in example 2-3 (b)
@@ -1194,14 +1248,60 @@ pub mod tests {
             )
         }
 
-        /// Write out the graph as is to the given file name (with an svg suffix).
-        fn write_svg_file(&self, name: &str, debug: bool) {
-            use std::fs::File;
-            use std::io::prelude::*;
+        /// The two cut value examples given in the paper are too simple for
+        /// more complex testing.  For example, there is only one negative cut value,
+        /// thus network simplex never kicks in.
+        ///
+        /// This extended example adds a second cut value from l -> h which is -2, so
+        /// there are two different cut values.
+        pub fn configure_example_2_3_extended() -> (Graph, Vec<(&'static str, &'static str, i32)>) {
+            let mut graph = Graph::example_graph_from_paper_2_3_extended();
+            graph.configure_node("a", 0);
+            graph.configure_node("b", 1);
+            graph.configure_node("c", 2);
+            graph.configure_node("d", 3);
+            graph.configure_node("h", 4);
 
-            let svg = self.get_svg(debug);
-            let mut file = File::create(format!("{name}.svg")).unwrap();
-            file.write_all(svg.as_bytes()).unwrap();
+            graph.configure_node("e", 1);
+            graph.configure_node("f", 1);
+            graph.configure_node("g", 2);
+
+            graph.configure_node("i", 1);
+            graph.configure_node("j", 1);
+            graph.configure_node("k", 1);
+            graph.configure_node("l", 2);
+
+            // Set feasible edges given in example 2-3 (a)
+            let e_idx = graph.name_to_node_idx("e").unwrap();
+            let f_idx = graph.name_to_node_idx("f").unwrap();
+            let i_idx = graph.name_to_node_idx("i").unwrap();
+            let j_idx = graph.name_to_node_idx("j").unwrap();
+            let k_idx = graph.name_to_node_idx("k").unwrap();
+            for edge in graph.edges.iter_mut() {
+                if edge.dst_node != e_idx
+                    && edge.dst_node != f_idx
+                    && edge.dst_node != i_idx
+                    && edge.dst_node != j_idx
+                    && edge.dst_node != k_idx
+                {
+                    edge.set_in_spanning_tree(true);
+                }
+            }
+
+            // cutvalues expected in example 2-3 (a)
+            (
+                graph,
+                vec![
+                    ("a", "b", 6),
+                    ("b", "c", 6),
+                    ("c", "d", 6),
+                    ("d", "h", 6),
+                    ("e", "g", 0),
+                    ("f", "g", 0),
+                    ("g", "h", -1),
+                    ("l", "h", -2),
+                ],
+            )
         }
     }
 
@@ -1294,25 +1394,6 @@ pub mod tests {
         }
     }
 
-    pub fn example_graph_from_paper_2_3() -> Graph {
-        let mut graph = Graph::new();
-        let node_map = graph.add_nodes('a'..='h');
-        let edges = vec![
-            ("a", "b"),
-            ("b", "c"),
-            ("c", "d"),
-            ("d", "h"),
-            ("a", "f"),
-            ("f", "g"),
-            ("g", "h"),
-            ("a", "e"),
-            ("e", "g"),
-        ];
-        graph.add_edges(&edges, &node_map);
-
-        graph
-    }
-
     #[test]
     fn test_get_source_nodes_single() {
         let mut graph = Graph::new();
@@ -1389,10 +1470,7 @@ pub mod tests {
 
     #[test]
     fn test_get_initial_ordering() {
-        let mut graph = Graph::new();
-        let node_map = graph.add_nodes('a'..='e');
-        let edges = vec![("a", "b"), ("b", "c"), ("b", "d"), ("c", "e"), ("d", "e")];
-        graph.add_edges(&edges, &node_map);
+        let mut graph = Graph::from("digraph { a -> b; b -> c; b -> d; c -> e; d -> e }");
 
         graph.rank_nodes_vertically();
 
@@ -1404,7 +1482,7 @@ pub mod tests {
 
     #[test]
     fn test_rank() {
-        let mut graph = example_graph_from_paper_2_3();
+        let mut graph = Graph::example_graph_from_paper_2_3();
 
         graph.rank_nodes_vertically();
 
@@ -1432,12 +1510,10 @@ pub mod tests {
 
     #[test]
     fn test_draw_graph() {
-        let mut graph = example_graph_from_paper_2_3();
+        let mut graph = Graph::example_graph_from_paper_2_3();
 
         println!("{graph}");
         graph.layout_nodes();
         println!("{graph}");
-
-        graph.write_svg_file("foo", true);
     }
 }

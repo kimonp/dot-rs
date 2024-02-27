@@ -36,7 +36,7 @@ pub struct Edge {
     /// Used as port of the algorithm to rank the nodes of the graph.
     pub cut_value: Option<i32>,
     /// True if this edge is part of the feasible tree use to calculate cut values.
-    pub feasible_tree_member: bool,
+    in_spanning_tree: bool,
 }
 
 impl Edge {
@@ -48,7 +48,7 @@ impl Edge {
             ignored: false,
             reversed: false,
             cut_value: None,
-            feasible_tree_member: false,
+            in_spanning_tree: false,
         }
     }
 
@@ -59,5 +59,13 @@ impl Edge {
             (false, true) => 2,
             (true, true) => 8,
         }
+    }
+    
+    pub fn in_spanning_tree(&self) -> bool {
+        self.in_spanning_tree
+    }
+
+    pub fn set_in_spanning_tree(&mut self, value: bool) {
+        self.in_spanning_tree = value;
     }
 }

@@ -11,7 +11,7 @@ fn main() {
     // launch the dioxus app in a webview
     // dioxus_desktop::launch(App);
 
-    let size = PhysicalSize::new(2500, 1000);
+    let size = PhysicalSize::new(2000, 1000);
     let position = LogicalPosition::new(10, 10);
     let window = WindowBuilder::new()
         .with_title("GraphViz Comparison")
@@ -70,8 +70,17 @@ fn App(cx: Scope) -> Element {
         c -> d; d -> h;
         g -> h;
     }";
+    // let dot_str = "digraph {
+    //     a -> c; b -> c
+    // }";
     let dot_str = "digraph {
-        a -> c; b -> c
+        l -> h;
+        i -> l; j -> l; k -> l;
+        a -> i; a -> j; a -> k;
+        g -> h;
+        c -> d; d -> h;
+        e -> g; f -> g; b -> c;
+        a -> b; a -> e; a -> f;
     }";
 
     let mut graph = Graph::from(dot_str);
