@@ -86,7 +86,6 @@ impl Graph {
         self.set_feasible_tree_for_simplex();
         self.init_cutvalues();
 
-        println!("HELLO");
         let mut start_idx = 0;
         while let Some(neg_cut_edge_idx) = self.leave_edge_for_simplex(start_idx) {
             let non_tree_edge_idx = self
@@ -399,6 +398,11 @@ impl Graph {
     pub(super) fn init_simplex_rank(&mut self) {
         let mut nodes_to_rank = Vec::new();
         let mut scanned_edges = HashSet::new();
+
+        // Lets not assume the tree fields are clear to begin with
+        for edge in self.edges.iter_mut() {
+            edge.set_in_spanning_tree(false)
+        }
 
         // Initialize the queue with all nodes with no incoming edges (since no edges
         // are scanned yet)
