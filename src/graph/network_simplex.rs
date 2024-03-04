@@ -5,14 +5,11 @@
 //!
 //! <https://en.wikipedia.org/wiki/Network_simplex_algorithm>
 
-use super::{
-    edge::MIN_EDGE_LENGTH,
-    Graph,
-};
+use super::{edge::MIN_EDGE_LENGTH, Graph};
 use std::collections::HashSet;
 
-pub(super) mod spanning_tree;
 mod heap;
+pub(super) mod spanning_tree;
 pub(crate) mod sub_tree;
 
 /// Determines what variable on each node which is set by the network simplex algorithm.
@@ -550,7 +547,12 @@ impl Graph {
 
         for (edge_idx, edge) in self.edges.iter().enumerate() {
             if head_nodes.contains(&edge.src_node) && tail_nodes.contains(&edge.dst_node) {
-                let edge_slack = self.simplex_slack(edge_idx).expect("Can't calculate slack");
+                let edge_slack = self.simplex_slack(edge_idx).unwrap_or_else(|| {
+                    panic!(
+                        "Can't calculate slack for edge {tree_edge_idx} between {} and {}",
+                        edge.src_node, edge.dst_node
+                    )
+                });
 
                 if edge_slack < min_slack {
                     replacement_edge_idx = Some(edge_idx);
@@ -871,7 +873,7 @@ mod tests {
 
     #[test]
     fn setup_init_cut_values_2_3_extended() {
-        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_extended();
+        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a_extended();
 
         graph.init_cutvalues();
         println!("{graph}");
@@ -880,8 +882,8 @@ mod tests {
 
     #[test]
     fn test_leave_edge_for_simplex() {
-        let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_extended();
-        graph.set_feasible_tree_for_simplex();
+        let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a_extended();
+        // graph.set_feasible_tree_for_simplex();
         graph.init_cutvalues();
 
         let (_, neg_edge1_idx) = graph.get_named_edge("g", "h");
@@ -903,9 +905,11 @@ mod tests {
     /// Given a specific example, we know which edges we expect it to return.
     #[test]
     fn test_enter_edge_for_simplex() {
-        let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_extended();
-        graph.set_feasible_tree_for_simplex();
+        let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a_extended();
+        println!("Graph Before feasible:\n{graph}");
+        // graph.set_feasible_tree_for_simplex();
         graph.init_cutvalues();
+        println!("Graph after:\n{graph}");
 
         assert_eq!(
             graph.tree_node_count(),
@@ -913,8 +917,13 @@ mod tests {
             "all nodes should be tree nodes"
         );
 
-        let (_, neg_edge1_idx) = graph.get_named_edge("e", "g");
-        let (_, neg_edge2_idx) = graph.get_named_edge("i", "l");
+        // The non-tree edges we expect to be picked by leave_edge_for_simplex()
+        // Somewhat a guess based on the approach because several candidates can have
+        // the same cut value.
+        let (_, neg_edge1_idx) = graph.get_named_edge("a", "e");
+        let (_, neg_edge2_idx) = graph.get_named_edge("a", "i");
+
+        println!("Graph (ne1: {neg_edge1_idx}, ne2: {neg_edge2_idx}):\n{graph}");
 
         let neg_edge = graph.leave_edge_for_simplex(0).unwrap();
         let neg_edge2 = graph.leave_edge_for_simplex(neg_edge + 1).unwrap();

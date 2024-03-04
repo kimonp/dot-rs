@@ -12,7 +12,9 @@ mod rank_orderings;
 
 use rank_orderings::RankOrderings;
 use std::{
-    collections::{HashMap, HashSet, VecDeque}, fmt::Display, mem::replace
+    collections::{HashMap, HashSet, VecDeque},
+    fmt::Display,
+    mem::replace,
 };
 
 use self::{
@@ -1042,28 +1044,31 @@ impl Graph {
         file.write_all(svg.as_bytes()).unwrap();
     }
 
-
     /// Given a node index, return an iterator to a tuple with each edge_idx, and the node_idx of
     /// the node on the other side of the edge.
-    fn get_node_edges_and_adjacent_node(&self, node_idx: usize) -> impl Iterator<Item = (usize, usize)> + '_ {
+    fn get_node_edges_and_adjacent_node(
+        &self,
+        node_idx: usize,
+    ) -> impl Iterator<Item = (usize, usize)> + '_ {
         let node = self.get_node(node_idx);
-        
-        node.get_all_edges_with_disposition().map(|(edge_idx, disposition)| {
-            let edge_idx = *edge_idx;
-            let edge = self.get_edge(edge_idx);
-            let adjacent_node_idx = match disposition {
-                EdgeDisposition::In => edge.src_node,
-                EdgeDisposition::Out => edge.dst_node,
-            };
-            
-            (edge_idx, adjacent_node_idx)
-        })
+
+        node.get_all_edges_with_disposition()
+            .map(|(edge_idx, disposition)| {
+                let edge_idx = *edge_idx;
+                let edge = self.get_edge(edge_idx);
+                let adjacent_node_idx = match disposition {
+                    EdgeDisposition::In => edge.src_node,
+                    EdgeDisposition::Out => edge.dst_node,
+                };
+
+                (edge_idx, adjacent_node_idx)
+            })
     }
 }
 
 impl Display for Graph {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        for edge in &self.edges {
+        for (edge_id, edge) in self.edges.iter().enumerate() {
             let src = &self.nodes[edge.src_node];
             let dst = &self.nodes[edge.dst_node];
 
@@ -1085,7 +1090,7 @@ impl Display for Graph {
                 "r: -".to_string()
             };
 
-            let _ = writeln!(fmt, "{src}({src_rank}) -{line}> {dst}({dst_rank})",);
+            let _ = writeln!(fmt, "{src}({src_rank}) -{line}> {dst}({dst_rank}) eid:{edge_id}",);
         }
         Ok(())
     }
@@ -1149,6 +1154,7 @@ pub mod tests {
             let node = self.get_node_mut(node_idx);
 
             node.vertical_rank = Some(vertical_rank);
+            node.simplex_rank = Some(vertical_rank);
             node.set_tree_root_node();
         }
 
@@ -1270,7 +1276,8 @@ pub mod tests {
         ///
         /// This extended example adds a second cut value from l -> h which is -2, so
         /// there are two different cut values.
-        pub fn configure_example_2_3_extended() -> (Graph, Vec<(&'static str, &'static str, i32)>) {
+        pub fn configure_example_2_3_a_extended() -> (Graph, Vec<(&'static str, &'static str, i32)>)
+        {
             let mut graph = Graph::example_graph_from_paper_2_3_extended();
             graph.configure_node("a", 0);
             graph.configure_node("b", 1);
