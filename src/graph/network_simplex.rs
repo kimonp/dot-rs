@@ -6,12 +6,14 @@
 //! <https://en.wikipedia.org/wiki/Network_simplex_algorithm>
 
 use super::{
-    edge::{EdgeDisposition, MIN_EDGE_LENGTH},
+    edge::MIN_EDGE_LENGTH,
     Graph,
 };
 use std::collections::HashSet;
 
-mod spanning_tree;
+pub(super) mod spanning_tree;
+mod heap;
+pub(crate) mod sub_tree;
 
 /// Determines what variable on each node which is set by the network simplex algorithm.
 #[derive(Debug, Clone, Copy)]

@@ -1,5 +1,7 @@
 //! Reprecents an edge connecting two nodes within a graph.
 
+use std::cell::RefCell;
+
 /// Minimum allowed edge weight.  In future implementations, user could set this.
 /// Edge weight could be used when drawing to deletemine the stroke width of an edge.
 pub const MIN_EDGE_WEIGHT: u32 = 1;
@@ -36,7 +38,7 @@ pub struct Edge {
     /// Used as port of the algorithm to rank the nodes of the graph.
     pub cut_value: Option<i32>,
     /// True if this edge is part of the feasible tree use to calculate cut values.
-    in_spanning_tree: bool,
+    in_spanning_tree: RefCell<bool>,
 }
 
 impl Edge {
@@ -48,7 +50,7 @@ impl Edge {
             ignored: false,
             reversed: false,
             cut_value: None,
-            in_spanning_tree: false,
+            in_spanning_tree: RefCell::new(false),
         }
     }
 
@@ -62,10 +64,10 @@ impl Edge {
     }
     
     pub fn in_spanning_tree(&self) -> bool {
-        self.in_spanning_tree
+        self.in_spanning_tree.borrow().clone()
     }
 
-    pub fn set_in_spanning_tree(&mut self, value: bool) {
-        self.in_spanning_tree = value;
+    pub fn set_in_spanning_tree(&self, value: bool) {
+        *self.in_spanning_tree.borrow_mut() = value;
     }
 }

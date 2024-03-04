@@ -12,9 +12,7 @@ mod rank_orderings;
 
 use rank_orderings::RankOrderings;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    fmt::Display,
-    mem::replace,
+    collections::{HashMap, HashSet, VecDeque}, fmt::Display, mem::replace
 };
 
 use self::{
@@ -1042,6 +1040,24 @@ impl Graph {
         let svg = self.get_svg(debug);
         let mut file = File::create(format!("{name}.svg")).unwrap();
         file.write_all(svg.as_bytes()).unwrap();
+    }
+
+
+    /// Given a node index, return an iterator to a tuple with each edge_idx, and the node_idx of
+    /// the node on the other side of the edge.
+    fn get_node_edges_and_adjacent_node(&self, node_idx: usize) -> impl Iterator<Item = (usize, usize)> + '_ {
+        let node = self.get_node(node_idx);
+        
+        node.get_all_edges_with_disposition().map(|(edge_idx, disposition)| {
+            let edge_idx = *edge_idx;
+            let edge = self.get_edge(edge_idx);
+            let adjacent_node_idx = match disposition {
+                EdgeDisposition::In => edge.src_node,
+                EdgeDisposition::Out => edge.dst_node,
+            };
+            
+            (edge_idx, adjacent_node_idx)
+        })
     }
 }
 

@@ -1,8 +1,8 @@
 //! Reprecents a node (vertice) within a graph.
 
-use std::{collections::HashSet, fmt::Display};
+use std::{cell::RefCell, collections::HashSet, fmt::Display};
 
-use super::edge::EdgeDisposition;
+use super::{edge::EdgeDisposition, network_simplex::sub_tree::SubTree};
 use crate::graph::network_simplex::SimplexNodeTarget;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -62,14 +62,16 @@ impl NodeType {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct SpanningTreeData {
-    // Graph index id of the edge connects to the parent of this node.  None if this node has no tree parent.
+    /// Graph index id of the edge connects to the parent of this node.  None if this node has no tree parent.
     edge_idx_to_parent: Option<usize>,
-    // The minimal tree index of all nodes for which this node is an ancestor.
+    /// The minimal tree index of all nodes for which this node is an ancestor.
     sub_tree_idx_min: usize,
-    // The maximum tree index of all nodes for which this node is an ancestor.
+    /// The maximum tree index of all nodes for which this node is an ancestor.
     sub_tree_idx_max: usize,
+    /// Referance to the subtree this node is a member of
+    sub_tree: Option<SubTree>,
 }
 
 impl SpanningTreeData {
@@ -82,9 +84,10 @@ impl SpanningTreeData {
             edge_idx_to_parent,
             sub_tree_idx_min,
             sub_tree_idx_max,
+            sub_tree: None,
         }
     }
-    
+
     pub fn edge_idx_to_parent(&self) -> Option<usize> {
         self.edge_idx_to_parent
     }
@@ -123,7 +126,7 @@ pub struct Node {
     pub(super) out_edges: Vec<usize>,
 
     /// True if this node is part of the "spanning" tree under consideration.  Used during ranking.
-    spanning_tree: Option<SpanningTreeData>,
+    spanning_tree: RefCell<Option<SpanningTreeData>>,
     /// Added as a placeholder node during position assignement or other part of graphinc
     pub(super) node_type: NodeType,
 }
@@ -139,7 +142,7 @@ impl Node {
             coordinates: None,
             in_edges: vec![],
             out_edges: vec![],
-            spanning_tree: None,
+            spanning_tree: RefCell::new(None),
             node_type: NodeType::Real,
         }
     }
@@ -150,11 +153,11 @@ impl Node {
     }
 
     pub(super) fn in_spanning_tree(&self) -> bool {
-        self.spanning_tree.is_some()
+        self.spanning_tree.borrow().is_some()
     }
 
-    pub(super) fn spaning_tree(&self) -> Option<SpanningTreeData> {
-        self.spanning_tree
+    pub(super) fn spanning_tree(&self) -> Option<SpanningTreeData> {
+        self.spanning_tree.borrow().clone()
     }
 
     /// If this node is in the tree, return the graph index of the parent.
@@ -162,7 +165,7 @@ impl Node {
     /// Note that None is retuned if either this node is not a tree node,
     /// or it has no parent.
     pub(super) fn spanning_tree_parent_edge_idx(&self) -> Option<usize> {
-        if let Some(tree_data) = self.spanning_tree {
+        if let Some(tree_data) = self.spanning_tree() {
             tree_data.edge_idx_to_parent
         } else {
             None
@@ -170,25 +173,46 @@ impl Node {
     }
 
     /// Set the given node's tree data as a root node of the tree.
-    /// 
+    ///
     /// Typically, nodes with no in_edges are set as root nodes.
-    pub(super) fn set_tree_root_node(&mut self) {
-        self.spanning_tree = Some(SpanningTreeData::new(None, 0, 0));
+    pub(super) fn set_tree_root_node(&self) {
+        *self.spanning_tree.borrow_mut() = Some(SpanningTreeData::new(None, 0, 0));
     }
 
-    pub(super) fn clear_tree_data(&mut self) {
-        self.spanning_tree = None;
+    pub(super) fn clear_tree_data(&self) {
+        *self.spanning_tree.borrow_mut() = None;
     }
 
-    pub(super) fn set_tree_data(&mut self, parent: Option<usize>, min: usize, max: usize) {
-        self.spanning_tree = Some(SpanningTreeData::new(parent, min, max));
+    pub(super) fn set_tree_data(&self, parent: Option<usize>, min: usize, max: usize) {
+        *self.spanning_tree.borrow_mut() = Some(SpanningTreeData::new(parent, min, max));
+    }
+
+    /// Return a internally mutable subtree if one is set for this node.
+    pub(super) fn sub_tree(&self) -> Option<SubTree> {
+        self.spanning_tree
+            .borrow()
+            .as_ref()
+            .and_then(|data| data.sub_tree.clone())
+    }
+
+    /// Return a internally mutable subtree if one is set for this node.
+    pub(super) fn set_sub_tree(&self, sub_tree: SubTree) {
+        if !self.in_spanning_tree() {
+            self.set_empty_tree_node();
+        }
+
+        if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
+            data.sub_tree = Some(sub_tree);
+        } else {
+            panic!("trying to set sub_tree but node not in spanning tree");
+        }
     }
 
     /// Set the node as a tree node, but don't set the parent, and set min or max to zero.
-    /// 
+    ///
     /// Used by asyclic tree for tree nodes, but does not use the other data.
     /// This must be cleared by simplex for it runs.
-    pub(super) fn set_empty_tree_node(&mut self) {
+    pub(super) fn set_empty_tree_node(&self) {
         self.set_tree_data(None, 0, 0);
     }
 
@@ -237,6 +261,21 @@ impl Node {
     /// Return all in and out edges associated with a node.
     pub(super) fn get_all_edges(&self) -> impl Iterator<Item = &usize> {
         self.out_edges.iter().chain(self.in_edges.iter())
+    }
+
+    /// Return all in and out edges associated with a node in tuple that includes
+    /// the disposition (in our out) of each edge.
+    pub(super) fn get_all_edges_with_disposition(
+        &self,
+    ) -> impl Iterator<Item = (&usize, EdgeDisposition)> {
+        self.out_edges
+            .iter()
+            .map(|edge_idx| (edge_idx, EdgeDisposition::Out))
+            .chain(
+                self.in_edges
+                    .iter()
+                    .map(|edge_idx| (edge_idx, EdgeDisposition::In)),
+            )
     }
 
     /// Swap an edge from in_edges to out_edges or vice versa, depending on disposition.
