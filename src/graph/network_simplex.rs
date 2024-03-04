@@ -235,95 +235,95 @@ impl Graph {
         sum
     }
 
-    // True if the head (src_node) of the given edge is not in the feasible tree.
-    fn edge_head_is_incident(&self, edge_idx: usize) -> bool {
-        let edge = self.get_edge(edge_idx);
-        let src_node = self.get_node(edge.src_node);
-        let dst_node = self.get_node(edge.dst_node);
+    // // True if the head (src_node) of the given edge is not in the feasible tree.
+    // fn edge_head_is_incident(&self, edge_idx: usize) -> bool {
+    //     let edge = self.get_edge(edge_idx);
+    //     let src_node = self.get_node(edge.src_node);
+    //     let dst_node = self.get_node(edge.dst_node);
 
-        !src_node.in_spanning_tree() && dst_node.in_spanning_tree()
-    }
+    //     !src_node.in_spanning_tree() && dst_node.in_spanning_tree()
+    // }
 
-    /// edge_index is expected to span two nodes, one of which is in the tree, one of which is not.
-    /// Return the index to the node which is not yet in the tree.
-    fn get_incident_node(&self, edge_idx: usize) -> Option<usize> {
-        let edge = self.get_edge(edge_idx);
-        let src_node = self.get_node(edge.src_node);
-        let dst_node = self.get_node(edge.dst_node);
+    // /// edge_index is expected to span two nodes, one of which is in the tree, one of which is not.
+    // /// Return the index to the node which is not yet in the tree.
+    // fn get_incident_node(&self, edge_idx: usize) -> Option<usize> {
+    //     let edge = self.get_edge(edge_idx);
+    //     let src_node = self.get_node(edge.src_node);
+    //     let dst_node = self.get_node(edge.dst_node);
 
-        if !src_node.in_spanning_tree() && dst_node.in_spanning_tree() {
-            Some(edge.src_node)
-        } else if src_node.in_spanning_tree() && !dst_node.in_spanning_tree() {
-            Some(edge.dst_node)
-        } else {
-            None
-        }
-    }
+    //     if !src_node.in_spanning_tree() && dst_node.in_spanning_tree() {
+    //         Some(edge.src_node)
+    //     } else if src_node.in_spanning_tree() && !dst_node.in_spanning_tree() {
+    //         Some(edge.dst_node)
+    //     } else {
+    //         None
+    //     }
+    // }
 
-    /// Return an edge with the smallest slack of any edge which is incident to the tree.
-    ///
-    /// Incident to the tree means one point of the edge points to a node that is in the tree,
-    /// and the other point points to a node that it not within the tree.
-    ///
-    /// TODO: Make more efficient by keeping a list of incident nodes
-    ///
-    /// Optimization TODO from the paper:
-    /// * The network simplex is also very sensitive to the choice of the negative edge to replace.
-    /// * We observed that searching cyclically through all the tree edges, instead of searching from the
-    ///   beginning of the list of tree edges every time, can save many iterations.
-    fn get_min_incident_edge(&self) -> Option<usize> {
-        let mut candidate = None;
-        let mut candidate_slack = i32::MAX;
+    // /// Return an edge with the smallest slack of any edge which is incident to the tree.
+    // ///
+    // /// Incident to the tree means one point of the edge points to a node that is in the tree,
+    // /// and the other point points to a node that it not within the tree.
+    // ///
+    // /// TODO: Make more efficient by keeping a list of incident nodes
+    // ///
+    // /// Optimization TODO from the paper:
+    // /// * The network simplex is also very sensitive to the choice of the negative edge to replace.
+    // /// * We observed that searching cyclically through all the tree edges, instead of searching from the
+    // ///   beginning of the list of tree edges every time, can save many iterations.
+    // fn get_min_incident_edge(&self) -> Option<usize> {
+    //     let mut candidate = None;
+    //     let mut candidate_slack = i32::MAX;
 
-        for (node_idx, node) in self.nodes.iter().enumerate() {
-            if node.in_spanning_tree() {
-                for edge_idx in node.get_all_edges() {
-                    let connected_node_idx = self
-                        .get_connected_node(node_idx, *edge_idx)
-                        .expect("Edge not connected");
+    //     for (node_idx, node) in self.nodes.iter().enumerate() {
+    //         if node.in_spanning_tree() {
+    //             for edge_idx in node.get_all_edges() {
+    //                 let connected_node_idx = self
+    //                     .get_connected_node(node_idx, *edge_idx)
+    //                     .expect("Edge not connected");
 
-                    if !self.get_node(connected_node_idx).in_spanning_tree() {
-                        let slack = self
-                            .simplex_slack(*edge_idx)
-                            .expect("Can't calculate slack");
+    //                 if !self.get_node(connected_node_idx).in_spanning_tree() {
+    //                     let slack = self
+    //                         .simplex_slack(*edge_idx)
+    //                         .expect("Can't calculate slack");
 
-                        if candidate.is_none() || slack < candidate_slack {
-                            candidate = Some(*edge_idx);
-                            candidate_slack = slack;
-                        }
-                    }
-                }
-            }
-        }
-        candidate
-    }
+    //                     if candidate.is_none() || slack < candidate_slack {
+    //                         candidate = Some(*edge_idx);
+    //                         candidate_slack = slack;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     candidate
+    // }
 
-    /// Get an edge that spans a node which is in the feasible tree with another node that is not.
-    #[allow(unused)]
-    fn get_next_feasible_edge(&self) -> Option<usize> {
-        for node in self.nodes.iter() {
-            if node.in_spanning_tree() {
-                for edge_idx in &node.out_edges {
-                    let dst_node = self.get_edge(*edge_idx).dst_node;
+    // /// Get an edge that spans a node which is in the feasible tree with another node that is not.
+    // #[allow(unused)]
+    // fn get_next_feasible_edge(&self) -> Option<usize> {
+    //     for node in self.nodes.iter() {
+    //         if node.in_spanning_tree() {
+    //             for edge_idx in &node.out_edges {
+    //                 let dst_node = self.get_edge(*edge_idx).dst_node;
 
-                    if !self.get_node(dst_node).in_spanning_tree() {
-                        return Some(*edge_idx);
-                    }
-                }
-            }
-        }
-        None
-    }
+    //                 if !self.get_node(dst_node).in_spanning_tree() {
+    //                     return Some(*edge_idx);
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     None
+    // }
 
-    /// An edge is "feasible" if both it's nodes have been ranked, and rank_diff > MIN_EDGE_LEN.
-    #[allow(unused)]
-    fn edge_is_feasible(&self, edge_idx: usize) -> bool {
-        if let Some(diff) = self.simplex_edge_length(edge_idx) {
-            diff > MIN_EDGE_LENGTH as i32
-        } else {
-            false
-        }
-    }
+    // /// An edge is "feasible" if both it's nodes have been ranked, and rank_diff > MIN_EDGE_LEN.
+    // #[allow(unused)]
+    // fn edge_is_feasible(&self, edge_idx: usize) -> bool {
+    //     if let Some(diff) = self.simplex_edge_length(edge_idx) {
+    //         diff > MIN_EDGE_LENGTH as i32
+    //     } else {
+    //         false
+    //     }
+    // }
 
     /// Returns the slack of and edge for the network simplex algorithm.
     ///
@@ -649,9 +649,9 @@ impl Graph {
                 if let Some(replace_edge_idx) = self.enter_edge_for_simplex(tree_edge_idx) {
                     if let Some(delta) = self.simplex_slack(replace_edge_idx) {
                         if delta > 1 {
-                            let edge = self.get_edge(replace_edge_idx);
-                            let src_node = self.get_node(edge.src_node);
-                            let dst_node = self.get_node(edge.dst_node);
+                            // let edge = self.get_edge(replace_edge_idx);
+                            // let src_node = self.get_node(edge.src_node);
+                            // let dst_node = self.get_node(edge.dst_node);
 
                             // ND_lim(n) is the max depth first index for nodes in the subtree of node n.
                             // * How many steps from the root is the node connected to n that is farthest
@@ -738,63 +738,63 @@ mod tests {
         }
     }
 
-    #[test]
-    // An incident edge is one that has one point in a tree node, and the other
-    // in a non-tree node (thus "incident" to the tree).
-    fn test_get_min_incident_edge() {
-        let mut graph = Graph::new();
-        let a_idx = graph.add_node("A");
-        let b_idx = graph.add_node("B");
-        let c_idx = graph.add_node("C");
+    // #[test]
+    // // An incident edge is one that has one point in a tree node, and the other
+    // // in a non-tree node (thus "incident" to the tree).
+    // fn test_get_min_incident_edge() {
+    //     let mut graph = Graph::new();
+    //     let a_idx = graph.add_node("A");
+    //     let b_idx = graph.add_node("B");
+    //     let c_idx = graph.add_node("C");
 
-        let e1 = graph.add_edge(a_idx, b_idx);
-        let e2 = graph.add_edge(a_idx, c_idx);
+    //     let e1 = graph.add_edge(a_idx, b_idx);
+    //     let e2 = graph.add_edge(a_idx, c_idx);
 
-        graph.init_simplex_rank();
+    //     graph.init_simplex_rank();
 
-        println!("{graph}");
+    //     println!("{graph}");
 
-        graph.get_node_mut(a_idx).set_tree_root_node();
-        let min_edge_idx = graph.get_min_incident_edge();
-        assert_eq!(min_edge_idx, Some(e1));
+    //     graph.get_node_mut(a_idx).set_tree_root_node();
+    //     let min_edge_idx = graph.get_min_incident_edge();
+    //     assert_eq!(min_edge_idx, Some(e1));
 
-        graph.get_node_mut(b_idx).set_tree_root_node();
-        let min_edge_idx = graph.get_min_incident_edge();
-        assert_eq!(min_edge_idx, Some(e2));
+    //     graph.get_node_mut(b_idx).set_tree_root_node();
+    //     let min_edge_idx = graph.get_min_incident_edge();
+    //     assert_eq!(min_edge_idx, Some(e2));
 
-        graph.get_node_mut(c_idx).set_tree_root_node();
-        let min_edge_idx = graph.get_min_incident_edge();
-        assert_eq!(min_edge_idx, None);
-    }
+    //     graph.get_node_mut(c_idx).set_tree_root_node();
+    //     let min_edge_idx = graph.get_min_incident_edge();
+    //     assert_eq!(min_edge_idx, None);
+    // }
 
-    #[test]
-    fn test_edge_head_is_incident() {
-        let mut graph = Graph::new();
-        let a_idx = graph.add_node("A");
-        let b_idx = graph.add_node("B");
-        let c_idx = graph.add_node("C");
+    // #[test]
+    // fn test_edge_head_is_incident() {
+    //     let mut graph = Graph::new();
+    //     let a_idx = graph.add_node("A");
+    //     let b_idx = graph.add_node("B");
+    //     let c_idx = graph.add_node("C");
 
-        let e1 = graph.add_edge(a_idx, b_idx);
-        let e2 = graph.add_edge(a_idx, c_idx);
-        let e3 = graph.add_edge(b_idx, c_idx);
-        let e4 = graph.add_edge(b_idx, a_idx);
+    //     let e1 = graph.add_edge(a_idx, b_idx);
+    //     let e2 = graph.add_edge(a_idx, c_idx);
+    //     let e3 = graph.add_edge(b_idx, c_idx);
+    //     let e4 = graph.add_edge(b_idx, a_idx);
 
-        graph.init_simplex_rank();
+    //     graph.init_simplex_rank();
 
-        println!("{graph}");
+    //     println!("{graph}");
 
-        graph.get_node_mut(a_idx).set_tree_root_node();
-        // Graph:(A) <-> B
-        //         |    |
-        //         |    v
-        //          \-> C
-        //
-        // head is incident only for: B->A
-        assert!(!graph.edge_head_is_incident(e1), "A -> B");
-        assert!(!graph.edge_head_is_incident(e2), "A -> C");
-        assert!(!graph.edge_head_is_incident(e3), "B -> C");
-        assert!(graph.edge_head_is_incident(e4), "B -> A");
-    }
+    //     graph.get_node_mut(a_idx).set_tree_root_node();
+    //     // Graph:(A) <-> B
+    //     //         |    |
+    //     //         |    v
+    //     //          \-> C
+    //     //
+    //     // head is incident only for: B->A
+    //     assert!(!graph.edge_head_is_incident(e1), "A -> B");
+    //     assert!(!graph.edge_head_is_incident(e2), "A -> C");
+    //     assert!(!graph.edge_head_is_incident(e3), "B -> C");
+    //     assert!(graph.edge_head_is_incident(e4), "B -> A");
+    // }
 
     /// * l(e) = length(e) = rank(e.dst_node)-rank(e.src_node) = rank_diff(e)
     ///   * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
@@ -883,7 +883,6 @@ mod tests {
     #[test]
     fn test_leave_edge_for_simplex() {
         let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a_extended();
-        // graph.set_feasible_tree_for_simplex();
         graph.init_cutvalues();
 
         let (_, neg_edge1_idx) = graph.get_named_edge("g", "h");
@@ -906,10 +905,7 @@ mod tests {
     #[test]
     fn test_enter_edge_for_simplex() {
         let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a_extended();
-        println!("Graph Before feasible:\n{graph}");
-        // graph.set_feasible_tree_for_simplex();
         graph.init_cutvalues();
-        println!("Graph after:\n{graph}");
 
         assert_eq!(
             graph.tree_node_count(),
@@ -919,7 +915,8 @@ mod tests {
 
         // The non-tree edges we expect to be picked by leave_edge_for_simplex()
         // Somewhat a guess based on the approach because several candidates can have
-        // the same cut value.
+        // the same cut value, so this test is a but brittle.
+        // But we know they can only be non-tree edges.
         let (_, neg_edge1_idx) = graph.get_named_edge("a", "e");
         let (_, neg_edge2_idx) = graph.get_named_edge("a", "i");
 

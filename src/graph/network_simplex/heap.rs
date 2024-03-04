@@ -27,6 +27,7 @@ impl<T: Ord + HeapIndex + Eq> MinHeap<T> {
         self.data.len()
     }
 
+    #[allow(unused)]
     /// Return the maximum capacity of the heap.
     pub fn capacity(&self) -> usize {
         self.data.capacity()

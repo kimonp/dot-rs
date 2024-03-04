@@ -64,12 +64,12 @@ fn dot_to_svg(graph: &str) -> String {
 // define a component that renders a div with the text "Hello, world!"
 #[component]
 fn App(cx: Scope) -> Element {
-    let dot_str = "digraph {
-        a -> e; a -> f; a -> b;
-        e -> g; f -> g; b -> c;
-        c -> d; d -> h;
-        g -> h;
-    }";
+    // let dot_str = "digraph {
+    //     a -> e; a -> f; a -> b;
+    //     e -> g; f -> g; b -> c;
+    //     c -> d; d -> h;
+    //     g -> h;
+    // }";
     // let dot_str = "digraph {
     //     a -> c; b -> c
     // }";

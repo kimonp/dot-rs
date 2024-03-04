@@ -175,6 +175,7 @@ impl Node {
     /// Set the given node's tree data as a root node of the tree.
     ///
     /// Typically, nodes with no in_edges are set as root nodes.
+    #[cfg(test)]
     pub(super) fn set_tree_root_node(&self) {
         *self.spanning_tree.borrow_mut() = Some(SpanningTreeData::new(None, 0, 0));
     }
@@ -339,10 +340,10 @@ impl Node {
         self.get_edges(EdgeDisposition::In).is_empty()
     }
 
-    /// True if there are no outgoing edges to a node.
-    pub(super) fn no_out_edges(&self) -> bool {
-        self.get_edges(EdgeDisposition::Out).is_empty()
-    }
+    // /// True if there are no outgoing edges to a node.
+    // pub(super) fn no_out_edges(&self) -> bool {
+    //     self.get_edges(EdgeDisposition::Out).is_empty()
+    // }
 
     /// Sets the simplex rank of a node.
     ///

@@ -64,7 +64,7 @@ impl Edge {
     }
     
     pub fn in_spanning_tree(&self) -> bool {
-        self.in_spanning_tree.borrow().clone()
+        *self.in_spanning_tree.borrow()
     }
 
     pub fn set_in_spanning_tree(&self, value: bool) {
