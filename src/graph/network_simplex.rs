@@ -138,6 +138,15 @@ impl Graph {
     ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
     ///     and thus whether a non-tree edge crosses between the two components.
     pub(super) fn init_cutvalues(&mut self) {
+        // init_spanning_tree() is here for now because it mirrors the GraphViz code calling dfs_range_init()
+        // of which init_spanning_tree() is the equivalent.
+        //
+        // Assuming I continue to move over to GraphViz style code, this will make sense here.
+        // Otherwise, it should be probably pulled into the calling function.
+        println!("before spanning:\n{self}");
+        self.init_spanning_tree();
+        println!("after spanning");
+
         for edge_idx in 0..self.edges.len() {
             let edge = self.get_edge(edge_idx);
             if edge.in_spanning_tree() {
@@ -649,9 +658,9 @@ impl Graph {
                 if let Some(replace_edge_idx) = self.enter_edge_for_simplex(tree_edge_idx) {
                     if let Some(delta) = self.simplex_slack(replace_edge_idx) {
                         if delta > 1 {
-                            // let edge = self.get_edge(replace_edge_idx);
-                            // let src_node = self.get_node(edge.src_node);
-                            // let dst_node = self.get_node(edge.dst_node);
+                            let edge = self.get_edge(replace_edge_idx);
+                            let src_node = self.get_node(edge.src_node);
+                            let dst_node = self.get_node(edge.dst_node);
 
                             // ND_lim(n) is the max depth first index for nodes in the subtree of node n.
                             // * How many steps from the root is the node connected to n that is farthest
@@ -899,7 +908,7 @@ mod tests {
         assert_eq!(neg_edge3, Some(neg_edge1_idx));
     }
 
-    /// enter_edge_for_simplex is supposed to find the next edge with the minimum cut value.
+    /// enter_edge_for_simplex() is supposed to find the next edge with the minimum cut value.
     ///
     /// Given a specific example, we know which edges we expect it to return.
     #[test]
@@ -943,9 +952,11 @@ mod tests {
         // println!("Next edge 2: {} -> {}", src_node, dst_node);
     }
 
+    /// Only tests in that network_simplex_ranking() does not crash or
+    /// stack overflow.
     #[test]
     fn test_network_simplex_ranking() {
-        let mut graph = Graph::example_graph_from_paper_2_3_extended();
+        let mut graph = Graph::example_graph_from_paper_2_3();
 
         graph.network_simplex_ranking(SimplexNodeTarget::VerticalRank);
     }

@@ -213,8 +213,8 @@ impl Graph {
 
     /// Rank nodes in the tree using the network simplex algorithm.
     pub fn rank_nodes_vertically(&mut self) {
-        self.merge_edges();
         self.make_asyclic();
+        self.merge_edges();
         self.network_simplex_ranking(VerticalRank);
     }
 
@@ -1046,6 +1046,8 @@ impl Graph {
 
     /// Given a node index, return an iterator to a tuple with each edge_idx, and the node_idx of
     /// the node on the other side of the edge.
+    ///
+    /// Only returns non-ignored edges.
     fn get_node_edges_and_adjacent_node(
         &self,
         node_idx: usize,
@@ -1053,15 +1055,19 @@ impl Graph {
         let node = self.get_node(node_idx);
 
         node.get_all_edges_with_disposition()
-            .map(|(edge_idx, disposition)| {
+            .filter_map(|(edge_idx, disposition)| {
                 let edge_idx = *edge_idx;
                 let edge = self.get_edge(edge_idx);
-                let adjacent_node_idx = match disposition {
-                    EdgeDisposition::In => edge.src_node,
-                    EdgeDisposition::Out => edge.dst_node,
-                };
 
-                (edge_idx, adjacent_node_idx)
+                if edge.ignored {
+                    None
+                } else {
+                    let adjacent_node_idx = match disposition {
+                        EdgeDisposition::In => edge.src_node,
+                        EdgeDisposition::Out => edge.dst_node,
+                    };
+                    Some((edge_idx, adjacent_node_idx))
+                }
             })
     }
 }
@@ -1069,6 +1075,12 @@ impl Graph {
 impl Display for Graph {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         for (edge_id, edge) in self.edges.iter().enumerate() {
+            let reversed = if edge.reversed { "reversed!" } else { "" };
+            let in_tree = if edge.in_spanning_tree() {
+                "TREE MEMBER"
+            } else {
+                "NOT IN TREE"
+            };
             let src = &self.nodes[edge.src_node];
             let dst = &self.nodes[edge.dst_node];
 
@@ -1090,7 +1102,10 @@ impl Display for Graph {
                 "r: -".to_string()
             };
 
-            let _ = writeln!(fmt, "{src}({src_rank}) -{line}> {dst}({dst_rank}) eid:{edge_id}",);
+            let _ = writeln!(
+                fmt,
+                "{src}({src_rank}) -{line}> {dst}({dst_rank}) eid:{edge_id} {in_tree} {reversed}",
+            );
         }
         Ok(())
     }
@@ -1474,21 +1489,15 @@ pub mod tests {
 
     #[test]
     fn test_get_min_rank() {
-        let mut graph = Graph::new();
-        let node_map = graph.add_nodes('a'..='d');
-        let edges = vec![("a", "b"), ("b", "a"), ("c", "d"), ("c", "a")];
-        graph.add_edges(&edges, &node_map);
+        let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; }");
+        let node_c_idx = graph.name_to_node_idx("c").unwrap();
 
         graph.rank_nodes_vertically();
 
         let min_rank = graph.get_min_vertical_rank_nodes();
         let min_rank = min_rank.iter().cloned().collect::<Vec<usize>>();
 
-        assert_eq!(
-            min_rank,
-            vec![*node_map.get("c").unwrap()],
-            "min node should be 'c'"
-        );
+        assert_eq!(min_rank, vec![node_c_idx], "min node should be 'c'");
     }
 
     #[test]

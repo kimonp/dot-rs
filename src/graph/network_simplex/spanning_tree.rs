@@ -40,17 +40,21 @@ use crate::graph::edge::{
 
 #[allow(unused)]
 impl Graph {
-    /// Initializes the spanning tree data
+    /// Initializes the spanning tree data.
+    ///
+    /// This includes:
+    /// * Setting the edge_idx_to_parent value
+    /// * setting min and max ranges
+    ///
+    /// Must be done before calling network simplex.
+    //
     /// In the graphviz 9.0 code, this function is: dfs_range_init()
-    fn init_spanning_tree(&mut self, node_idx: usize) {
-        self.set_tree_ranges(true, node_idx, None, 1);
-    }
-
-    /// In the graphviz 9.0 code, this function is: dfs_range_init()
-    fn update_tree_ranges(&mut self, lca_node_idx: usize, min: usize) {
-        let parent_edge_idx = self.get_node(lca_node_idx).spanning_tree_parent_edge_idx();
-
-        self.set_tree_ranges(false, lca_node_idx, parent_edge_idx, min);
+    /// It assumes that graph is fully connected.
+    pub(super) fn init_spanning_tree(&mut self) {
+        if self.node_count() != 0 {
+            println!("init_spanning:\n{self}");
+            self.set_tree_ranges(true, 0, None, 1);
+        }
     }
 
     /// In the graphviz 9.0 code, there are two functions:
@@ -70,22 +74,28 @@ impl Graph {
         if !initializing {
             if let Some(tree_data) = node.spanning_tree() {
                 if tree_data.edge_idx_to_parent() == parent_edge_idx
-                    && tree_data.sub_tree_idx_min() == min
+                    && tree_data.sub_tree_idx_min() == Some(min)
                 {
-                    return tree_data.sub_tree_idx_max() + 1;
+                    return tree_data.sub_tree_idx_max().unwrap_or(0) + 1;
                 }
             } else {
                 panic!("Setting tree ranges on a node that is not in the tree!");
             }
         }
 
+        self.get_node_mut(node_idx)
+            .set_tree_data(parent_edge_idx, Some(min), None);
+
         let mut max = min;
-        for (edge_idx, node_idx) in self.non_parent_tree_nodes(node_idx) {
+
+        // println!("Setting range for: {node_idx}: {:?}", self.non_parent_tree_nodes(node_idx));
+
+        for (node_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
             max = max.max(self.set_tree_ranges(initializing, node_idx, Some(edge_idx), max));
         }
 
         self.get_node_mut(node_idx)
-            .set_tree_data(parent_edge_idx, min, max);
+            .set_tree_data(parent_edge_idx, Some(min), Some(max));
 
         max + 1
     }
@@ -150,7 +160,6 @@ impl Graph {
             let modified_sub_tree_idx = self.merge_sub_trees(edge_idx);
             min_heap.reorder_item(modified_sub_tree_idx);
         }
-
         self.init_cutvalues();
     }
 
@@ -259,7 +268,7 @@ impl Graph {
     }
 
     // Return the tightest edge to another tree incident on the given tree.
-    // 
+    //
     // In GraphVis code: inter_tree_edge()
     fn find_tightest_incident_edge(&self, sub_tree: SubTree) -> Option<usize> {
         self.tightest_incident_edge_search(sub_tree.start_node_idx(), None, None)
@@ -316,7 +325,9 @@ impl Graph {
 
     /// Given a node_idx, find it's root sub_tree.
     fn find_node_sub_tree_root(&self, node_idx: usize) -> Option<SubTree> {
-        self.get_node(node_idx).sub_tree().map(|sub_tree| sub_tree.find_root())
+        self.get_node(node_idx)
+            .sub_tree()
+            .map(|sub_tree| sub_tree.find_root())
     }
 
     /// Finds a tight subtree starting from node node_idx.
@@ -368,9 +379,14 @@ impl Graph {
 
         for (edge_idx, adjacent_node_idx) in self.get_node_edges_and_adjacent_node(node_idx) {
             let edge = self.get_edge(edge_idx);
+            let adjacent_node = self.get_node(adjacent_node_idx);
 
+            // Note that in the GraphViz code, they ignore nodes with sub_trees
+            // instead of ignoring nodes in the spanning tree.  I believe this
+            // is incorrect logic, and only works by luck because they have
+            // overloaded ND_subtree.
             if !edge.in_spanning_tree()
-                && self.get_node(adjacent_node_idx).sub_tree().is_none()
+                && !adjacent_node.in_spanning_tree()
                 && self.simplex_slack(edge_idx) == Some(0)
             {
                 self.add_tree_edge(edge);
@@ -453,14 +469,16 @@ impl Graph {
             let new_rank = (cur_rank as i32 + delta) as u32;
             self.get_node_mut(node_idx).set_simplex_rank(Some(new_rank));
 
-            for (_edge_idx, node_idx) in self.non_parent_tree_nodes(node_idx) {
+            for (node_idx, _) in self.non_parent_tree_nodes(node_idx) {
                 self.rerank_by_tree(node_idx, delta)
             }
         }
     }
 
-    /// Return a vector of (edge_idx, node_idx) which are tree members and do not point to the
+    /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the
     /// parent node of the given node.
+    ///
+    /// Only returns non-ignored nodes.
     fn non_parent_tree_nodes(&self, node_idx: usize) -> Vec<(usize, usize)> {
         let mut nodes = self.directional_non_parent_tree_nodes(node_idx, Out);
         let mut in_nodes = self.directional_non_parent_tree_nodes(node_idx, In);
@@ -469,8 +487,10 @@ impl Graph {
         nodes
     }
 
-    /// Return a vector of (edge_idx, node_idx) which are tree members and do not point to the
+    /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the
     /// parent node of the given node from either in_edges or out_edges depending on disposition.
+    ///
+    /// Only returns non-ignored nodes.
     fn directional_non_parent_tree_nodes(
         &self,
         node_idx: usize,
@@ -491,14 +511,84 @@ impl Graph {
                     Out => edge.dst_node,
                 };
 
-                if edge.in_spanning_tree()
+                if !edge.ignored
+                    && edge.in_spanning_tree()
                     && node.spanning_tree_parent_edge_idx() != Some(*edge_idx)
                 {
-                    Some((*edge_idx, other_node_idx))
+                    Some((other_node_idx, *edge_idx))
                 } else {
+                    // if edge.ignored {
+                    //     println!("Edge {edge_idx}: ignored ");
+                    // }
+                    // if !edge.in_spanning_tree() {
+                    //     println!("Edge {edge_idx}: not in spanning tree");
+                    // }
+                    // if node.spanning_tree_parent_edge_idx() == Some(*edge_idx) {
+                    //     println!("Edge {edge_idx}: points to parent");
+                    // }
                     None
                 }
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_directional_non_parent_tree_nodes() {
+        let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; }");
+        let a_idx = graph.name_to_node_idx("a").unwrap();
+        let b_idx = graph.name_to_node_idx("b").unwrap();
+        let c_idx = graph.name_to_node_idx("c").unwrap();
+        let d_idx = graph.name_to_node_idx("d").unwrap();
+
+        graph.make_asyclic();
+        graph.merge_edges();
+        graph.init_simplex_rank();
+        graph.set_feasible_tree_for_simplex();
+
+        let a_in_nodes = graph.directional_non_parent_tree_nodes(a_idx, In);
+        let a_out_nodes = graph.directional_non_parent_tree_nodes(a_idx, Out);
+
+        assert_eq!(a_out_nodes, [(b_idx, 0)]);
+        assert_eq!(a_in_nodes, [(c_idx, 3)]);
+
+        let c_in_nodes = graph.directional_non_parent_tree_nodes(c_idx, In);
+        let c_out_nodes = graph.directional_non_parent_tree_nodes(c_idx, Out);
+
+        // It does not include (a_idx, 3), because that is a parent node.
+        assert_eq!(c_out_nodes, [(d_idx, 2)]);
+        assert_eq!(c_in_nodes, []);
+    }
+
+    /// This test is here to ensure init_spanning_tree() does not go into an
+    /// infinite loop because it adds edges that should be ignored (edges that
+    /// point to a node already in the tree).
+    #[test]
+    fn test_init_spanning_tree_ingore_tree_nodes() {
+        let mut graph = Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }");
+        graph.make_asyclic();
+        graph.merge_edges();
+        graph.init_simplex_rank();
+
+        // at end end calls: init_cutvals() -> graph.init_spanning_tree();
+        graph.set_feasible_tree_for_simplex();
+    }
+    
+    /// Not a useful test yet...XXX
+    #[test]
+    fn test_set_feasible_tree_for_simplex() {
+        let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; }");
+
+        graph.make_asyclic();
+        graph.merge_edges();
+        graph.init_simplex_rank();
+        graph.set_feasible_tree_for_simplex();
+        // at end end calls: init_cutvals() -> graph.init_spanning_tree();
+
+        println!("{graph}");
     }
 }

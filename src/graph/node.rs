@@ -64,21 +64,28 @@ impl NodeType {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct SpanningTreeData {
-    /// Graph index id of the edge connects to the parent of this node.  None if this node has no tree parent.
     edge_idx_to_parent: Option<usize>,
-    /// The minimal tree index of all nodes for which this node is an ancestor.
-    sub_tree_idx_min: usize,
-    /// The maximum tree index of all nodes for which this node is an ancestor.
-    sub_tree_idx_max: usize,
-    /// Referance to the subtree this node is a member of
+    sub_tree_idx_min: Option<usize>,
+    sub_tree_idx_max: Option<usize>,
+    /// Reference to the subtree that this node is a member of.
     sub_tree: Option<SubTree>,
+}
+
+impl Display for SpanningTreeData {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        let parent = self.edge_idx_to_parent().map(|p| p.to_string()).unwrap_or("-".to_string());
+        let min = self.sub_tree_idx_min.map(|m| m.to_string()).unwrap_or("-".to_string());
+        let max = self.sub_tree_idx_max.map(|m| m.to_string()).unwrap_or("-".to_string());
+
+        write!(fmt, "edge_to_parent:{parent} min:{min} max:{max}")
+    }
 }
 
 impl SpanningTreeData {
     fn new(
         edge_idx_to_parent: Option<usize>,
-        sub_tree_idx_min: usize,
-        sub_tree_idx_max: usize,
+        sub_tree_idx_min: Option<usize>,
+        sub_tree_idx_max: Option<usize>,
     ) -> SpanningTreeData {
         SpanningTreeData {
             edge_idx_to_parent,
@@ -88,15 +95,20 @@ impl SpanningTreeData {
         }
     }
 
+    /// Graph index id of the edge that connects to the parent of this node.
+    ///
+    /// None if this node has no tree parent.
     pub fn edge_idx_to_parent(&self) -> Option<usize> {
         self.edge_idx_to_parent
     }
 
-    pub fn sub_tree_idx_min(&self) -> usize {
+    /// The minimal tree index of all nodes for which this node is an ancestor.
+    pub fn sub_tree_idx_min(&self) -> Option<usize> {
         self.sub_tree_idx_min
     }
 
-    pub fn sub_tree_idx_max(&self) -> usize {
+    /// The maximum tree index of all nodes for which this node is an ancestor.
+    pub fn sub_tree_idx_max(&self) -> Option<usize> {
         self.sub_tree_idx_max
     }
 }
@@ -177,15 +189,19 @@ impl Node {
     /// Typically, nodes with no in_edges are set as root nodes.
     #[cfg(test)]
     pub(super) fn set_tree_root_node(&self) {
-        *self.spanning_tree.borrow_mut() = Some(SpanningTreeData::new(None, 0, 0));
+        *self.spanning_tree.borrow_mut() = Some(SpanningTreeData::new(None, None, None));
     }
 
     pub(super) fn clear_tree_data(&self) {
         *self.spanning_tree.borrow_mut() = None;
     }
 
-    pub(super) fn set_tree_data(&self, parent: Option<usize>, min: usize, max: usize) {
+    pub(super) fn set_tree_data(&self, parent: Option<usize>, min: Option<usize>, max: Option<usize>) {
         *self.spanning_tree.borrow_mut() = Some(SpanningTreeData::new(parent, min, max));
+    }
+
+    fn tree_data(&self) -> Option<SpanningTreeData> {
+        self.spanning_tree.borrow().clone()
     }
 
     /// Return a internally mutable subtree if one is set for this node.
@@ -214,7 +230,7 @@ impl Node {
     /// Used by asyclic tree for tree nodes, but does not use the other data.
     /// This must be cleared by simplex for it runs.
     pub(super) fn set_empty_tree_node(&self) {
-        self.set_tree_data(None, 0, 0);
+        self.set_tree_data(None, None, None);
     }
 
     pub(super) fn set_coordinates(&mut self, x: u32, y: u32) {
@@ -376,6 +392,7 @@ impl Node {
 
 impl Display for Node {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        let tree = self.tree_data().map(|td| td.to_string());
         let coords = if let Some(coords) = self.coordinates {
             format!("({:3},{:3})", coords.x(), coords.y())
         } else {
@@ -391,7 +408,7 @@ impl Display for Node {
         } else {
             "      ".to_string()
         };
-        write!(fmt, "{}: {v_rank} {coords} {pos}", &self.name)
+        write!(fmt, "{} ({tree:?}): {v_rank} {coords} {pos}", &self.name)
     }
 }
 

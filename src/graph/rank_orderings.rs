@@ -489,8 +489,11 @@ mod test {
     #[test]
     fn test_adjacent_position() {
         let mut graph = Graph::example_graph_from_paper_2_3();
+        println!("0");
         graph.rank_nodes_vertically();
+        println!("1");
         let order = graph.init_horizontal_order();
+        println!("2");
 
         let node_a = graph.name_to_node_idx("a").unwrap();
         let node_f = graph.name_to_node_idx("f").unwrap();
