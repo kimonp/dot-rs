@@ -67,7 +67,7 @@ impl Graph {
     pub fn layout_nodes(&mut self) {
         self.rank_nodes_vertically();
         self.set_horizontal_ordering();
-        self.set_horizontal_coordinates();
+        // self.set_horizontal_coordinates();
         // self.make_splines()
     }
 

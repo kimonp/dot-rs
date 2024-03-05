@@ -143,9 +143,7 @@ impl Graph {
         //
         // Assuming I continue to move over to GraphViz style code, this will make sense here.
         // Otherwise, it should be probably pulled into the calling function.
-        println!("before spanning:\n{self}");
         self.init_spanning_tree();
-        println!("after spanning");
 
         for edge_idx in 0..self.edges.len() {
             let edge = self.get_edge(edge_idx);
@@ -512,32 +510,24 @@ impl Graph {
     ///   list of tree edges every time, can save many iterations
     fn leave_edge_for_simplex(&self, start_idx: usize) -> Option<usize> {
         // Search starting at start_idx
-        let mut edge_idx = start_idx;
-
-        while edge_idx < self.edges.len() {
+        for edge_idx in start_idx..self.edges.len() {
             let edge = self.get_edge(edge_idx);
-            println!("Checking from {edge_idx}: {:?}", edge.cut_value);
-
             if let Some(cut_value) = edge.cut_value {
                 if cut_value < 0 {
                     return Some(edge_idx);
                 }
             }
-            edge_idx += 1;
         }
-        // Search starting at zero up to start_idx
-        println!("Checking from 0-{start_idx}");
-        edge_idx = 0;
-        while edge_idx < start_idx {
+        // Now start at zero
+        for edge_idx in 0..start_idx {
             let edge = self.get_edge(edge_idx);
-
             if let Some(cut_value) = edge.cut_value {
                 if cut_value < 0 {
                     return Some(edge_idx);
                 }
             }
-            edge_idx += 1;
         }
+
         None
     }
 
@@ -658,9 +648,9 @@ impl Graph {
                 if let Some(replace_edge_idx) = self.enter_edge_for_simplex(tree_edge_idx) {
                     if let Some(delta) = self.simplex_slack(replace_edge_idx) {
                         if delta > 1 {
-                            let edge = self.get_edge(replace_edge_idx);
-                            let src_node = self.get_node(edge.src_node);
-                            let dst_node = self.get_node(edge.dst_node);
+                            // let edge = self.get_edge(replace_edge_idx);
+                            // let src_node = self.get_node(edge.src_node);
+                            // let dst_node = self.get_node(edge.dst_node);
 
                             // ND_lim(n) is the max depth first index for nodes in the subtree of node n.
                             // * How many steps from the root is the node connected to n that is farthest
@@ -867,7 +857,6 @@ mod tests {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a();
 
         graph.init_cutvalues();
-        println!("{graph}");
         graph.assert_expected_cutvals(expected_cutvals);
     }
 
@@ -876,7 +865,6 @@ mod tests {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_b();
 
         graph.init_cutvalues();
-        println!("{graph}");
         graph.assert_expected_cutvals(expected_cutvals);
     }
 
@@ -885,7 +873,6 @@ mod tests {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a_extended();
 
         graph.init_cutvalues();
-        println!("{graph}");
         graph.assert_expected_cutvals(expected_cutvals);
     }
 

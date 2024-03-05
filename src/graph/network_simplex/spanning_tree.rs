@@ -581,7 +581,8 @@ mod test {
     /// Not a useful test yet...XXX
     #[test]
     fn test_set_feasible_tree_for_simplex() {
-        let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; }");
+        // let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; }");
+        let mut graph = Graph::example_graph_from_paper_2_3_extended();
 
         graph.make_asyclic();
         graph.merge_edges();
