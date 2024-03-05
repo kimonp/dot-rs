@@ -67,7 +67,7 @@ impl Graph {
     pub fn layout_nodes(&mut self) {
         self.rank_nodes_vertically();
         self.set_horizontal_ordering();
-        // self.set_horizontal_coordinates();
+        self.set_horizontal_coordinates();
         // self.make_splines()
     }
 
@@ -193,7 +193,7 @@ impl Graph {
         let v_node = self.get_node_mut(idx);
 
         v_node.node_type = node_type;
-        v_node.simplex_rank = Some(rank);
+        v_node.set_simplex_rank(Some(rank));
         v_node.vertical_rank = Some(rank);
 
         idx
@@ -1070,6 +1070,14 @@ impl Graph {
                 }
             })
     }
+
+    /// An iterator that returns only tree edges (not all graph edges).
+    fn tree_edge_iter(&self) -> impl Iterator<Item = (usize, &Edge)> {
+        self.edges
+            .iter()
+            .enumerate()
+            .filter(|(_, edge)| edge.in_spanning_tree())
+    }
 }
 
 impl Display for Graph {
@@ -1091,12 +1099,12 @@ impl Display for Graph {
             } else {
                 " - -".to_string()
             };
-            let src_rank = if let Some(rank) = src.simplex_rank {
+            let src_rank = if let Some(rank) = src.simplex_rank() {
                 format!("r:{:2}", rank)
             } else {
                 "r: -".to_string()
             };
-            let dst_rank = if let Some(rank) = dst.simplex_rank {
+            let dst_rank = if let Some(rank) = dst.simplex_rank() {
                 format!("r:{:2}", rank)
             } else {
                 "r: -".to_string()
@@ -1169,7 +1177,7 @@ pub mod tests {
             let node = self.get_node_mut(node_idx);
 
             node.vertical_rank = Some(vertical_rank);
-            node.simplex_rank = Some(vertical_rank);
+            node.set_simplex_rank(Some(vertical_rank));
             node.set_tree_root_node();
         }
 
@@ -1542,7 +1550,17 @@ pub mod tests {
 
     #[test]
     fn test_draw_graph() {
-        let mut graph = Graph::example_graph_from_paper_2_3();
+        // let mut graph = Graph::example_graph_from_paper_2_3_extended();
+        let dot_str = "digraph {
+            l -> h;
+            i -> l; j -> l; k -> l;
+            a -> i; a -> j; a -> k;
+            g -> h;
+            c -> d; d -> h;
+            e -> g; f -> g; b -> c;
+            a -> b; a -> e; a -> f;
+        }";
+        let mut graph = Graph::from(dot_str);
 
         println!("{graph}");
         graph.layout_nodes();

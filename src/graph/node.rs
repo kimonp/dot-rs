@@ -124,7 +124,7 @@ pub struct Node {
     pub(super) name: String,
     // Rank is computed using the network simplex algorithm.  Used to determine both vertical_rank
     // and coordianates.x.
-    pub(super) simplex_rank: Option<u32>,
+    simplex_rank: RefCell<Option<u32>>,
     /// Relative verticial ranking of this node.  Zero based, greater numbers are lower.
     pub(super) vertical_rank: Option<u32>,
     /// Position is the relative horizontal position of this node compared to
@@ -148,7 +148,7 @@ impl Node {
     pub(super) fn new(name: &str) -> Self {
         Node {
             name: name.to_string(),
-            simplex_rank: None,
+            simplex_rank: RefCell::new(None),
             vertical_rank: None,
             horizontal_position: None,
             coordinates: None,
@@ -365,17 +365,17 @@ impl Node {
     ///
     /// Rank corresponds to the vertical placement of a node.  The greater the rank,
     /// the lower the placement on a canvas.
-    pub(super) fn set_simplex_rank(&mut self, rank: Option<u32>) {
-        self.simplex_rank = rank;
+    pub(super) fn set_simplex_rank(&self, rank: Option<u32>) {
+        *self.simplex_rank.borrow_mut() = rank;
     }
 
     /// Gets the simplex rank of a node.
     pub(super) fn simplex_rank(&self) -> Option<u32> {
-        self.simplex_rank
+        *self.simplex_rank.borrow()
     }
 
     pub(super) fn assign_simplex_rank(&mut self, target: SimplexNodeTarget) {
-        let simplex_rank = self.simplex_rank.unwrap();
+        let simplex_rank = self.simplex_rank().unwrap();
 
         match target {
             SimplexNodeTarget::VerticalRank => self.vertical_rank = Some(simplex_rank),

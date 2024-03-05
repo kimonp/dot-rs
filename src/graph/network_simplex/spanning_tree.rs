@@ -462,12 +462,12 @@ impl Graph {
     // }
 
     /// Re-rank the given node by adding delta to the rank, and all sub_nodes in the tree.
-    fn rerank_by_tree(&mut self, node_idx: usize, delta: i32) {
+    pub(super) fn rerank_by_tree(&self, node_idx: usize, delta: i32) {
         let node = self.get_node(node_idx);
 
-        if let Some(cur_rank) = node.simplex_rank {
+        if let Some(cur_rank) = node.simplex_rank() {
             let new_rank = (cur_rank as i32 + delta) as u32;
-            self.get_node_mut(node_idx).set_simplex_rank(Some(new_rank));
+            node.set_simplex_rank(Some(new_rank));
 
             for (node_idx, _) in self.non_parent_tree_nodes(node_idx) {
                 self.rerank_by_tree(node_idx, delta)

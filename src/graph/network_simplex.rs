@@ -365,7 +365,7 @@ impl Graph {
         let src_node = self.get_node(edge.src_node);
         let dst_node = self.get_node(edge.dst_node);
 
-        match (src_node.simplex_rank, dst_node.simplex_rank) {
+        match (src_node.simplex_rank(), dst_node.simplex_rank()) {
             (Some(src), Some(dst)) => Some((dst as i32) - (src as i32)),
             _ => None,
         }
@@ -425,7 +425,7 @@ impl Graph {
             let mut next_nodes_to_rank = Vec::new();
             while let Some(node_idx) = nodes_to_rank.pop() {
                 let node = self.get_node(node_idx);
-                if node.simplex_rank.is_none() {
+                if node.simplex_rank().is_none() {
                     let mut new_rank = 0;
 
                     for edge_idx in node.in_edges.clone() {
@@ -532,6 +532,8 @@ impl Graph {
     }
 
     /// Given a tree edge, return the non-tree edge with the lowest remaining cut-value.
+    /// 
+    /// XXX: This can be updated to use GraphViz like code, which is much more effecient, but uglier.
     ///
     /// Documentation from paper:
     /// * enter_edge ﬁnds a non-tree edge to replace e.
@@ -585,10 +587,10 @@ impl Graph {
     /// The solution is normalized setting the least rank to zero.
     fn normalize_simplex_rank(&mut self) {
         if let Some(min_node) = self.nodes.iter().min() {
-            if let Some(least_rank) = min_node.simplex_rank {
+            if let Some(least_rank) = min_node.simplex_rank() {
                 for node in self.nodes.iter_mut() {
-                    if let Some(rank) = node.simplex_rank {
-                        node.simplex_rank = Some(rank - least_rank);
+                    if let Some(rank) = node.simplex_rank() {
+                        node.set_simplex_rank(Some(rank - least_rank));
                     }
                 }
             }
@@ -638,19 +640,23 @@ impl Graph {
     /// * ND_lim(n) - max DFS index for nodes in sub-tree
     ///
     fn balance_left_right(&mut self) {
-        for (tree_edge_idx, tree_edge) in self
-            .edges
-            .iter()
-            .enumerate()
-            .filter(|(_, edge)| edge.in_spanning_tree())
-        {
+        for (tree_edge_idx, tree_edge) in self.tree_edge_iter() {
             if tree_edge.cut_value == Some(0) {
                 if let Some(replace_edge_idx) = self.enter_edge_for_simplex(tree_edge_idx) {
                     if let Some(delta) = self.simplex_slack(replace_edge_idx) {
                         if delta > 1 {
-                            // let edge = self.get_edge(replace_edge_idx);
-                            // let src_node = self.get_node(edge.src_node);
-                            // let dst_node = self.get_node(edge.dst_node);
+                            let src_node = self.get_node(tree_edge.src_node);
+                            let dst_node = self.get_node(tree_edge.dst_node);
+                            
+                            if let (Some(src_tree), Some(dst_tree)) = (src_node.spanning_tree(), dst_node.spanning_tree()) {
+                                if src_tree.sub_tree_idx_min() < dst_tree.sub_tree_idx_max() {
+                                    self.rerank_by_tree(tree_edge.src_node, delta/2);
+                                } else {
+                                    self.rerank_by_tree(tree_edge.dst_node, -delta/2);
+                                }
+                            } else {
+                                panic!("Not all nodes in spanning tree!");
+                            }
 
                             // ND_lim(n) is the max depth first index for nodes in the subtree of node n.
                             // * How many steps from the root is the node connected to n that is farthest
