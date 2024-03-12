@@ -5,6 +5,7 @@ use super::heap::HeapIndex;
 use core::cmp::Ordering;
 
 use std::cell::RefCell;
+use std::fmt::{Display, Error, Formatter};
 use std::rc::Rc;
 
 /// SubTree is analogous to the subtree_s struct found in GraphViz: lib/common/ns.c
@@ -19,31 +20,35 @@ impl SubTree {
         SubTree(Rc::new(RefCell::new(InternalSubTree::new(node_idx))))
     }
 
+    pub fn strong_count(&self) -> usize {
+        Rc::strong_count(&self.0)
+    }
+
     /// Number of nodes within the subtree.
     pub fn size(&self) -> u32 {
-        (*self.0).borrow().size()
+        self.0.borrow().size()
     }
 
     /// Node Index where this sub_tree started building.
     pub fn start_node_idx(&self) -> usize {
-        (*self.0).borrow().start_node_idx()
+        self.0.borrow().start_node_idx()
     }
 
     /// Node Index of the parent of this subtree.
     pub fn parent(&self) -> Option<SubTree> {
-        (*self.0).borrow().parent()
+        self.0.borrow().parent()
     }
 
     /// Set the size of this subtree (number of nodes within the subtree)
     pub fn set_size(&self, size: u32) {
-        (*self.0).borrow_mut().set_size(size)
+        self.0.borrow_mut().set_size(size)
     }
 
     /// Set the size of this subtree (number of nodes within the subtree)
     pub fn set_parent(&self, parent: Option<SubTree>) {
-        (*self.0).borrow_mut().set_parent(parent)
+        self.0.borrow_mut().set_parent(parent)
     }
-    
+
     // Return the root of this sub_tree.
     //
     // If we don't have a parent, we are the root.
@@ -54,6 +59,26 @@ impl SubTree {
         } else {
             self.clone()
         }
+    }
+}
+
+impl Display for SubTree {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
+        // let parent = if let Some(parent) = &self.parent {
+        //     parent.start_node_idx().to_string()
+        // } else {
+        //     "-".to_string()
+        // };
+        // let heap = if let Some(heap) = &self.heap_idx {
+        //     heap.to_string()
+        // } else {
+        //     "-".to_string()
+        // };
+
+        write!(
+            fmt,
+            "{}", self.0.borrow()
+        )
     }
 }
 
@@ -105,6 +130,27 @@ struct InternalSubTree {
     heap_idx: Option<usize>,
     /// Pointer to the parent of this sub_tree or none if this is the root of the sub_tree.
     parent: Option<SubTree>,
+}
+
+impl Display for InternalSubTree {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
+        let parent = if let Some(parent) = &self.parent {
+            parent.start_node_idx().to_string()
+        } else {
+            "-".to_string()
+        };
+        let heap = if let Some(heap) = &self.heap_idx {
+            heap.to_string()
+        } else {
+            "-".to_string()
+        };
+
+        write!(
+            fmt,
+            "sub_tree:{} size:{} parent:{parent} heap:{heap}",
+            self.start_node_idx, self.size
+        )
+    }
 }
 
 impl PartialEq for InternalSubTree {

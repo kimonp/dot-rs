@@ -52,7 +52,6 @@ impl Graph {
     /// It assumes that graph is fully connected.
     pub(super) fn init_spanning_tree(&mut self) {
         if self.node_count() != 0 {
-            println!("init_spanning:\n{self}");
             self.set_tree_ranges(true, 0, None, 1);
         }
     }
@@ -142,23 +141,33 @@ impl Graph {
         // fewer subtrees than nodes, but not more.
         let mut min_heap = MinHeap::new(self.node_count());
 
+        // Whether you are in the spanning tree or not, create as subtree
+        // for all nodes.
+        self.print_nodes("BEFORE find_tight_subtree");
         for node_idx in 0..self.node_count() {
-            if !self.get_node(node_idx).in_spanning_tree() {
+            // Don't place this exclusion in a filter, as it can change from the preivous call.
+            if !self.get_node(node_idx).has_sub_tree() {
                 let sub_tree = self.find_tight_subtree(node_idx);
-
                 min_heap.insert_unordered_item(sub_tree);
             }
         }
+
         min_heap.order_heap();
+
+        self.print_nodes(&format!("BEFORE MIN_HEAP: {}", min_heap.len()));
 
         while min_heap.len() > 1 {
             let sub_tree = min_heap.pop().expect("can't be empty");
+            println!("finding edge for: {:?} with heap of {}", sub_tree, min_heap.len());
             let edge_idx = self
                 .find_tightest_incident_edge(sub_tree)
                 .expect("cant find inter tree edge");
 
+            println!("Merging: {edge_idx}");
             let modified_sub_tree_idx = self.merge_sub_trees(edge_idx);
+            println!("Reording: {modified_sub_tree_idx}");
             min_heap.reorder_item(modified_sub_tree_idx);
+            println!("reorder done");
         }
         self.init_cutvalues();
     }
@@ -189,6 +198,11 @@ impl Graph {
             .find_node_sub_tree_root(edge.dst_node)
             .expect("count not find dst tree root");
 
+        println!(
+            "Merging sub_trees for {edge_idx}: {}",
+            self.edge_to_string(edge_idx)
+        );
+
         if src_tree_root.heap_idx().is_none() {
             let delta = edge_slack;
 
@@ -206,11 +220,10 @@ impl Graph {
     /// Adjust the rank of all nodes in the spanning tree by delta.
     fn tree_adjust_rank(&self, node_idx: usize, from_idx: Option<usize>, delta: i32) {
         let node = self.get_node(node_idx);
-        let rank = node.simplex_rank().expect("all nodes should be ranked") as i32;
-        let new_rank = (rank + delta) as u32;
+        let rank = node.simplex_rank().expect("all nodes should be ranked");
+        let new_rank = rank + delta;
 
-        // XXX Needs to be mutable!
-        // node.set_simplex_rank(Some(new_rank));
+        node.set_simplex_rank(Some(new_rank));
 
         for (edge_idx, next_node_idx) in self.get_node_edges_and_adjacent_node(node_idx) {
             let edge = self.get_edge(edge_idx);
@@ -240,17 +253,7 @@ impl Graph {
         // The merged tree will replace one of the roots
         // based on whether it is in the heap, and of both
         // are in the heap, the biggest one.
-        let selection = if heap_idx1.is_none() {
-            2
-        } else if heap_idx2.is_none() || size1 > size2 {
-            1
-        } else {
-            2
-        };
-
-        // The selected root is still None (it was a root)
-        // But the unselected root's parent becomes the selected root.
-        let union_tree = if selection == 1 {
+        let union_tree = if heap_idx2.is_none() || size1 >= size2 {
             sub_tree_root2.set_parent(Some(sub_tree_root1.clone()));
             sub_tree_root1.set_parent(None); // But should already be none...
 
@@ -261,7 +264,6 @@ impl Graph {
 
             sub_tree_root2
         };
-
         union_tree.set_size(size1 + size2);
 
         union_tree.heap_idx().unwrap()
@@ -294,6 +296,7 @@ impl Graph {
             return best_edge_idx;
         }
 
+        println!("tigtest_incident_edge_search: {search_node_idx}");
         let search_sub_tree_root = self.find_node_sub_tree_root(search_node_idx);
         for (edge_idx, next_node_idx) in self.get_node_edges_and_adjacent_node(search_node_idx) {
             if self.get_edge(edge_idx).in_spanning_tree() {
@@ -302,6 +305,7 @@ impl Graph {
                     continue; // do not search back in the tree
                 } else {
                     // search forward in tree
+                    println!("search forward from {search_node_idx} to {next_node_idx}");
                     best_edge_idx = self.tightest_incident_edge_search(
                         next_node_idx,
                         Some(search_node_idx),
@@ -325,6 +329,7 @@ impl Graph {
 
     /// Given a node_idx, find it's root sub_tree.
     fn find_node_sub_tree_root(&self, node_idx: usize) -> Option<SubTree> {
+        println!("Finding root of: {node_idx}");
         self.get_node(node_idx)
             .sub_tree()
             .map(|sub_tree| sub_tree.find_root())
@@ -356,6 +361,7 @@ impl Graph {
     fn find_tight_subtree(&self, node_idx: usize) -> SubTree {
         let tree = SubTree::new(node_idx);
 
+        println!("find_tight_subtree for: {node_idx} for {tree}");
         // Update the tree size to the combined size of all the nodes we found.
         tree.set_size(self.tight_subtree_search(node_idx, tree.clone()));
 
@@ -374,19 +380,21 @@ impl Graph {
     fn tight_subtree_search(&self, node_idx: usize, sub_tree: SubTree) -> u32 {
         let mut subtree_size = 1;
 
+        println!("    tight subtree search for {}", self.get_node(node_idx));
+
         // set this node to be in the given sub_tree.
         self.get_node(node_idx).set_sub_tree(sub_tree.clone());
 
         for (edge_idx, adjacent_node_idx) in self.get_node_edges_and_adjacent_node(node_idx) {
             let edge = self.get_edge(edge_idx);
-            let adjacent_node = self.get_node(adjacent_node_idx);
+            // let adjacent_node = self.get_node(adjacent_node_idx);
 
             // Note that in the GraphViz code, they ignore nodes with sub_trees
             // instead of ignoring nodes in the spanning tree.  I believe this
             // is incorrect logic, and only works by luck because they have
             // overloaded ND_subtree.
             if !edge.in_spanning_tree()
-                && !adjacent_node.in_spanning_tree()
+                && !self.get_node(adjacent_node_idx).has_sub_tree()
                 && self.simplex_slack(edge_idx) == Some(0)
             {
                 self.add_tree_edge(edge);
@@ -405,8 +413,12 @@ impl Graph {
         let dst_node = self.get_node(edge.dst_node);
 
         edge.set_in_spanning_tree(true);
-        src_node.set_empty_tree_node();
-        dst_node.set_empty_tree_node();
+        if !src_node.in_spanning_tree() {
+            src_node.set_empty_tree_node();
+        }
+        if !dst_node.in_spanning_tree() {
+            dst_node.set_empty_tree_node();
+        }
     }
 
     // pub(super) fn old_set_feasible_tree_for_simplex(&mut self) {
@@ -464,9 +476,10 @@ impl Graph {
     /// Re-rank the given node by adding delta to the rank, and all sub_nodes in the tree.
     pub(super) fn rerank_by_tree(&self, node_idx: usize, delta: i32) {
         let node = self.get_node(node_idx);
+        println!("Reranking {} by {delta}", node.name);
 
         if let Some(cur_rank) = node.simplex_rank() {
-            let new_rank = (cur_rank as i32 + delta) as u32;
+            let new_rank = cur_rank - delta;
             node.set_simplex_rank(Some(new_rank));
 
             for (node_idx, _) in self.non_parent_tree_nodes(node_idx) {
@@ -577,7 +590,7 @@ mod test {
         // at end end calls: init_cutvals() -> graph.init_spanning_tree();
         graph.set_feasible_tree_for_simplex();
     }
-    
+
     /// Not a useful test yet...XXX
     #[test]
     fn test_set_feasible_tree_for_simplex() {

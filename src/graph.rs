@@ -7,7 +7,7 @@ mod crossing_lines;
 pub mod dot_parser;
 mod edge;
 mod network_simplex;
-mod node;
+pub mod node;
 mod rank_orderings;
 
 use rank_orderings::RankOrderings;
@@ -18,9 +18,13 @@ use std::{
 };
 
 use self::{
-    edge::{Edge, EdgeDisposition},
+    edge::{
+        Edge, EdgeDisposition,
+        EdgeDisposition::{In, Out},
+        MIN_EDGE_LENGTH, MIN_EDGE_WEIGHT,
+    },
     network_simplex::SimplexNodeTarget::{VerticalRank, XCoordinate},
-    node::{Node, NodeType},
+    node::{Node, NodeType, Point, Rect, NODE_MIN_SEP_X},
     rank_orderings::AdjacentRank,
 };
 
@@ -39,12 +43,16 @@ use self::{
 ///   ignored nodes.
 /// * Add an error type and remove all unwrap(), expect() and panic() code.
 /// * Make runtime effecient
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Graph {
     /// All nodes in the graph.
     nodes: Vec<Node>,
     /// All edges in the graph.
     edges: Vec<Edge>,
+    /// Ordering of nodes by vertical rank.
+    rank_orderings: Option<RankOrderings>,
+    /// Separation of nodes horizontally in pixels, assuming 72 pixels per inch.
+    horizontal_node_separation: u32,
 }
 
 impl Default for Graph {
@@ -58,6 +66,8 @@ impl Graph {
         Graph {
             nodes: vec![],
             edges: vec![],
+            rank_orderings: None,
+            horizontal_node_separation: NODE_MIN_SEP_X as u32,
         }
     }
 
@@ -67,8 +77,12 @@ impl Graph {
     pub fn layout_nodes(&mut self) {
         self.rank_nodes_vertically();
         self.set_horizontal_ordering();
-        self.set_horizontal_coordinates();
+        self.set_coordinates();
         // self.make_splines()
+    }
+
+    pub fn horizontal_node_separation(&self) -> u32 {
+        self.horizontal_node_separation
     }
 
     /// Return the node indexed by node_idx.
@@ -104,20 +118,27 @@ impl Graph {
         }
     }
 
-    /// Return the max position in any rank, and the max rank.
-    fn max_positions(&self) -> (u32, u32) {
-        let mut max_pos = 0;
-        let mut max_rank = 0;
+    /// Return the top left and bottom right coordinates in the graph.
+    pub fn graph_rect(&self) -> Rect {
+        let mut min = Point::new(i32::MAX, i32::MAX);
+        let mut max = Point::new(i32::MIN, i32::MIN);
+
+        if self.node_count() == 0 {
+            panic!("No nodes in graph");
+        }
 
         for node in self.nodes.iter() {
-            if let Some(pos) = node.horizontal_position {
-                max_pos = max_pos.max(pos);
-            }
-            if let Some(rank) = node.vertical_rank {
-                max_rank = max_rank.max(rank);
+            if let Some(coords) = node.coordinates {
+                max.set_x(max.x().max(coords.x()));
+                max.set_y(max.y().max(coords.y()));
+
+                min.set_y(min.x().min(coords.x()));
+                min.set_x(min.x().min(coords.x()));
+            } else {
+                panic!("All nodes must have coordinates");
             }
         }
-        (max_pos as u32, max_rank)
+        Rect::new(min, max)
     }
 
     fn get_vertical_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
@@ -184,12 +205,13 @@ impl Graph {
     /// Virtual nodes are (typically) added after ranking.  Once
     /// ranking has been done, all nodes must be ranked, so
     /// a rank must be passed in for the new virtual node.
-    pub fn add_virtual_node(&mut self, rank: u32, node_type: NodeType) -> usize {
+    pub fn add_virtual_node(&mut self, rank: i32, node_type: NodeType) -> usize {
         if !node_type.is_virtual() {
             panic!("Cannot add read node as a virtual node");
         }
 
-        let idx = self.add_node("V");
+        let name = format!("v{}", self.node_count());
+        let idx = self.add_node(&name);
         let v_node = self.get_node_mut(idx);
 
         v_node.node_type = node_type;
@@ -200,13 +222,26 @@ impl Graph {
     }
 
     /// Add a new edge between two nodes, and return the edge's index in the graph.
+    ///
+    /// Weight is set to the minimum edge weight.
     pub fn add_edge(&mut self, src_node: usize, dst_node: usize) -> usize {
-        let new_edge = Edge::new(src_node, dst_node);
+        self.add_edge_with_details(src_node, dst_node, MIN_EDGE_LENGTH, MIN_EDGE_WEIGHT)
+    }
+
+    /// Add a new edge between two nodes with a given weight, and return the edge's index in the graph.
+    pub fn add_edge_with_details(
+        &mut self,
+        src_node: usize,
+        dst_node: usize,
+        min_len: i32,
+        weight: u32,
+    ) -> usize {
+        let new_edge = Edge::new_with_details(src_node, dst_node, min_len, weight);
         let idx = self.edges.len();
         self.edges.push(new_edge);
 
-        self.nodes[src_node].add_edge(idx, EdgeDisposition::Out);
-        self.nodes[dst_node].add_edge(idx, EdgeDisposition::In);
+        self.nodes[src_node].add_edge(idx, Out);
+        self.nodes[dst_node].add_edge(idx, In);
 
         idx
     }
@@ -332,7 +367,7 @@ impl Graph {
 
         // Swap the references in src and dst nodes
         self.get_node_mut(src_node_idx)
-            .swap_edge_in_list(edge_idx_to_reverse, EdgeDisposition::Out);
+            .swap_edge_in_list(edge_idx_to_reverse, Out);
         self.get_node_mut(dst_node_idx)
             .swap_edge_in_list(edge_idx_to_reverse, EdgeDisposition::In);
 
@@ -394,7 +429,7 @@ impl Graph {
     ///     }
     ///     return best
     /// }
-    fn set_horizontal_ordering(&mut self) -> RankOrderings {
+    fn set_horizontal_ordering(&mut self) -> &RankOrderings {
         const MAX_ITERATIONS: usize = 24;
         let order = self.init_horizontal_order();
         let mut best = order.clone();
@@ -427,7 +462,9 @@ impl Graph {
 
         self.set_node_positions(&best);
 
-        best
+        self.rank_orderings = Some(best);
+
+        self.rank_orderings.as_ref().unwrap()
     }
 
     /// Set the relative positions of each node from the given orderings.
@@ -485,7 +522,7 @@ impl Graph {
     fn replace_edge_with_virtual_chain(
         &mut self,
         edge_idx: usize,
-        rank: u32,
+        rank: i32,
         slack: i32,
         order: &RankOrderings,
     ) {
@@ -505,6 +542,11 @@ impl Graph {
 
             let old_edge = self.get_edge_mut(cur_edge_idx);
             let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
+
+            self.get_node_mut(virt_node_idx).add_edge(cur_edge_idx, Out);
+
+            // The old edge needs to be removed from the original dst_node.
+            self.get_node_mut(orig_dst).remove_edge(cur_edge_idx, In);
 
             cur_edge_idx = self.add_edge(virt_node_idx, orig_dst);
             order.add_node_idx_to_existing_rank(new_rank, virt_node_idx);
@@ -661,13 +703,23 @@ impl Graph {
     ///     means the cost of an original edge (u ,v) in G equals the sum of the cost of the two edges e_u, e_v
     ///     in G′ and, globally, the two solutions have the same cost.
     ///   * Thus, optimality of G′ implies optimality for G and solving G′ gives us a solution for G.
-    fn set_horizontal_coordinates(&mut self) {
-        self.init_node_coordinates();
+    fn set_coordinates(&mut self) {
+        self.set_y_coordinates();
+
         let mut aux_graph = self.create_positioning_aux_graph();
 
-        aux_graph.network_simplex_ranking(XCoordinate);
+        // This is necessary as part of initializing tree nodes.
+        // XXX This should be more obvious in the name, because otherwise set_feasible_ranking can crash.
+        aux_graph.make_asyclic();
 
-        // Technically, once we find the firs XCoordCalc node, we can exit, since they are all added
+        aux_graph.network_simplex_ranking(XCoordinate);
+        self.set_x_coordinates_from_aux(&aux_graph);
+
+        self.print_nodes("after Xcoordinate network_simplex_ranking");
+    }
+
+    fn set_x_coordinates_from_aux(&mut self, aux_graph: &Graph) {
+        // Technically, once we find the first XCoordCalc node, we can exit, since they are all added
         // after other nodes.  At least, that's true now...
         for (node_idx, node) in aux_graph
             .nodes
@@ -677,17 +729,28 @@ impl Graph {
         {
             let x = node.coordinates.unwrap().x();
 
-            self.get_node_mut(node_idx).coordinates.unwrap().set_x(x);
+            self.get_node_mut(node_idx).assign_x_coord(x);
         }
     }
 
-    /// Initialize the x and y coordinates of all nodes.
-    fn init_node_coordinates(&mut self) {
+    /// Set the y coordinates of all nodes.
+    /// XXX START WORK HERE: we need to copy position.c set_y_coords
+    ///     Looks like we can skip a bunch of the code for different
+    ///     heights and clusters.
+    /// XXX Then review set_x_coords
+    fn set_y_coordinates(&mut self) {
+        let order = self.rank_orderings.as_ref().unwrap();
+
+        // make the initial assignment of ycoords to leftmost nodes by ranks
+        // for (rank, nodes) in order.iter().rev() {
+
+        // }
+
         for (node_idx, node) in self.nodes.iter_mut().enumerate() {
             let min_x = node.min_separation_x();
             let min_y = node.min_separation_y();
             let new_x = if let Some(position) = node.horizontal_position {
-                position as u32 * min_x
+                position as i32 * min_x
             } else {
                 panic!("Node {node_idx}: position not set");
             };
@@ -740,38 +803,67 @@ impl Graph {
     fn create_positioning_aux_graph(&self) -> Graph {
         let mut aux_graph = Graph::new();
 
-        // Add all the existing edges to the current graph without edges.
+        self.print_nodes("before create_positioning_aux_graph() (create_aux_edges)");
+
+        // Add all the existing nodes from the current graph without edges.
         for node in self.nodes.iter() {
             let mut new_node = node.clone();
             new_node.clear_edges();
+            // let new_node = Node::new(node.name());
 
             aux_graph.nodes.push(new_node)
         }
 
-        // Add the new node and edges between the new node, as per figure 4-2 in paper
-        // Note that we are adding 2 edges and one node for every edge, but not the orignal edge itself.
+        aux_graph.print_nodes("before set_left_right_constraints() (make_LR_constraints)");
+        self.set_left_right_constraints(&mut aux_graph);
+        aux_graph.print_nodes("after set_left_right_constraints()");
+
+        self.add_virtual_nodes_for_horizontal_positioning(&mut aux_graph);
+        aux_graph.print_nodes("after add_virtual_nodes_for_horizontal...() (make_edge_pairs)");
+
+        // We need to build a feasible tree from scratch
+        for node in aux_graph.nodes.iter_mut() {
+            node.clear_tree_data();
+        }
+
+        aux_graph
+    }
+
+    /// Add the new node and edges between the new node, as per figure 4-2 in paper
+    ///
+    /// Note that we are adding 2 edges and one node for every edge, but not the orignal edge itself.
+    fn add_virtual_nodes_for_horizontal_positioning(&self, aux_graph: &mut Graph) {
         for edge in self.edges.iter() {
             let src_node_idx = edge.src_node;
             let dst_node_idx = edge.dst_node;
             let src_node = self.get_node(src_node_idx);
             let dst_node = self.get_node(dst_node_idx);
 
-            // QUESTION: Should the new node be a virtual node?  Unclear from text.
-            let new_node_idx =
-                aux_graph.add_virtual_node(src_node.vertical_rank.unwrap(), NodeType::XCoordCalc);
-            let omega = Edge::edge_omega_value(src_node.is_virtual(), dst_node.is_virtual());
-            let new_weight = edge.weight * omega;
+            let src_rank = src_node.vertical_rank.unwrap();
+            let dst_rank = dst_node.vertical_rank.unwrap();
+            let new_rank = (src_rank - 1).min(dst_rank - 1);
 
-            let new_edge_idx_1 = aux_graph.add_edge(new_node_idx, src_node_idx);
-            {
-                let new_edge_1 = aux_graph.get_edge_mut(new_edge_idx_1);
-                new_edge_1.weight = new_weight;
-            }
-            let new_edge_idx_2 = aux_graph.add_edge(new_node_idx, dst_node_idx);
-            {
-                let new_edge_2 = aux_graph.get_edge_mut(new_edge_idx_2);
-                new_edge_2.weight = new_weight;
-            }
+            let new_node_idx = aux_graph.add_virtual_node(new_rank, NodeType::XCoordCalc);
+
+            // The paper described setting the new weight edge.weight*omega, but the GraphViz code does
+            // not seem to do this, and just passes on the weight of the existing edge:
+            //
+            // let omega = Edge::edge_omega_value(src_node.is_virtual(), dst_node.is_virtual());
+            // let new_weight = edge.weight * omega;
+            let new_weight = edge.weight;
+
+            aux_graph.add_edge_with_details(
+                new_node_idx,
+                src_node_idx,
+                MIN_EDGE_LENGTH,
+                new_weight,
+            );
+            aux_graph.add_edge_with_details(
+                new_node_idx,
+                dst_node_idx,
+                MIN_EDGE_LENGTH,
+                new_weight,
+            );
 
             // TODO: deal with unwraps();
             let new_node = aux_graph.get_node_mut(new_node_idx);
@@ -779,15 +871,47 @@ impl Graph {
             let src_y = src_node.coordinates.unwrap().y();
             let dst_x = dst_node.coordinates.unwrap().x();
 
-            // ...assigning each n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
+            // ...assigning each new node n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
             // and where x_u and x_v are the X coordinates assigned to u and v in G.
             new_node.set_coordinates(src_x.min(dst_x), src_y);
         }
+        aux_graph.print_nodes("after adding virtual nodes");
+    }
 
-        // Add edges between adjacent nodes in a rank, as per figure 4-2 in the paper.
-        // TODO
+    /// Add constraints to nodes in preparation for ranking nodes horizontally.
+    /// * Set ranks to be based on horizontal_node_separation: usually 72 pixes per inch.
+    /// * Add edges between adjacent nodes in a rank, as per figure 4-2 in the paper.
+    ///
+    /// This allows the nodes to be properly spaced during network simplex ranking.
+    ///
+    /// Note: "flat" edges are edges that connect two nodes on the same rank.
+    ///
+    /// In GraphViz code: make_LR_constraints() (which does more as well)
+    fn set_left_right_constraints(&self, aux_graph: &mut Graph) {
+        let node_sep = self.horizontal_node_separation; // Same as GraphViz because 72 dpi is standard.
 
-        aux_graph
+        // make edges to separate nodes on the same rank
+        for (_rank, node_order) in self.rank_orderings.as_ref().unwrap().iter() {
+            let mut prev_rank = None;
+            let mut prev_node_idx = None;
+            for node_idx in node_order.borrow().iter().cloned() {
+                let new_rank: i32 = if let Some(prev_rank) = prev_rank {
+                    prev_rank + node_sep as i32
+                } else {
+                    0
+                };
+                if let Some(prev_node_idx) = prev_node_idx {
+                    aux_graph.add_edge_with_details(prev_node_idx, node_idx, node_sep as i32, 0);
+                }
+
+                aux_graph
+                    .get_node(node_idx)
+                    .set_simplex_rank(Some(new_rank));
+
+                prev_node_idx = Some(node_idx);
+                prev_rank = Some(new_rank);
+            }
+        }
     }
 
     #[allow(unused)]
@@ -795,254 +919,42 @@ impl Graph {
         todo!();
     }
 
-    /// Return a value for the graph used to optimize the graph for the selection of x coordiantes for nodes.
-    ///
-    /// Documentation from paper: page 17
-    fn graph_coordinate_optimization_value(&self) -> u32 {
-        self.edges
-            .iter()
-            .map(|edge| self.edge_coordinate_optimization_value(edge))
-            .sum()
-    }
+    // /// Return a value for the graph used to optimize the graph for the selection of x coordiantes for nodes.
+    // ///
+    // /// Documentation from paper: page 17
+    // fn graph_coordinate_optimization_value(&self) -> u32 {
+    //     self.edges
+    //         .iter()
+    //         .map(|edge| self.edge_coordinate_optimization_value(edge))
+    //         .sum()
+    // }
 
-    /// Return a value for an edge used to optimize the graph for the selection of x coordiantes for nodes.
-    ///
-    /// Documentation from paper: page 17
-    /// * For edge = (v,w): Ω(e)*ω(e)*|Xw − Xv|
-    /// * Subject to: Xb − Xa ≥ ρ(a,b)
-    ///   * ρ is a function on pairs of adjacent nodes in the same rank giving the minimum separation
-    ///     between their center points
-    fn edge_coordinate_optimization_value(&self, edge: &Edge) -> u32 {
-        let src_node = self.get_node(edge.src_node);
-        let dst_node = self.get_node(edge.dst_node);
-        let omega = Edge::edge_omega_value(src_node.is_virtual(), dst_node.is_virtual());
-        let weight = edge.weight;
-        let w_x = src_node.coordinates.unwrap().x();
-        let v_x = dst_node.coordinates.unwrap().y();
-        let x_diff = w_x.abs_diff(v_x);
+    // /// Return a value for an edge used to optimize the graph for the selection of x coordiantes for nodes.
+    // ///
+    // /// Documentation from paper: page 17
+    // /// * For edge = (v,w): Ω(e)*ω(e)*|Xw − Xv|
+    // /// * Subject to: Xb − Xa ≥ ρ(a,b)
+    // ///   * ρ is a function on pairs of adjacent nodes in the same rank giving the minimum separation
+    // ///     between their center points
+    // fn edge_coordinate_optimization_value(&self, edge: &Edge) -> u32 {
+    //     let src_node = self.get_node(edge.src_node);
+    //     let dst_node = self.get_node(edge.dst_node);
+    //     let omega = Edge::edge_omega_value(src_node.is_virtual(), dst_node.is_virtual());
+    //     let weight = edge.weight;
+    //     let w_x = src_node.coordinates.unwrap().x();
+    //     let v_x = dst_node.coordinates.unwrap().y();
+    //     let x_diff = w_x.abs_diff(v_x);
 
-        self.min_node_distance().max(omega * weight * x_diff)
-    }
+    //     self.min_node_distance().max(omega * weight * x_diff)
+    // }
 
-    /// TODO: min_node_distance should be determined by graph context, and perhaps the specific nodes
-    ///       involved
-    fn min_node_distance(&self) -> u32 {
-        const MIN_NODE_DISTANCE: u32 = 100; // pixels...
+    // /// TODO: min_node_distance should be determined by graph context, and perhaps the specific nodes
+    // ///       involved
+    // fn min_node_distance(&self) -> u32 {
+    //     const MIN_NODE_DISTANCE: u32 = 100; // pixels...
 
-        MIN_NODE_DISTANCE
-    }
-
-    /// Return an SVG representation of graph.
-    /// * self.layout_nodes() must be called first.
-    /// * debug=true will display additional debugging information on the svg
-    ///
-    /// For now, this is just quick and dirty to be able to see the graph
-    /// in svg form.
-    ///
-    /// Later, the dot parser of graph should be improved, and the output
-    /// of get_svg() should be generalized and take the parser directives
-    /// into account.
-    pub fn get_svg(&self, debug: bool) -> String {
-        const DEFAULT_X: usize = 1;
-        const DEFAULT_Y: u32 = 1;
-        let (max_pos, max_rank) = self.max_positions();
-        let max_pos = max_pos as f64;
-        let max_rank = max_rank as f64;
-
-        let mult = 110.0;
-        let (x_scale, y_scale) = if max_pos > max_rank {
-            (1.0, max_pos / max_rank)
-        } else {
-            (max_rank / max_pos, 1.0)
-        };
-        let x_scale = x_scale * mult;
-        let y_scale = y_scale * mult;
-
-        let width = max_pos * x_scale;
-        let height = max_rank * y_scale;
-        let px_size = 1_f64 / y_scale * 1.0;
-
-        let vb_width = max_pos + 0.5 + 0.5;
-        let vb_height = max_rank + 0.5 + 0.5;
-
-        // To set the coordinates within the svg We set the viewbox's height and width
-        let mut svg = vec![
-            format!(
-                r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}"
-                    viewBox="-0.5 -0.5 {vb_width} {vb_height}"
-                    preserveAspectRatio="xMinYMin meet"
-                    >"#
-            ),
-            format!(
-                r#"<defs>
-                    <marker
-                        id="arrow-head"
-                        orient="auto"
-                        viewBox="0 0 10 10"
-                        refX="10" refY="5"
-                        markerWidth="10" markerHeight="10"
-                    >
-                        <path d="M0,0 L10,5 L0,10 Z" fill="black"/>
-                    </marker>
-                </defs>"#
-            ),
-        ];
-
-        let real_radius = 0.2;
-        let virtual_radius = if debug { real_radius } else { 0.0 };
-
-        for edge in self.edges.iter() {
-            let reversed = edge.reversed;
-            let (src_node_idx, dst_node_idx) = if reversed {
-                (edge.dst_node, edge.src_node)
-            } else {
-                (edge.src_node, edge.dst_node)
-            };
-            let src_node = self.get_node(src_node_idx);
-            let src_x = src_node.horizontal_position.unwrap_or(DEFAULT_X) as f64;
-            let src_y = src_node.vertical_rank.unwrap_or(DEFAULT_Y) as f64;
-
-            let dst_node = self.get_node(dst_node_idx);
-            let mut dst_x = dst_node.horizontal_position.unwrap_or(DEFAULT_X + 1) as f64;
-            let mut dst_y = dst_node.vertical_rank.unwrap_or(DEFAULT_Y + 1) as f64;
-
-            let slope = (src_y - dst_y) / (src_x - dst_x); // # TODO
-            let theta = slope.atan();
-            let show_dst = !dst_node.is_virtual() || debug;
-            let node_radius = if show_dst {
-                // TODO: This is just an approximation if the node
-                //       is shows as an ellipse with x_radius=1.5*y_radius
-                let node_radius_x = real_radius * 1.5 * 0.8;
-
-                if debug {
-                    node_radius_x
-                } else {
-                    real_radius
-                }
-            } else {
-                virtual_radius
-            };
-
-            let y_offset = theta.sin() * node_radius;
-            let x_offset = theta.cos() * node_radius;
-
-            if (slope < 0.0 && !reversed) || (slope > 0.0 && reversed) {
-                dst_x += x_offset;
-                dst_y += y_offset;
-            } else {
-                dst_x -= x_offset;
-                dst_y -= y_offset;
-            }
-
-            let dashed = if !debug || edge.in_spanning_tree() {
-                ""
-            } else {
-                r#"stroke-dasharray="0.015""#
-            };
-            let marker = if show_dst {
-                r#"marker-end="url(#arrow-head)""#
-            } else {
-                ""
-            };
-
-            svg.push(format!(
-                r#"<path {marker} d="M{src_x} {src_y} L{dst_x} {dst_y}" stroke="black" {dashed} stroke-width="{px_size}px"/>"#
-            ));
-
-            if debug {
-                let font_size = 0.1;
-                let font_style = format!("font-size:{font_size}; text-anchor: left");
-                let label_x = (src_x + dst_x) / 2.0 + (font_size / 3.0);
-                let label_y = (src_y + dst_y) / 2.0 + (font_size / 3.0);
-                let edge_label = if let Some(cut_value) = edge.cut_value {
-                    format!("{cut_value}")
-                } else {
-                    "Null".to_string()
-                };
-
-                svg.push(format!(
-                    r#"<text x="{label_x}" y="{label_y}" style="{font_style}">{edge_label}</text>"#
-                ));
-            }
-        }
-
-        for node in self.nodes.iter() {
-            let x = node.horizontal_position.unwrap_or(DEFAULT_X) as f64;
-            let y = node.vertical_rank.unwrap_or(DEFAULT_Y) as f64;
-            let name = if debug {
-                format!(
-                    "{}: {:?}",
-                    node.name,
-                    node.coordinates
-                        .unwrap_or(node::Point::new(DEFAULT_Y, DEFAULT_Y))
-                        .x()
-                )
-            } else {
-                node.name.to_string()
-            };
-            let font_size = if debug { 0.17 } else { 0.2 };
-            let font_style = format!("font-size:{font_size}; text-anchor: middle");
-            let label_x = x;
-            let label_y = y + (font_size / 3.0);
-
-            let show_node = !node.is_virtual() || debug;
-            let node_radius = if show_node {
-                real_radius
-            } else {
-                virtual_radius
-            };
-            let fill = if node.is_virtual() {
-                "lightgray"
-            } else {
-                "skyblue"
-            };
-            let style = format!("fill: {fill}; stroke: black; stroke-width: {px_size}px;");
-
-            if debug {
-                let node_radius_x = node_radius * 1.5;
-
-                svg.push(format!(
-                    r#"<ellipse cx="{x}" cy="{y}" ry="{node_radius}" rx="{node_radius_x}" style="{style}"/>"#
-                ));
-            } else {
-                svg.push(format!(
-                    r#"<circle cx="{x}" cy="{y}" r="{node_radius}" style="{style}"/>"#
-                ));
-            }
-
-            // svg.push(format!(
-            //     r#"<svg viewBox="{rect_x} {rect_y} {rect_width} {rect_height}">"#
-            // ));
-            // svg.push(format!(
-            //     r#"<rect x="0" y="0" height="1" width="1" rx=".001" style="{rect_style}"/>"#
-            // ));
-            if show_node {
-                svg.push(format!(
-                    r#"<text x="{label_x}" y="{label_y}" style="{font_style}">{name}</text>"#
-                ));
-            }
-            // svg.push("</svg>".to_string());
-
-            // if true {
-            //     break;
-            // }
-        }
-
-        svg.push("</svg>".to_string());
-
-        svg.join("\n")
-    }
-
-    /// Write out the graph as is to the given file name (with an svg suffix).
-    #[allow(unused)]
-    fn write_svg_file(&self, name: &str, debug: bool) {
-        use std::fs::File;
-        use std::io::prelude::*;
-
-        let svg = self.get_svg(debug);
-        let mut file = File::create(format!("{name}.svg")).unwrap();
-        file.write_all(svg.as_bytes()).unwrap();
-    }
+    //     MIN_NODE_DISTANCE
+    // }
 
     /// Given a node index, return an iterator to a tuple with each edge_idx, and the node_idx of
     /// the node on the other side of the edge.
@@ -1063,12 +975,45 @@ impl Graph {
                     None
                 } else {
                     let adjacent_node_idx = match disposition {
-                        EdgeDisposition::In => edge.src_node,
-                        EdgeDisposition::Out => edge.dst_node,
+                        In => edge.src_node,
+                        Out => edge.dst_node,
                     };
                     Some((edge_idx, adjacent_node_idx))
                 }
             })
+    }
+
+    fn get_node_edges_and_adjacent_node_with_disposition(
+        &self,
+        node_idx: usize,
+        requested_disposition: EdgeDisposition,
+    ) -> impl Iterator<Item = (usize, usize)> + '_ {
+        let node = self.get_node(node_idx);
+
+        node.get_all_edges_with_disposition()
+            .filter_map(move |(edge_idx, disposition)| {
+                let edge_idx = *edge_idx;
+                let edge = self.get_edge(edge_idx);
+
+                if edge.ignored {
+                    None
+                } else {
+                    match (disposition, requested_disposition) {
+                        (In, Out) => None,
+                        (Out, In) => None,
+                        (In, In) => Some((edge_idx, edge.src_node)),
+                        (Out, Out) => Some((edge_idx, edge.dst_node)),
+                    }
+                }
+            })
+    }
+
+    pub fn edges_iter(&self) -> impl Iterator<Item = &Edge> {
+        self.edges.iter()
+    }
+
+    pub fn nodes_iter(&self) -> impl Iterator<Item = &Node> {
+        self.nodes.iter()
     }
 
     /// An iterator that returns only tree edges (not all graph edges).
@@ -1078,42 +1023,77 @@ impl Graph {
             .enumerate()
             .filter(|(_, edge)| edge.in_spanning_tree())
     }
+
+    /// An iterator that returns only nodes that are "real" (not virtual nodes added
+    /// for layout)
+    fn real_nodes_iter(&self) -> impl Iterator<Item = (usize, &Node)> {
+        self.nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, node)| node.node_type == NodeType::Real)
+    }
+
+    fn print_edge(&self, edge_idx: usize) {
+        println!("{}", self.edge_to_string(edge_idx));
+    }
+
+    fn edge_to_string(&self, edge_idx: usize) -> String {
+        let edge = self.get_edge(edge_idx);
+        let src_node = self.get_node(edge.src_node);
+        let dst_node = self.get_node(edge.dst_node);
+        let in_tree = if edge.in_spanning_tree() {
+            ""
+        } else {
+            "NOT IN TREE"
+        };
+
+        format!(
+            "{: >3} ->{: >3}: cut_value:{:?} slack:{:?} weight:{} min_len:{} {in_tree}",
+            src_node.name,
+            dst_node.name,
+            edge.cut_value,
+            self.simplex_slack(edge_idx),
+            edge.weight,
+            edge.min_len()
+        )
+    }
+
+    fn node_to_string(&self, node_idx: usize) -> String {
+        let node = self.get_node(node_idx);
+        let coords = node
+            .coordinates
+            .map(|coords| format!("({},{})", coords.x(), coords.y()))
+            .unwrap_or("None".to_string());
+        let tree_node = if node.in_spanning_tree() {
+            if let Some(sub_tree) = &node.sub_tree() {
+                sub_tree.to_string()
+            } else {
+                "NO SUB_TREE".to_string()
+            }
+        } else {
+            "NOT IN TREE".to_string()
+        };
+        format!(
+            "{node_idx}: {}: type={:?} rank={:?} coord:{coords} {tree_node}",
+            node.name,
+            node.node_type,
+            node.simplex_rank(),
+        )
+    }
+
+    pub fn print_nodes(&self, title: &str) {
+        println!("-{title}: NODES----------------");
+        println!("{self}----------------------");
+    }
 }
 
 impl Display for Graph {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        for (edge_id, edge) in self.edges.iter().enumerate() {
-            let reversed = if edge.reversed { "reversed!" } else { "" };
-            let in_tree = if edge.in_spanning_tree() {
-                "TREE MEMBER"
-            } else {
-                "NOT IN TREE"
-            };
-            let src = &self.nodes[edge.src_node];
-            let dst = &self.nodes[edge.dst_node];
-
-            let line = if let Some(val) = edge.cut_value {
-                format!(" {:2} ", val)
-            } else if edge.in_spanning_tree() {
-                "----".to_string()
-            } else {
-                " - -".to_string()
-            };
-            let src_rank = if let Some(rank) = src.simplex_rank() {
-                format!("r:{:2}", rank)
-            } else {
-                "r: -".to_string()
-            };
-            let dst_rank = if let Some(rank) = dst.simplex_rank() {
-                format!("r:{:2}", rank)
-            } else {
-                "r: -".to_string()
-            };
-
-            let _ = writeln!(
-                fmt,
-                "{src}({src_rank}) -{line}> {dst}({dst_rank}) eid:{edge_id} {in_tree} {reversed}",
-            );
+        for (node_idx, node) in self.nodes.iter().enumerate() {
+            let _ = writeln!(fmt, "{}", self.node_to_string(node_idx));
+            for edge_idx in node.get_all_edges() {
+                let _ = writeln!(fmt, "    {}", self.edge_to_string(*edge_idx));
+            }
         }
         Ok(())
     }
@@ -1121,10 +1101,12 @@ impl Display for Graph {
 
 #[cfg(test)]
 pub mod tests {
-    use tests::edge::MIN_EDGE_WEIGHT;
-
     use super::*;
+
+    use crate::svg::SVG;
+
     use std::ops::RangeInclusive;
+    use tests::edge::MIN_EDGE_WEIGHT;
 
     /// Additional test only functions for Graph to make graph construction testing easier.
     impl Graph {
@@ -1172,7 +1154,7 @@ pub mod tests {
         /// Configures the named node by setting the rank and making the node a feasible tree member.
         ///
         /// Expensive for large data sets: O(n)
-        fn configure_node(&mut self, name: &str, vertical_rank: u32) {
+        fn configure_node(&mut self, name: &str, vertical_rank: i32) {
             let node_idx = self.name_to_node_idx(name).unwrap();
             let node = self.get_node_mut(node_idx);
 
@@ -1543,27 +1525,22 @@ pub mod tests {
 
         for (edge_idx, _edge) in graph.edges.iter().enumerate() {
             if let Some(len) = graph.simplex_edge_length(edge_idx) {
-                assert!(len.abs() <= MIN_EDGE_LENGTH as i32)
+                assert!(len.abs() <= MIN_EDGE_LENGTH)
             }
         }
     }
 
     #[test]
     fn test_draw_graph() {
-        // let mut graph = Graph::example_graph_from_paper_2_3_extended();
-        let dot_str = "digraph {
-            l -> h;
-            i -> l; j -> l; k -> l;
-            a -> i; a -> j; a -> k;
-            g -> h;
-            c -> d; d -> h;
-            e -> g; f -> g; b -> c;
-            a -> b; a -> e; a -> f;
-        }";
-        let mut graph = Graph::from(dot_str);
+        let mut graph = Graph::example_graph_from_paper_2_3_extended();
+        // let dot_str = "digraph { a -> b; a -> c; a -> d; }";
+        // let mut graph = Graph::from(dot_str);
 
         println!("{graph}");
         graph.layout_nodes();
         println!("{graph}");
+
+        let svg = SVG::new(graph, false);
+        svg.write_to_file("foo");
     }
 }

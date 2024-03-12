@@ -7,34 +7,70 @@ use crate::graph::network_simplex::SimplexNodeTarget;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Point {
-    x: u32,
-    y: u32,
+    x: i32,
+    y: i32,
 }
 
-const NODE_MIN_SEP_X: u32 = 100;
-const NODE_MIN_SEP_Y: u32 = 100;
+#[derive(Debug, Clone)]
+pub struct Rect {
+    min: Point,
+    max: Point,
+}
+
+impl Rect {
+    pub fn new(min: Point, max: Point) -> Self {
+        Rect { min, max }
+    }
+    
+    pub fn min(&self) -> Point {
+        self.min
+    }
+
+    pub fn max(&self) -> Point {
+        self.max
+    }
+    
+    pub fn height(&self) -> i32 {
+        println!("HEIGHT: {} vs {}", self.max.y(), self.min.y());
+        self.max.y() - self.min.y()
+    }
+
+    pub fn width(&self) -> i32 {
+        self.max.x() - self.min.x()
+    }
+    
+    /// Normalize a point to be placed inside of this Rect.
+    pub fn normalize(&self, point: Point) -> Point {
+        Point::new(point.x() - self.min().x(), point.y() - self.min().y())
+    }
+
+}
+
+/// Separation of nodes horizontally in pixels, assuming 72 pixels per inch.
+pub(super) const NODE_MIN_SEP_X: i32 = 72;
+const NODE_MIN_SEP_Y: i32 = 72;
 
 impl Point {
-    pub fn new(x: u32, y: u32) -> Self {
+    pub fn new(x: i32, y: i32) -> Self {
         Self { x, y }
     }
 
-    pub fn x(&self) -> u32 {
+    pub fn x(&self) -> i32 {
         self.x
     }
 
-    pub fn y(&self) -> u32 {
+    pub fn y(&self) -> i32 {
         self.y
     }
 
-    pub fn set_x(&mut self, x: u32) -> u32 {
+    #[allow(unused)]
+    pub fn set_x(&mut self, x: i32) -> i32 {
         self.x = x;
 
         x
     }
 
-    #[allow(unused)]
-    pub fn set_y(&mut self, y: u32) -> u32 {
+    pub fn set_y(&mut self, y: i32) -> i32 {
         self.y = y;
 
         y
@@ -73,9 +109,18 @@ pub struct SpanningTreeData {
 
 impl Display for SpanningTreeData {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        let parent = self.edge_idx_to_parent().map(|p| p.to_string()).unwrap_or("-".to_string());
-        let min = self.sub_tree_idx_min.map(|m| m.to_string()).unwrap_or("-".to_string());
-        let max = self.sub_tree_idx_max.map(|m| m.to_string()).unwrap_or("-".to_string());
+        let parent = self
+            .edge_idx_to_parent()
+            .map(|p| p.to_string())
+            .unwrap_or("-".to_string());
+        let min = self
+            .sub_tree_idx_min
+            .map(|m| m.to_string())
+            .unwrap_or("-".to_string());
+        let max = self
+            .sub_tree_idx_max
+            .map(|m| m.to_string())
+            .unwrap_or("-".to_string());
 
         write!(fmt, "edge_to_parent:{parent} min:{min} max:{max}")
     }
@@ -124,9 +169,9 @@ pub struct Node {
     pub(super) name: String,
     // Rank is computed using the network simplex algorithm.  Used to determine both vertical_rank
     // and coordianates.x.
-    simplex_rank: RefCell<Option<u32>>,
+    simplex_rank: RefCell<Option<i32>>,
     /// Relative verticial ranking of this node.  Zero based, greater numbers are lower.
-    pub(super) vertical_rank: Option<u32>,
+    pub(super) vertical_rank: Option<i32>,
     /// Position is the relative horizontal position of this node compared to
     /// other nodes in the same rank.  Zero based, greater numbers are farther right.
     pub(super) horizontal_position: Option<usize>,
@@ -159,9 +204,42 @@ impl Node {
         }
     }
 
+    /// Return the x,y coordinates of the node if it has been set.
+    ///
+    /// Once a graph has been layed out, all node coordinates should
+    /// be set.
+    pub fn coordinates(&self) -> Option<Point> {
+        self.coordinates
+    }
+    
+    /// Remove edge_idx from either the in_edges or out_edges depending on disposition.
+    /// 
+    /// Return the position of the removed edge, or None if it could not be found.
+    pub fn remove_edge(&mut self, edge_idx: usize, disposition: EdgeDisposition) -> Option<usize> {
+        let mut edges_iter = match disposition {
+            EdgeDisposition::In => self.in_edges.iter_mut(),
+            EdgeDisposition::Out => self.in_edges.iter_mut(),
+        };
+        if let Some(position) = edges_iter.position(|x| *x == edge_idx) {
+            let edges = match disposition {
+                EdgeDisposition::In => &mut self.in_edges,
+                EdgeDisposition::Out => &mut self.out_edges,
+            };
+
+            Some(edges.swap_remove(position))
+        } else {
+            None
+        }
+    }
+
     /// Return true of the node is one of the virtual node types.
-    pub(super) fn is_virtual(&self) -> bool {
+    pub fn is_virtual(&self) -> bool {
         self.node_type.is_virtual()
+    }
+
+    /// Return the name of the node.
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub(super) fn in_spanning_tree(&self) -> bool {
@@ -196,7 +274,12 @@ impl Node {
         *self.spanning_tree.borrow_mut() = None;
     }
 
-    pub(super) fn set_tree_data(&self, parent: Option<usize>, min: Option<usize>, max: Option<usize>) {
+    pub(super) fn set_tree_data(
+        &self,
+        parent: Option<usize>,
+        min: Option<usize>,
+        max: Option<usize>,
+    ) {
         *self.spanning_tree.borrow_mut() = Some(SpanningTreeData::new(parent, min, max));
     }
 
@@ -210,6 +293,14 @@ impl Node {
             .borrow()
             .as_ref()
             .and_then(|data| data.sub_tree.clone())
+    }
+
+    /// Return true if this node has a sub_tree set.
+    pub(super) fn has_sub_tree(&self) -> bool {
+        self.spanning_tree
+            .borrow()
+            .as_ref()
+            .is_some()
     }
 
     /// Return a internally mutable subtree if one is set for this node.
@@ -233,7 +324,7 @@ impl Node {
         self.set_tree_data(None, None, None);
     }
 
-    pub(super) fn set_coordinates(&mut self, x: u32, y: u32) {
+    pub(super) fn set_coordinates(&mut self, x: i32, y: i32) {
         self.coordinates = Some(Point::new(x, y));
     }
 
@@ -249,7 +340,7 @@ impl Node {
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
-    pub(super) fn min_separation_x(&self) -> u32 {
+    pub(super) fn min_separation_x(&self) -> i32 {
         NODE_MIN_SEP_X
     }
 
@@ -257,7 +348,7 @@ impl Node {
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
-    pub(super) fn min_separation_y(&self) -> u32 {
+    pub(super) fn min_separation_y(&self) -> i32 {
         NODE_MIN_SEP_Y
     }
 
@@ -365,12 +456,12 @@ impl Node {
     ///
     /// Rank corresponds to the vertical placement of a node.  The greater the rank,
     /// the lower the placement on a canvas.
-    pub(super) fn set_simplex_rank(&self, rank: Option<u32>) {
+    pub(super) fn set_simplex_rank(&self, rank: Option<i32>) {
         *self.simplex_rank.borrow_mut() = rank;
     }
 
     /// Gets the simplex rank of a node.
-    pub(super) fn simplex_rank(&self) -> Option<u32> {
+    pub(super) fn simplex_rank(&self) -> Option<i32> {
         *self.simplex_rank.borrow()
     }
 
@@ -380,13 +471,17 @@ impl Node {
         match target {
             SimplexNodeTarget::VerticalRank => self.vertical_rank = Some(simplex_rank),
             SimplexNodeTarget::XCoordinate => {
-                if let Some(mut coords) = self.coordinates {
-                    coords.x = simplex_rank;
-                } else {
-                    self.coordinates = Some(Point::new(simplex_rank, 0));
-                }
+                self.assign_x_coord(simplex_rank);
             }
         };
+    }
+
+    pub(super) fn assign_x_coord(&mut self, x: i32) {
+        if let Some(coords) = self.coordinates {
+            self.coordinates = Some(Point::new(x, coords.y()));
+        } else {
+            self.coordinates = Some(Point::new(x, 0));
+        }
     }
 }
 

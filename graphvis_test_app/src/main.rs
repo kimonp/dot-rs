@@ -3,6 +3,7 @@ use dioxus::prelude::*;
 use dioxus_desktop::tao::dpi::LogicalPosition;
 use dioxus_desktop::{Config, PhysicalSize, WindowBuilder};
 use dot_rs::graph::Graph;
+use dot_rs::svg::SVG;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str;
@@ -41,9 +42,16 @@ fn main() {
 /// Note: graphviz (and dot) needs to be installed for this to work: https://graphviz.org/download/
 ///
 /// Example command: echo 'digraph { a -> b; a -> c; b -> d; c -> d;}' | dot -Tsvg
-fn dot_to_svg(graph: &str) -> String {
+fn dot_to_svg(graph: &str, custom_dot: bool) -> String {
     let graph = graph.to_string();
-    let mut dot_child = Command::new("dot")
+    let dot_path = if custom_dot {
+        "/Users/kimonp/code/graphviz-9.0.0/cmd/dot/"
+    } else {
+        ""
+    };
+    let dot_cmd = "dot";
+    let dot_bin = format!("{dot_path}{dot_cmd}");
+    let mut dot_child = Command::new(dot_bin)
         .arg("-Tsvg")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -82,27 +90,39 @@ fn App(cx: Scope) -> Element {
         i -> l; j -> l; k -> l;
         l -> h;
     }";
+    // let dot_str = "digraph {
+    //     a -> b; a -> c; a -> d; a -> e;
+    // }";
 
     let mut graph = Graph::from(dot_str);
 
     graph.layout_nodes();
 
-    let dot_rs = graph.get_svg(false);
-    let dot_rs_debug = graph.get_svg(true);
+    let svg = SVG::new(graph.clone(), false);
+    let svg_debug = SVG::new(graph, false);
+    let dot_rs = svg.to_string();
+    let dot_rs_debug = svg_debug.to_string();
 
-    let dot_svg = dot_to_svg(dot_str);
+    let custom_dot_svg = dot_to_svg(dot_str, true);
+    let std_dot_svg = dot_to_svg(dot_str, false);
 
     cx.render(rsx! {
         div { display: "flex", flex_flow: "column nowrap",
             div { display: "flex", flex_flow: "row nowrap", width: "100%",
                 div { display: "flex", flex: 1, justify_content: "center", "dot-rs" }
                 div { display: "flex", flex: 1, justify_content: "center", "dot-rs debug" }
-                div { display: "flex", flex: 1, justify_content: "center", "graphviz & dot" }
             }
             div { display: "flex", flex_flow: "row nowrap", width: "100%",
                 div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{dot_rs}" }
                 div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{dot_rs_debug}" }
-                div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{dot_svg}" }
+            }
+            div { display: "flex", flex_flow: "row nowrap", width: "100%",
+                div { display: "flex", flex: 1, justify_content: "center", "graphviz & dot" }
+                div { display: "flex", flex: 1, justify_content: "center", "customized graphviz & dot" }
+            }
+            div { display: "flex", flex_flow: "row nowrap", width: "100%",
+                div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{std_dot_svg}" }
+                div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{custom_dot_svg}" }
             }
         }
     })

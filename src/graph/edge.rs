@@ -8,7 +8,7 @@ pub const MIN_EDGE_WEIGHT: u32 = 1;
 
 /// Minimum allowed edge length.  In future implementations, user could set this.
 /// See function of edge length below: edge_length()
-pub const MIN_EDGE_LENGTH: u32 = 1;
+pub const MIN_EDGE_LENGTH: i32 = 1;
 
 // EdgeDisposition indicates whether a edge is incoming our outgoing with respect to a particular node.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -18,7 +18,7 @@ pub enum EdgeDisposition {
 }
 
 /// An edge connects to nodes in a graph, and points from src_node to dst_node.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Edge {
     /// Node that this edge points from.  This is an index into graph.nodes.
     pub src_node: usize,
@@ -39,18 +39,25 @@ pub struct Edge {
     pub cut_value: Option<i32>,
     /// True if this edge is part of the feasible tree use to calculate cut values.
     in_spanning_tree: RefCell<bool>,
+    /// Minimum length of this edge.  Critical for calculating slack.
+    min_len: i32,
 }
 
 impl Edge {
     pub fn new(src_node: usize, dst_node: usize) -> Self {
+        Self::new_with_details(src_node, dst_node, MIN_EDGE_LENGTH, MIN_EDGE_WEIGHT)
+    }
+
+    pub fn new_with_details(src_node: usize, dst_node: usize, min_len: i32, weight: u32) -> Self {
         Edge {
             src_node,
             dst_node,
-            weight: MIN_EDGE_WEIGHT,
+            weight,
             ignored: false,
             reversed: false,
             cut_value: None,
             in_spanning_tree: RefCell::new(false),
+            min_len,
         }
     }
 
@@ -62,12 +69,16 @@ impl Edge {
             (true, true) => 8,
         }
     }
-    
+
     pub fn in_spanning_tree(&self) -> bool {
         *self.in_spanning_tree.borrow()
     }
 
     pub fn set_in_spanning_tree(&self, value: bool) {
         *self.in_spanning_tree.borrow_mut() = value;
+    }
+
+    pub fn min_len(&self) -> i32 {
+        self.min_len
     }
 }

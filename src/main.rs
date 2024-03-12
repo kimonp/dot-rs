@@ -1,4 +1,5 @@
 pub mod graph;
+pub mod svg;
 
 use graph::Graph;
 

@@ -13,7 +13,7 @@ pub(super) mod spanning_tree;
 pub(crate) mod sub_tree;
 
 /// Determines what variable on each node which is set by the network simplex algorithm.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) enum SimplexNodeTarget {
     /// The rank of each node, which corresponds with to the ultimate y position of the node
     VerticalRank,
@@ -87,18 +87,26 @@ impl Graph {
 
         let mut start_idx = 0;
         while let Some(neg_cut_edge_idx) = self.leave_edge_for_simplex(start_idx) {
-            let non_tree_edge_idx = self
-                .enter_edge_for_simplex(neg_cut_edge_idx)
-                .expect("No negative cut values found!");
+            println!("About to enter: {neg_cut_edge_idx}\n{self}");
 
-            println!("Exchanging {neg_cut_edge_idx} with {non_tree_edge_idx}");
-            self.exchange(neg_cut_edge_idx, non_tree_edge_idx);
+            if let Some(non_tree_edge_idx) = self.enter_edge_for_simplex(neg_cut_edge_idx) {
+                // .expect("No negative cut values found!");
 
-            start_idx = neg_cut_edge_idx + 1;
+                println!("Exchanging {neg_cut_edge_idx} with {non_tree_edge_idx}");
+                self.exchange(neg_cut_edge_idx, non_tree_edge_idx);
+
+                start_idx = neg_cut_edge_idx + 1;
+            } else {
+                println!("No negative cut values!");
+                break;
+            }
         }
         self.normalize_simplex_rank();
         self.balance(target);
         self.assign_simplex_rank(target);
+        if target == SimplexNodeTarget::XCoordinate {
+            self.print_nodes("network_simplex_ranking after balance_left_right END");
+        }
     }
 
     /// After running the network simplex algorithm, assign the result to each node.
@@ -339,10 +347,11 @@ impl Graph {
     /// An edge is "tight" if it's slack is zero.
     pub(super) fn simplex_slack(&self, edge_idx: usize) -> Option<i32> {
         self.simplex_edge_length(edge_idx).map(|len| {
+            let min_len = self.get_edge(edge_idx).min_len();
             if len > 0 {
-                len - (MIN_EDGE_LENGTH as i32)
+                len - min_len
             } else {
-                len + (MIN_EDGE_LENGTH as i32)
+                len + min_len
             }
         })
     }
@@ -366,7 +375,7 @@ impl Graph {
         let dst_node = self.get_node(edge.dst_node);
 
         match (src_node.simplex_rank(), dst_node.simplex_rank()) {
-            (Some(src), Some(dst)) => Some((dst as i32) - (src as i32)),
+            (Some(src), Some(dst)) => Some(dst - src),
             _ => None,
         }
     }
@@ -532,7 +541,7 @@ impl Graph {
     }
 
     /// Given a tree edge, return the non-tree edge with the lowest remaining cut-value.
-    /// 
+    ///
     /// XXX: This can be updated to use GraphViz like code, which is much more effecient, but uglier.
     ///
     /// Documentation from paper:
@@ -585,12 +594,16 @@ impl Graph {
     ///
     /// Documentation from paper:
     /// The solution is normalized setting the least rank to zero.
+    ///
+    /// In GraphVis Code: scan_and_normalize()
     fn normalize_simplex_rank(&mut self) {
-        if let Some(min_node) = self.nodes.iter().min() {
+        if let Some(min_node) = self.real_nodes_iter().map(|(_idx, node)| node).min() {
             if let Some(least_rank) = min_node.simplex_rank() {
                 for node in self.nodes.iter_mut() {
                     if let Some(rank) = node.simplex_rank() {
-                        node.set_simplex_rank(Some(rank - least_rank));
+                        if let Some(new_rank) = rank.checked_sub(least_rank) {
+                            node.set_simplex_rank(Some(new_rank));
+                        }
                     }
                 }
             }
@@ -640,19 +653,32 @@ impl Graph {
     /// * ND_lim(n) - max DFS index for nodes in sub-tree
     ///
     fn balance_left_right(&mut self) {
+        self.print_nodes("balance_left_right start");
+
         for (tree_edge_idx, tree_edge) in self.tree_edge_iter() {
+            print!("Looking at edge:");
+            self.print_edge(tree_edge_idx);
+
             if tree_edge.cut_value == Some(0) {
                 if let Some(replace_edge_idx) = self.enter_edge_for_simplex(tree_edge_idx) {
+                    println!("balance_left_right: replace {tree_edge_idx} with {replace_edge_idx}");
                     if let Some(delta) = self.simplex_slack(replace_edge_idx) {
+                        println!("  SELECTED EDGE: ");
+                        self.print_edge(replace_edge_idx);
+
                         if delta > 1 {
                             let src_node = self.get_node(tree_edge.src_node);
                             let dst_node = self.get_node(tree_edge.dst_node);
-                            
-                            if let (Some(src_tree), Some(dst_tree)) = (src_node.spanning_tree(), dst_node.spanning_tree()) {
+
+                            if let (Some(src_tree), Some(dst_tree)) =
+                                (src_node.spanning_tree(), dst_node.spanning_tree())
+                            {
                                 if src_tree.sub_tree_idx_min() < dst_tree.sub_tree_idx_max() {
-                                    self.rerank_by_tree(tree_edge.src_node, delta/2);
+                                    println!("  rerank by tail: {}", delta / 2);
+                                    self.rerank_by_tree(tree_edge.src_node, delta / 2);
                                 } else {
-                                    self.rerank_by_tree(tree_edge.dst_node, -delta/2);
+                                    println!("  rerank by head: {}", delta / 2);
+                                    self.rerank_by_tree(tree_edge.dst_node, -delta / 2);
                                 }
                             } else {
                                 panic!("Not all nodes in spanning tree!");
@@ -681,6 +707,8 @@ impl Graph {
                             //     rerank(dst_node, -delta / 2)
                             // }
                         }
+                    } else {
+                        panic!("Can't calculate slack for left right balance");
                     }
                 }
             }

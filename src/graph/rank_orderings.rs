@@ -17,7 +17,7 @@ type RankOrder = RefCell<BTreeSet<usize>>;
 #[derive(Debug, Clone)]
 pub struct RankOrderings {
     /// Ordered list of ranks in the graph, with a set of all node positons at that rank.
-    ranks: BTreeMap<u32, RankOrder>,
+    ranks: BTreeMap<i32, RankOrder>,
     /// Map of node_idx to node positions.  Node postions are shared refs into positions in "ranks".
     nodes: RefCell<HashMap<usize, RefCell<NodePosition>>>,
 }
@@ -29,7 +29,7 @@ impl Display for RankOrderings {
         for (rank_idx, rank) in self.ranks.iter() {
             let crosses = self.crossing_count_to_next_rank(&rank.borrow());
 
-            if *rank_idx < max_rank as u32 - 1 {
+            if *rank_idx < max_rank as i32 - 1 {
                 let _ = writeln!(fmt, "Rank {rank_idx}: crosses below: {crosses}");
             } else {
                 let _ = writeln!(fmt, "Rank {rank_idx}:");
@@ -113,14 +113,14 @@ impl RankOrderings {
     }
 
     /// Add the given node index to the given rank, creating a new rank if necessary.
-    pub fn add_node_idx_to_rank(&mut self, rank: u32, node_idx: usize) {
+    pub fn add_node_idx_to_rank(&mut self, rank: i32, node_idx: usize) {
         if self.get_rank_mut(rank).is_none() {
             self.ranks.insert(rank, RefCell::new(BTreeSet::new()));
         };
         self.add_node_idx_to_existing_rank(rank, node_idx);
     }
 
-    pub fn add_node_idx_to_existing_rank(&self, rank: u32, node_idx: usize) {
+    pub fn add_node_idx_to_existing_rank(&self, rank: i32, node_idx: usize) {
         let rank_set = if let Some(rank_set) = self.get_rank(rank) {
             rank_set
         } else {
@@ -145,7 +145,7 @@ impl RankOrderings {
     }
 
     /// Iterate through each rank.
-    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, u32, RankOrder> {
+    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, i32, RankOrder> {
         self.ranks.iter()
     }
 
@@ -153,11 +153,11 @@ impl RankOrderings {
         &self.nodes
     }
 
-    fn get_rank_mut(&mut self, rank: u32) -> Option<&mut RankOrder> {
+    fn get_rank_mut(&mut self, rank: i32) -> Option<&mut RankOrder> {
         self.ranks.get_mut(&rank)
     }
 
-    fn get_rank(&self, rank: u32) -> Option<&RankOrder> {
+    fn get_rank(&self, rank: i32) -> Option<&RankOrder> {
         self.ranks.get(&rank)
     }
 
@@ -580,7 +580,7 @@ mod test {
     }
 
     // Fixture that generates a ordering with a single rank with max positions in that rank.
-    fn single_rank_orderings(max: usize) -> (RankOrderings, u32) {
+    fn single_rank_orderings(max: usize) -> (RankOrderings, i32) {
         let mut order = RankOrderings::new();
         let rank_idx = 0;
 
