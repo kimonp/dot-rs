@@ -86,13 +86,17 @@ fn App(cx: Scope) -> Element {
         e -> g; f -> g; b -> c;
         c -> d; d -> h;
         g -> h;
-        a -> i; a -> j; a -> k;
-        i -> l; j -> l; k -> l;
-        l -> h;
     }";
-    // let dot_str = "digraph {
-    //     a -> b; a -> c; a -> d; a -> e;
+    let dot_str = "digraph {
+        a -> b; a -> c; a -> d;
+    }";
+    //     a -> i; a -> j; a -> k;
+    //     i -> l; j -> l; k -> l;
+    //     l -> h;
     // }";
+    let dot_str = "digraph {
+        a -> b; a -> c; a -> d; a -> e;
+    }";
 
     let mut graph = Graph::from(dot_str);
 

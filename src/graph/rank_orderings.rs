@@ -489,20 +489,12 @@ mod test {
     #[test]
     fn test_adjacent_position() {
         let mut graph = Graph::example_graph_from_paper_2_3();
-        println!("0");
         graph.rank_nodes_vertically();
-        println!("1");
         let order = graph.init_horizontal_order();
-        println!("2");
 
         let node_a = graph.name_to_node_idx("a").unwrap();
         let node_f = graph.name_to_node_idx("f").unwrap();
         let node_g = graph.name_to_node_idx("g").unwrap();
-
-        println!("GRAPH: {graph}");
-        println!("ORDER: {order}");
-
-        println!("a:{node_a} f:{node_f} g:{node_g}");
 
         let nodes = order.nodes.borrow();
         let node_f_pos = nodes.get(&node_f).unwrap();
@@ -519,9 +511,7 @@ mod test {
         assert_eq!(below_g, vec![1]);
 
         // order.weighted_median(1);
-        println!("Calling horizontal_ordering");
         graph.set_horizontal_ordering();
-        println!("FINAL ORDER: {order}");
     }
 
     /// Fixture that generates two ranks, with crossing to oppoite lower ranks, e.g:

@@ -143,7 +143,7 @@ impl Graph {
 
         // Whether you are in the spanning tree or not, create as subtree
         // for all nodes.
-        self.print_nodes("BEFORE find_tight_subtree");
+        self.print_nodes("BEFORE find_tight_subtree()");
         for node_idx in 0..self.node_count() {
             // Don't place this exclusion in a filter, as it can change from the preivous call.
             if !self.get_node(node_idx).has_sub_tree() {
@@ -154,7 +154,7 @@ impl Graph {
 
         min_heap.order_heap();
 
-        self.print_nodes(&format!("BEFORE MIN_HEAP: {}", min_heap.len()));
+        self.print_nodes(&format!("AFTER find_tight_subtree(): heap_size:{}", min_heap.len()));
 
         while min_heap.len() > 1 {
             let sub_tree = min_heap.pop().expect("can't be empty");

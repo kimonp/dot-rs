@@ -1,6 +1,6 @@
 //! Reprecents an edge connecting two nodes within a graph.
 
-use std::cell::RefCell;
+use std::{cell::RefCell, fmt::Display};
 
 /// Minimum allowed edge weight.  In future implementations, user could set this.
 /// Edge weight could be used when drawing to deletemine the stroke width of an edge.
@@ -15,6 +15,16 @@ pub const MIN_EDGE_LENGTH: i32 = 1;
 pub enum EdgeDisposition {
     In,
     Out,
+}
+
+impl Display for EdgeDisposition {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        let disp = match self {
+            EdgeDisposition::In => "in",
+            EdgeDisposition::Out => "out",
+        };
+        write!(fmt, "{disp}")
+    }
 }
 
 /// An edge connects to nodes in a graph, and points from src_node to dst_node.

@@ -49,6 +49,7 @@ impl Rect {
 /// Separation of nodes horizontally in pixels, assuming 72 pixels per inch.
 pub(super) const NODE_MIN_SEP_X: i32 = 72;
 const NODE_MIN_SEP_Y: i32 = 72;
+pub(super) const NODE_START_HEIGHT: i32 = NODE_MIN_SEP_X / 4;
 
 impl Point {
     pub fn new(x: i32, y: i32) -> Self {
@@ -326,6 +327,11 @@ impl Node {
 
     pub(super) fn set_coordinates(&mut self, x: i32, y: i32) {
         self.coordinates = Some(Point::new(x, y));
+    }
+
+    pub(super) fn set_y_coordinate(&mut self, y: i32) {
+        let prev_x = self.coordinates().unwrap_or(Point::new(0,0)).x();
+        self.set_coordinates(prev_x, y)
     }
 
     /// Add either an in our out edge to the node.

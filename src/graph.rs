@@ -19,12 +19,11 @@ use std::{
 
 use self::{
     edge::{
-        Edge, EdgeDisposition,
-        EdgeDisposition::{In, Out},
+        Edge, EdgeDisposition::{self, In, Out},
         MIN_EDGE_LENGTH, MIN_EDGE_WEIGHT,
     },
     network_simplex::SimplexNodeTarget::{VerticalRank, XCoordinate},
-    node::{Node, NodeType, Point, Rect, NODE_MIN_SEP_X},
+    node::{Node, NodeType, Point, Rect, NODE_MIN_SEP_X, NODE_START_HEIGHT},
     rank_orderings::AdjacentRank,
 };
 
@@ -242,6 +241,8 @@ impl Graph {
 
         self.nodes[src_node].add_edge(idx, Out);
         self.nodes[dst_node].add_edge(idx, In);
+        
+        println!("Added edge: {}", self.edge_to_string(idx));
 
         idx
     }
@@ -543,7 +544,7 @@ impl Graph {
             let old_edge = self.get_edge_mut(cur_edge_idx);
             let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
 
-            self.get_node_mut(virt_node_idx).add_edge(cur_edge_idx, Out);
+            self.get_node_mut(virt_node_idx).add_edge(cur_edge_idx, In);
 
             // The old edge needs to be removed from the original dst_node.
             self.get_node_mut(orig_dst).remove_edge(cur_edge_idx, In);
@@ -739,7 +740,31 @@ impl Graph {
     ///     heights and clusters.
     /// XXX Then review set_x_coords
     fn set_y_coordinates(&mut self) {
-        let order = self.rank_orderings.as_ref().unwrap();
+        
+        // /* make the initial assignment of ycoords to leftmost nodes by ranks */
+        // maxht = 0;
+        // r = GD_maxrank(g);
+        // (ND_coord(rank[r].v[0])).y = rank[r].ht1;
+        // while (--r >= GD_minrank(g))
+        // {
+        //     d0 = rank[r + 1].pht2 + rank[r].pht1 + GD_ranksep(g); /* prim node sep */
+        //     d1 = rank[r + 1].ht2 + rank[r].ht1 + CL_OFFSET;       /* cluster sep */
+        //     delta = fmax(d0, d1);
+        //     if (rank[r].n > 0) /* this may reflect some problem */
+        //         (ND_coord(rank[r].v[0])).y = (ND_coord(rank[r + 1].v[0])).y + delta;
+        //         maxht = fmax(maxht, delta);
+                
+        // let order = self.rank_orderings.as_ref().unwrap();
+        // let first_column = order.iter().rev()
+        //     .map(|(rank, nodes)| (*rank, nodes.borrow().first().copied()))
+        //     .collect::<Vec<(i32, Option<usize>)>>();
+
+        // for (rank, node_idx) in first_column {
+        //     if let Some(node_idx) = node_idx {
+        //         self.get_node_mut(node_idx).set_y_coordinate(0);
+        //     }
+        // }
+
 
         // make the initial assignment of ycoords to leftmost nodes by ranks
         // for (rank, nodes) in order.iter().rev() {
@@ -755,7 +780,7 @@ impl Graph {
                 panic!("Node {node_idx}: position not set");
             };
             let new_y = if let Some(rank) = node.vertical_rank {
-                rank * min_y
+                rank * min_y + NODE_START_HEIGHT
             } else {
                 panic!("Node {node_idx}: rank not set");
             };
@@ -1091,8 +1116,8 @@ impl Display for Graph {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         for (node_idx, node) in self.nodes.iter().enumerate() {
             let _ = writeln!(fmt, "{}", self.node_to_string(node_idx));
-            for edge_idx in node.get_all_edges() {
-                let _ = writeln!(fmt, "    {}", self.edge_to_string(*edge_idx));
+            for (edge_idx, disp) in node.get_all_edges_with_disposition() {
+                let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
             }
         }
         Ok(())
@@ -1532,9 +1557,10 @@ pub mod tests {
 
     #[test]
     fn test_draw_graph() {
-        let mut graph = Graph::example_graph_from_paper_2_3_extended();
-        // let dot_str = "digraph { a -> b; a -> c; a -> d; }";
-        // let mut graph = Graph::from(dot_str);
+        // let mut graph = Graph::example_graph_from_paper_2_3_extended();
+        // let mut graph = Graph::example_graph_from_paper_2_3();
+        let dot_str = "digraph { a -> b; a -> c; a -> d; }";
+        let mut graph = Graph::from(dot_str);
 
         println!("{graph}");
         graph.layout_nodes();
