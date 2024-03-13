@@ -19,7 +19,8 @@ use std::{
 
 use self::{
     edge::{
-        Edge, EdgeDisposition::{self, In, Out},
+        Edge,
+        EdgeDisposition::{self, In, Out},
         MIN_EDGE_LENGTH, MIN_EDGE_WEIGHT,
     },
     network_simplex::SimplexNodeTarget::{VerticalRank, XCoordinate},
@@ -139,6 +140,15 @@ impl Graph {
         }
         Rect::new(min, max)
     }
+    
+    // Return the maximum verticial rank in the graph.
+    fn max_rank(&self) -> Option<i32> {
+        if let Some(order) = self.rank_orderings.as_ref() {
+            order.max_rank()
+        } else {
+            None 
+        }
+    }
 
     fn get_vertical_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
         let mut above_nodes = vec![];
@@ -241,7 +251,7 @@ impl Graph {
 
         self.nodes[src_node].add_edge(idx, Out);
         self.nodes[dst_node].add_edge(idx, In);
-        
+
         println!("Added edge: {}", self.edge_to_string(idx));
 
         idx
@@ -740,7 +750,6 @@ impl Graph {
     ///     heights and clusters.
     /// XXX Then review set_x_coords
     fn set_y_coordinates(&mut self) {
-        
         // /* make the initial assignment of ycoords to leftmost nodes by ranks */
         // maxht = 0;
         // r = GD_maxrank(g);
@@ -753,7 +762,7 @@ impl Graph {
         //     if (rank[r].n > 0) /* this may reflect some problem */
         //         (ND_coord(rank[r].v[0])).y = (ND_coord(rank[r + 1].v[0])).y + delta;
         //         maxht = fmax(maxht, delta);
-                
+
         // let order = self.rank_orderings.as_ref().unwrap();
         // let first_column = order.iter().rev()
         //     .map(|(rank, nodes)| (*rank, nodes.borrow().first().copied()))
@@ -765,12 +774,13 @@ impl Graph {
         //     }
         // }
 
-
         // make the initial assignment of ycoords to leftmost nodes by ranks
         // for (rank, nodes) in order.iter().rev() {
 
         // }
 
+        // We set the y coorinate in reverse rank to match what GraphViz does.
+        let max_rank = self.max_rank().unwrap_or(0);
         for (node_idx, node) in self.nodes.iter_mut().enumerate() {
             let min_x = node.min_separation_x();
             let min_y = node.min_separation_y();
@@ -780,7 +790,7 @@ impl Graph {
                 panic!("Node {node_idx}: position not set");
             };
             let new_y = if let Some(rank) = node.vertical_rank {
-                rank * min_y + NODE_START_HEIGHT
+                (max_rank - rank) * min_y + NODE_START_HEIGHT
             } else {
                 panic!("Node {node_idx}: rank not set");
             };
@@ -890,17 +900,19 @@ impl Graph {
                 new_weight,
             );
 
-            // TODO: deal with unwraps();
+            // GraphViz code lets these coords just be zero
             let new_node = aux_graph.get_node_mut(new_node_idx);
-            let src_x = src_node.coordinates.unwrap().x();
-            let src_y = src_node.coordinates.unwrap().y();
-            let dst_x = dst_node.coordinates.unwrap().x();
+            new_node.set_coordinates(0, 0);
+            // The paper seems to say something different...
+            // // TODO: deal with unwraps();
+            // let src_x = src_node.coordinates.unwrap().x();
+            // let src_y = src_node.coordinates.unwrap().y();
+            // let dst_x = dst_node.coordinates.unwrap().x();
 
-            // ...assigning each new node n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
-            // and where x_u and x_v are the X coordinates assigned to u and v in G.
-            new_node.set_coordinates(src_x.min(dst_x), src_y);
+            // // ...assigning each new node n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
+            // // and where x_u and x_v are the X coordinates assigned to u and v in G.
+            // new_node.set_coordinates(src_x.min(dst_x), src_y);
         }
-        aux_graph.print_nodes("after adding virtual nodes");
     }
 
     /// Add constraints to nodes in preparation for ranking nodes horizontally.
@@ -1559,7 +1571,7 @@ pub mod tests {
     fn test_draw_graph() {
         // let mut graph = Graph::example_graph_from_paper_2_3_extended();
         // let mut graph = Graph::example_graph_from_paper_2_3();
-        let dot_str = "digraph { a -> b; a -> c; a -> d; }";
+        let dot_str = "digraph { a -> b; a -> c; a -> d; a -> e; }";
         let mut graph = Graph::from(dot_str);
 
         println!("{graph}");

@@ -298,10 +298,7 @@ impl Node {
 
     /// Return true if this node has a sub_tree set.
     pub(super) fn has_sub_tree(&self) -> bool {
-        self.spanning_tree
-            .borrow()
-            .as_ref()
-            .is_some()
+        self.sub_tree().is_some()
     }
 
     /// Return a internally mutable subtree if one is set for this node.

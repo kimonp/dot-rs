@@ -134,8 +134,10 @@ impl Graph {
     /// * Thus, a ranking is feasible if the slack of every edge is non-negative.
     /// * An edge is "tight" if its slack is zero.
     ///
-    pub(super) fn set_feasible_tree_for_simplex(&mut self) {
-        self.init_simplex_rank();
+    pub(super) fn set_feasible_tree_for_simplex(&mut self, init_rank: bool) {
+        if init_rank {
+            self.init_simplex_rank();
+        }
 
         // Nodecount is at least as big as necessary: there will very likely be
         // fewer subtrees than nodes, but not more.
@@ -561,7 +563,7 @@ mod test {
         graph.make_asyclic();
         graph.merge_edges();
         graph.init_simplex_rank();
-        graph.set_feasible_tree_for_simplex();
+        graph.set_feasible_tree_for_simplex(true);
 
         let a_in_nodes = graph.directional_non_parent_tree_nodes(a_idx, In);
         let a_out_nodes = graph.directional_non_parent_tree_nodes(a_idx, Out);
@@ -588,7 +590,7 @@ mod test {
         graph.init_simplex_rank();
 
         // at end end calls: init_cutvals() -> graph.init_spanning_tree();
-        graph.set_feasible_tree_for_simplex();
+        graph.set_feasible_tree_for_simplex(true);
     }
 
     /// Not a useful test yet...XXX
@@ -600,7 +602,7 @@ mod test {
         graph.make_asyclic();
         graph.merge_edges();
         graph.init_simplex_rank();
-        graph.set_feasible_tree_for_simplex();
+        graph.set_feasible_tree_for_simplex(true);
         // at end end calls: init_cutvals() -> graph.init_spanning_tree();
 
         println!("{graph}");

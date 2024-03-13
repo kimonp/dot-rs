@@ -160,6 +160,11 @@ impl RankOrderings {
     fn get_rank(&self, rank: i32) -> Option<&RankOrder> {
         self.ranks.get(&rank)
     }
+    
+    /// Return the maximum rank currently in RankOrder.
+    pub fn max_rank(&self) -> Option<i32> {
+        self.ranks.last_key_value().map(|(rank, _)| *rank)
+    }
 
     /// Documentation from paper: page 14
     /// * wmedian re-orders the nodes within each rank based on the weighted median heuristic.

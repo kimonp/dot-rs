@@ -82,7 +82,7 @@ impl Graph {
     /// }
     ///
     pub(super) fn network_simplex_ranking(&mut self, target: SimplexNodeTarget) {
-        self.set_feasible_tree_for_simplex();
+        self.set_feasible_tree_for_simplex(target == SimplexNodeTarget::VerticalRank);
         self.init_cutvalues();
 
         let mut start_idx = 0;
