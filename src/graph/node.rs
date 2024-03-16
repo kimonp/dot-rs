@@ -128,6 +128,7 @@ impl Display for SpanningTreeData {
 }
 
 impl SpanningTreeData {
+    #[cfg(test)]
     fn new(
         edge_idx_to_parent: Option<usize>,
         sub_tree_idx_min: Option<usize>,
@@ -263,6 +264,22 @@ impl Node {
         }
     }
 
+    pub(super) fn sub_tree_idx_max(&self) -> Option<usize> {
+        if let Some(tree_data) = self.spanning_tree() {
+            tree_data.sub_tree_idx_max()
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn sub_tree_idx_min(&self) -> Option<usize> {
+        if let Some(tree_data) = self.spanning_tree() {
+            tree_data.sub_tree_idx_min()
+        } else {
+            None
+        }
+    }
+
     /// Set the given node's tree data as a root node of the tree.
     ///
     /// Typically, nodes with no in_edges are set as root nodes.
@@ -281,7 +298,12 @@ impl Node {
         min: Option<usize>,
         max: Option<usize>,
     ) {
-        *self.spanning_tree.borrow_mut() = Some(SpanningTreeData::new(parent, min, max));
+        *self.spanning_tree.borrow_mut() = Some(SpanningTreeData {
+            edge_idx_to_parent: parent,
+            sub_tree_idx_min: min,
+            sub_tree_idx_max: max,
+            sub_tree: self.sub_tree(),
+        });
     }
 
     fn tree_data(&self) -> Option<SpanningTreeData> {
@@ -326,10 +348,10 @@ impl Node {
         self.coordinates = Some(Point::new(x, y));
     }
 
-    pub(super) fn set_y_coordinate(&mut self, y: i32) {
-        let prev_x = self.coordinates().unwrap_or(Point::new(0,0)).x();
-        self.set_coordinates(prev_x, y)
-    }
+    // pub(super) fn set_y_coordinate(&mut self, y: i32) {
+    //     let prev_x = self.coordinates().unwrap_or(Point::new(0,0)).x();
+    //     self.set_coordinates(prev_x, y)
+    // }
 
     /// Add either an in our out edge to the node.
     pub(super) fn add_edge(&mut self, edge: usize, disposition: EdgeDisposition) {

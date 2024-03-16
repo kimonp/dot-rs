@@ -59,9 +59,9 @@ impl Graph {
     /// In the graphviz 9.0 code, there are two functions:
     /// * dfs_range_init()
     /// * dfs_range()
-    /// They are identical code, expect for the exit condition.  set_tree_ranges() =
-    /// does both
-    fn set_tree_ranges(
+    /// They are identical code, expect for the exit condition.  set_tree_ranges()
+    /// does either depending on the "initializing flag"
+    pub(super) fn set_tree_ranges(
         &mut self,
         initializing: bool,
         node_idx: usize,
@@ -69,6 +69,13 @@ impl Graph {
         min: usize,
     ) -> usize {
         let node = self.get_node(node_idx);
+
+        let par_str = if let Some(parent_edge_idx) = parent_edge_idx {
+            self.edge_to_string(parent_edge_idx)
+        } else {
+            "None".to_string()
+        };
+        println!("set_tree_ranges({}, {parent_edge_idx:?}, {min})\n    {par_str}", node.name);
 
         if !initializing {
             if let Some(tree_data) = node.spanning_tree() {
@@ -82,8 +89,9 @@ impl Graph {
             }
         }
 
+        let cur_max = node.sub_tree_idx_max();
         self.get_node_mut(node_idx)
-            .set_tree_data(parent_edge_idx, Some(min), None);
+            .set_tree_data(parent_edge_idx, Some(min), cur_max);
 
         let mut max = min;
 
@@ -145,7 +153,7 @@ impl Graph {
 
         // Whether you are in the spanning tree or not, create as subtree
         // for all nodes.
-        self.print_nodes("BEFORE find_tight_subtree()");
+        self.print_nodes("BEFORE find_tight_subtree() in set_feasible_tree()");
         for node_idx in 0..self.node_count() {
             // Don't place this exclusion in a filter, as it can change from the preivous call.
             if !self.get_node(node_idx).has_sub_tree() {
@@ -156,7 +164,7 @@ impl Graph {
 
         min_heap.order_heap();
 
-        self.print_nodes(&format!("AFTER find_tight_subtree(): heap_size:{}", min_heap.len()));
+        self.print_nodes(&format!("AFTER find_tight_subtree(): heap_size:{} in set_feasible_tree", min_heap.len()));
 
         while min_heap.len() > 1 {
             let sub_tree = min_heap.pop().expect("can't be empty");
@@ -172,6 +180,7 @@ impl Graph {
             println!("reorder done");
         }
         self.init_cutvalues();
+        self.print_nodes(&format!("AFTER init_cut_vals() in set_feasible_tree:{}", min_heap.len()));
     }
 
     /// Given and edge, merge the two subtrees pointed to by each edge's nodes.
@@ -484,6 +493,9 @@ impl Graph {
             let new_rank = cur_rank - delta;
             node.set_simplex_rank(Some(new_rank));
 
+            let children = self.non_parent_tree_nodes(node_idx).iter().map(|(node_idx, _)| self.get_node(*node_idx).name.clone()).collect::<Vec<String>>();
+            println!("   {} reranking to: {:?}", node.name, children);
+
             for (node_idx, _) in self.non_parent_tree_nodes(node_idx) {
                 self.rerank_by_tree(node_idx, delta)
             }
@@ -506,6 +518,8 @@ impl Graph {
     /// parent node of the given node from either in_edges or out_edges depending on disposition.
     ///
     /// Only returns non-ignored nodes.
+    /// 
+    /// TODO: Rewrite this to call: node_tree_edges(node_idx, disposition)
     fn directional_non_parent_tree_nodes(
         &self,
         node_idx: usize,
@@ -546,6 +560,29 @@ impl Graph {
             })
             .collect()
     }
+
+    /// Return all of a node's tree edges that are of the given disposition.
+    pub(super) fn node_tree_edges(&self, node_idx: usize, disposition: EdgeDisposition) -> Vec<&Edge> {
+        let node = self.get_node(node_idx);
+        let edges = match disposition {
+            In => &node.in_edges,
+            Out => &node.out_edges,
+        };
+
+        edges
+            .iter()
+            .filter_map(|edge_idx| {
+                let edge = self.get_edge(*edge_idx);
+
+                if !edge.ignored && edge.in_spanning_tree() {
+                    Some(edge)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
 }
 
 #[cfg(test)]

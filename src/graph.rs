@@ -780,7 +780,7 @@ impl Graph {
         // }
 
         // We set the y coorinate in reverse rank to match what GraphViz does.
-        let max_rank = self.max_rank().unwrap_or(0);
+        // let max_rank = self.max_rank().unwrap_or(0);
         for (node_idx, node) in self.nodes.iter_mut().enumerate() {
             let min_x = node.min_separation_x();
             let min_y = node.min_separation_y();
@@ -790,7 +790,10 @@ impl Graph {
                 panic!("Node {node_idx}: position not set");
             };
             let new_y = if let Some(rank) = node.vertical_rank {
-                (max_rank - rank) * min_y + NODE_START_HEIGHT
+                // GraphViz code does this backwards, and later flips it back...
+                // but no need for us to do that foolishness.
+                // (max_rank - rank) * min_y + NODE_START_HEIGHT
+                rank * min_y + NODE_START_HEIGHT
             } else {
                 panic!("Node {node_idx}: rank not set");
             };
@@ -1102,11 +1105,28 @@ impl Graph {
             .map(|coords| format!("({},{})", coords.x(), coords.y()))
             .unwrap_or("None".to_string());
         let tree_node = if node.in_spanning_tree() {
-            if let Some(sub_tree) = &node.sub_tree() {
+            let parent = if let Some(parent_idx) = node.spanning_tree_parent_edge_idx() {
+                if parent_idx < self.edges.len() {
+                    let edge = self.get_edge(parent_idx);
+                    let parent_node = if edge.src_node == node_idx {
+                        self.get_node(edge.dst_node)
+                    } else {
+                        self.get_node(edge.src_node)
+                    };
+                    parent_node.name()
+                } else {
+                    "+"
+                }
+            } else {
+                "-"
+            };
+            let sub_tree = if let Some(sub_tree) = &node.sub_tree() {
                 sub_tree.to_string()
             } else {
                 "NO SUB_TREE".to_string()
-            }
+            };
+            
+            format!("TreeParent:{parent} {sub_tree}")
         } else {
             "NOT IN TREE".to_string()
         };
@@ -1126,7 +1146,13 @@ impl Graph {
 
 impl Display for Graph {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        for (node_idx, node) in self.nodes.iter().enumerate() {
+        for (node_idx, node) in self.nodes.iter().enumerate().filter(|(_,node)| node.is_virtual() ) {
+            let _ = writeln!(fmt, "{}", self.node_to_string(node_idx));
+            for (edge_idx, disp) in node.get_all_edges_with_disposition() {
+                let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
+            }
+        }
+        for (node_idx, node) in self.nodes.iter().enumerate().filter(|(_,node)| !node.is_virtual() ) {
             let _ = writeln!(fmt, "{}", self.node_to_string(node_idx));
             for (edge_idx, disp) in node.get_all_edges_with_disposition() {
                 let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
@@ -1140,9 +1166,8 @@ impl Display for Graph {
 pub mod tests {
     use super::*;
 
-    use crate::svg::SVG;
-
     use std::ops::RangeInclusive;
+    use rstest::rstest;
     use tests::edge::MIN_EDGE_WEIGHT;
 
     /// Additional test only functions for Graph to make graph construction testing easier.
@@ -1567,18 +1592,28 @@ pub mod tests {
         }
     }
 
-    #[test]
-    fn test_draw_graph() {
-        // let mut graph = Graph::example_graph_from_paper_2_3_extended();
-        // let mut graph = Graph::example_graph_from_paper_2_3();
-        let dot_str = "digraph { a -> b; a -> c; a -> d; a -> e; }";
-        let mut graph = Graph::from(dot_str);
-
-        println!("{graph}");
+    #[rstest(graph,
+        case::a_and_b_to_c(          Graph::from("digraph { a -> c; b -> c; }")),
+        case::a_to_4_nodes(          Graph::from("digraph { a -> b; a -> c; a -> d; a -> e; }")),
+        case::odd_spline(            Graph::from("digraph {
+                                        a -> e; a -> f; a -> b;
+                                        e -> g; f -> g; b -> c;
+                                        c -> d; d -> h;
+                                        g -> h;
+                                     }")),
+        case::odd2_spline(           Graph::from("digraph {
+                                        a -> b; a -> e; a -> f;
+                                        e -> g; f -> g; b -> c;
+                                        c -> d; d -> h;
+                                        g -> h;
+                                     }")),
+        case::paper_2_3(             Graph::example_graph_from_paper_2_3()),
+        case::paper_2_3_extended(    Graph::example_graph_from_paper_2_3_extended()),
+    )]
+    fn test_draw_graph(mut graph: Graph) {
         graph.layout_nodes();
-        println!("{graph}");
 
-        let svg = SVG::new(graph, false);
-        svg.write_to_file("foo");
+        // let svg = crate::svg::SVG::new(graph, false);
+        // svg.write_to_file("foo");
     }
 }

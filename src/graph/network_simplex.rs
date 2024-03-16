@@ -5,7 +5,10 @@
 //!
 //! <https://en.wikipedia.org/wiki/Network_simplex_algorithm>
 
-use super::{edge::MIN_EDGE_LENGTH, Graph};
+use super::{
+    edge::{EdgeDisposition, MIN_EDGE_LENGTH},
+    Graph,
+};
 use std::collections::HashSet;
 
 mod heap;
@@ -83,17 +86,21 @@ impl Graph {
     ///
     pub(super) fn network_simplex_ranking(&mut self, target: SimplexNodeTarget) {
         self.set_feasible_tree_for_simplex(target == SimplexNodeTarget::VerticalRank);
-        self.init_cutvalues();
 
         let mut start_idx = 0;
         while let Some(neg_cut_edge_idx) = self.leave_edge_for_simplex(start_idx) {
-            println!("About to enter: {neg_cut_edge_idx}\n{self}");
+            println!("About to enter: {neg_cut_edge_idx}");
 
-            if let Some(non_tree_edge_idx) = self.enter_edge_for_simplex(neg_cut_edge_idx) {
-                // .expect("No negative cut values found!");
-
-                println!("Exchanging {neg_cut_edge_idx} with {non_tree_edge_idx}");
-                self.exchange(neg_cut_edge_idx, non_tree_edge_idx);
+            if let Some((selected_edge_idx, selected_slack)) =
+                self.enter_edge_for_simplex(neg_cut_edge_idx)
+            {
+                println!(
+                    "Exchanging edges with slack {selected_slack}\n    {}\n    {}",
+                    self.edge_to_string(neg_cut_edge_idx),
+                    self.edge_to_string(selected_edge_idx),
+                );
+                self.rerank_for_simplex(neg_cut_edge_idx, selected_slack);
+                self.adjust_cutvalues_and_exchange_for_simplex(neg_cut_edge_idx, selected_edge_idx);
 
                 start_idx = neg_cut_edge_idx + 1;
             } else {
@@ -101,11 +108,168 @@ impl Graph {
                 break;
             }
         }
-        self.normalize_simplex_rank();
-        self.balance(target);
+        self.print_nodes("after simplex loop");
+        // self.normalize_simplex_rank(); GraphViz only does this in the "default" case (not TB or LR. We don't have that target)
+        self.balance_for_simplex(target);
         self.assign_simplex_rank(target);
         if target == SimplexNodeTarget::XCoordinate {
             self.print_nodes("network_simplex_ranking after balance_left_right END");
+        }
+    }
+
+    /// Adjust cutvalues based on the changing edges, and update cut values of tree edges.
+    fn adjust_cutvalues_and_exchange_for_simplex(
+        &mut self,
+        neg_cut_edge_idx: usize,
+        selected_edge_idx: usize,
+    ) {
+        let cutvalue = self
+            .get_edge(neg_cut_edge_idx)
+            .cut_value
+            .expect("Selected edge must have cut value");
+        let selected_edge = self.get_edge(selected_edge_idx);
+        let sel_src_node_idx = selected_edge.src_node;
+        let sel_dst_node_idx = selected_edge.dst_node;
+
+        let lca_idx =
+            self.adjust_cutvalues_to_lca(sel_src_node_idx, sel_dst_node_idx, cutvalue, true);
+        let lca_idx2 =
+            self.adjust_cutvalues_to_lca(sel_dst_node_idx, sel_src_node_idx, cutvalue, false);
+
+        assert_eq!(lca_idx, lca_idx2, "Least common ancestor must match");
+
+        self.get_edge_mut(neg_cut_edge_idx).cut_value = None;
+        self.get_edge_mut(sel_dst_node_idx).cut_value = Some(-cutvalue);
+
+        let lca = self.get_node(lca_idx);
+        let lca_parent_edge_idx = lca.spanning_tree_parent_edge_idx();
+        let lca_min = lca
+            .sub_tree_idx_min()
+            .expect("lca does not have a sub_tree_idx_min");
+
+        // TODO: invalidate_path for (lca, sel_src_node_idx), (lca, sel_dst_node_idx)
+
+        self.exchange_edges_for_simplex(neg_cut_edge_idx, selected_edge_idx);
+
+        println!("LCA of {} and {} is: {}", self.get_node(sel_src_node_idx).name, self.get_node(sel_dst_node_idx).name, self.get_node(lca_idx).name);
+        self.set_tree_ranges(true, lca_idx, lca_parent_edge_idx, lca_min);
+    }
+
+    /// Adjust cutvalues by the given amount from node_idx1 to the least commmon ancestor of nodes node_idx1 and node_idx2,
+    /// and return the least common ancestor of node_idx1 and node_idx2.
+    ///
+    /// "down" is a signal as to which direction to move the cutvalue.  If down, the cutvalue should be increased if the next
+    /// parent is the src_node.
+    ///
+    /// This is an effecient way of updating only the needed cutvalues during network simplex
+    /// without having to recalculate them all, which can be a large percentage of node layout
+    /// calculations.
+    fn adjust_cutvalues_to_lca(
+        &mut self,
+        node1_idx: usize,
+        node2_idx: usize,
+        cutvalue: i32,
+        down: bool,
+    ) -> usize {
+        let mut maybe_lca_idx = node1_idx;
+        while !self.is_common_ancestor(maybe_lca_idx, node2_idx) {
+            let not_lca = self.get_node_mut(maybe_lca_idx);
+            let parent_edge_idx = not_lca
+                .spanning_tree_parent_edge_idx()
+                .expect("Must have a common ancestor");
+            let (parent_src_idx_max, parent_dst_idx_max) =
+                self.edge_sub_tree_idx_max(parent_edge_idx);
+            let parent_edge = self.get_edge_mut(parent_edge_idx);
+            let cur_cutvalue = parent_edge
+                .cut_value
+                .expect("cutvalue not set for parent edge");
+            let is_down = if maybe_lca_idx == parent_edge.src_node {
+                down
+            } else {
+                !down
+            };
+
+            parent_edge.cut_value = if is_down {
+                Some(cur_cutvalue + cutvalue)
+            } else {
+                Some(cur_cutvalue - cutvalue)
+            };
+
+            maybe_lca_idx = if parent_src_idx_max > parent_dst_idx_max {
+                parent_edge.src_node
+            } else {
+                parent_edge.dst_node
+            };
+        }
+
+        maybe_lca_idx
+    }
+
+    /// Return the sub_tree_idx_max() for both the src and dst nodes of an edge.
+    ///
+    /// Panics if either node is not in the spanning tree, or does not have a sub_tree_idx_max value set.
+    fn edge_sub_tree_idx_max(&self, parent_edge_idx: usize) -> (usize, usize) {
+        let parent_edge = self.get_edge(parent_edge_idx);
+        let parent_src_idx_max = self
+            .get_node(parent_edge.src_node)
+            .sub_tree_idx_max()
+            .expect("sub_tree_idx_max no set");
+        let parent_dst_idx_max = self
+            .get_node(parent_edge.dst_node)
+            .sub_tree_idx_max()
+            .expect("sub_tree_idx_max no set");
+
+        (parent_src_idx_max, parent_dst_idx_max)
+    }
+
+    /// GraphViz code: !SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    fn is_common_ancestor(&self, node_idx1: usize, node_idx2: usize) -> bool {
+        let node1 = self.get_node(node_idx1);
+        let node2 = self.get_node(node_idx2);
+
+        let a = node1.sub_tree_idx_min();
+        let b = node2.sub_tree_idx_max();
+        let c = node1.sub_tree_idx_max();
+
+        a <= b && b <= c
+    }
+
+    /// Rerank nodes based on which edge was removed from the tree during a loop of network simplex.
+    ///
+    /// This makes edges "tight" as result of removing an edge with a negative cut value.
+    fn rerank_for_simplex(&self, prev_tree_edge_idx: usize, delta: i32) {
+        if delta > 0 {
+            let edge = self.get_edge(prev_tree_edge_idx);
+            let src_idx = edge.src_node;
+            let dst_idx = edge.dst_node;
+
+            let dst_node_in_cnt = self.node_tree_edges(dst_idx, EdgeDisposition::In).len();
+            let src_node_out_cnt = self.node_tree_edges(src_idx, EdgeDisposition::Out).len();
+            let size = (dst_node_in_cnt + src_node_out_cnt) as i32;
+
+            let (rerank_idx, rerank_delta) = if size == 1 {
+                (src_idx, delta)
+            } else {
+                let src_node_in_cnt = self.node_tree_edges(src_idx, EdgeDisposition::In).len();
+                let dst_node_out_cnt = self.node_tree_edges(dst_idx, EdgeDisposition::Out).len();
+                let size = (dst_node_out_cnt + src_node_in_cnt) as i32;
+
+                if size == 1 {
+                    (dst_idx, -delta)
+                } else if let (Some(src_tree), Some(dst_tree)) = (
+                    self.get_node(src_idx).spanning_tree(),
+                    self.get_node(dst_idx).spanning_tree(),
+                ) {
+                    if src_tree.sub_tree_idx_max() < dst_tree.sub_tree_idx_max() {
+                        (src_idx, delta)
+                    } else {
+                        (dst_idx, -delta)
+                    }
+                } else {
+                    panic!("Not all nodes in spanning tree!");
+                }
+            };
+            self.rerank_by_tree(rerank_idx, rerank_delta);
         }
     }
 
@@ -549,7 +713,7 @@ impl Graph {
     ///   * This is done by breaking the edge e, which divides the tree into a head and tail component.
     ///   * All edges going from the head component to the tail are considered, with an edge of minimum slack being chosen.
     ///   * This is necessary to maintain feasibility.
-    fn enter_edge_for_simplex(&self, tree_edge_idx: usize) -> Option<usize> {
+    fn enter_edge_for_simplex(&self, tree_edge_idx: usize) -> Option<(usize, i32)> {
         let (head_nodes, tail_nodes) = self.get_components(tree_edge_idx);
 
         let mut min_slack = i32::MAX;
@@ -565,7 +729,7 @@ impl Graph {
                 });
 
                 if edge_slack < min_slack {
-                    replacement_edge_idx = Some(edge_idx);
+                    replacement_edge_idx = Some((edge_idx, edge_slack));
                     min_slack = edge_slack;
                 }
             }
@@ -576,16 +740,13 @@ impl Graph {
 
     /// Documentation from paper:
     /// * The edges are exchanged, updating the tree and cut values.
-    fn exchange(&mut self, neg_cut_edge_idx: usize, non_tree_edge_idx: usize) {
-        {
-            let neg_cut_edge = self.get_edge_mut(neg_cut_edge_idx);
-            neg_cut_edge.set_in_spanning_tree(false);
-
-            let non_tree_edge = self.get_edge_mut(non_tree_edge_idx);
-            non_tree_edge.set_in_spanning_tree(true);
-        }
-
-        self.init_cutvalues();
+    fn exchange_edges_for_simplex(&mut self, neg_cut_edge_idx: usize, non_tree_edge_idx: usize) {
+        self.get_edge(neg_cut_edge_idx).set_in_spanning_tree(false);
+        self.get_edge(non_tree_edge_idx).set_in_spanning_tree(true);
+        
+        // LOOK AT EDGE C.
+        // XXX IT SEEMS LIKE WHILE IT SHOULD BE SET INTO THE TREE, THIS NEEDS TO BE DONE LATER, AFTER THE RERANK LOGIC...
+        //     BECAUSE SETTING THIS BEFORE THE RERANK IS DONE CAUSES AN INFINITE LOOP
     }
 
     /// Set the least rank of the tree to zero.
@@ -611,7 +772,7 @@ impl Graph {
     }
 
     /// Balance nodes either top to bottom or left to right
-    fn balance(&mut self, target: SimplexNodeTarget) {
+    fn balance_for_simplex(&mut self, target: SimplexNodeTarget) {
         match target {
             SimplexNodeTarget::VerticalRank => self.balance_top_bottom(),
             SimplexNodeTarget::XCoordinate => self.balance_left_right(),
@@ -656,60 +817,39 @@ impl Graph {
         self.print_nodes("balance_left_right start");
 
         for (tree_edge_idx, tree_edge) in self.tree_edge_iter() {
-            print!("Looking at edge:");
-            self.print_edge(tree_edge_idx);
-
             if tree_edge.cut_value == Some(0) {
-                if let Some(replace_edge_idx) = self.enter_edge_for_simplex(tree_edge_idx) {
-                    println!("balance_left_right: replace {tree_edge_idx} with {replace_edge_idx}");
-                    if let Some(delta) = self.simplex_slack(replace_edge_idx) {
-                        println!("  SELECTED EDGE: ");
-                        self.print_edge(replace_edge_idx);
+                print!("Looking at edge with cut of zero:");
+                self.print_edge(tree_edge_idx);
 
-                        if delta > 1 {
-                            let src_node = self.get_node(tree_edge.src_node);
-                            let dst_node = self.get_node(tree_edge.dst_node);
+                if let Some((replace_edge_idx, delta)) = self.enter_edge_for_simplex(tree_edge_idx)
+                {
+                    if delta > 1 {
+                        println!("  balance_left_right: replace {tree_edge_idx} with {replace_edge_idx}, slack: {delta}\n    replace: {}\n      with: {}",
+                                self.edge_to_string(tree_edge_idx),
+                                self.edge_to_string(replace_edge_idx),
+                            );
 
-                            if let (Some(src_tree), Some(dst_tree)) =
-                                (src_node.spanning_tree(), dst_node.spanning_tree())
-                            {
-                                if src_tree.sub_tree_idx_min() < dst_tree.sub_tree_idx_max() {
-                                    println!("  rerank by tail: {}", delta / 2);
-                                    self.rerank_by_tree(tree_edge.src_node, delta / 2);
-                                } else {
-                                    println!("  rerank by head: {}", delta / 2);
-                                    self.rerank_by_tree(tree_edge.dst_node, -delta / 2);
-                                }
+                        let src_node = self.get_node(tree_edge.src_node);
+                        let dst_node = self.get_node(tree_edge.dst_node);
+
+                        if let (Some(src_idx_min), Some(dst_idx_max)) =
+                            (src_node.sub_tree_idx_min(), dst_node.sub_tree_idx_max())
+                        {
+                            if src_idx_min < dst_idx_max {
+                                println!("  rerank by tail: {}", delta / 2);
+                                self.rerank_by_tree(tree_edge.src_node, delta / 2);
                             } else {
-                                panic!("Not all nodes in spanning tree!");
+                                println!("  rerank by head: {}", delta / 2);
+                                self.rerank_by_tree(tree_edge.dst_node, -delta / 2);
                             }
-
-                            // ND_lim(n) is the max depth first index for nodes in the subtree of node n.
-                            // * How many steps from the root is the node connected to n that is farthest
-                            //   farthest from the root.
-                            // So if src_node is connected to nodes farther from the root than src_node:
-                            //   reduce by delta/2 the rank of dst_node and all nodes under it
-                            // else
-                            //   increase by delta/2 the rank of dst_node and all nodes under it
-                            //
-                            // if ND_lim(src_node) < ND_lim(dst_node) {
-                            //     // rerank(n) subtracts delta to the rank of all subtree nodes:
-                            //     //
-                            //     // * reduces the rank of src_node by delta
-                            //     // * for each outgoing edge of the tree from n
-                            //     //   * if edge is not heading to the parent of n
-                            //     //      * call rerank(e.dst_node, delta)
-                            //     // * for each incoming edge of the tree from n
-                            //     //   * if edge is not heading to the parent of n
-                            //     //      * call rerank(e.src_node, delta)
-                            //     rerank(src_node, delta / 2);
-                            // } else {
-                            //     rerank(dst_node, -delta / 2)
-                            // }
+                        } else {
+                            panic!("Not all nodes in spanning tree!");
                         }
                     } else {
-                        panic!("Can't calculate slack for left right balance");
+                        println!("  skipping edge: {}", self.edge_to_string(replace_edge_idx));
                     }
+                } else {
+                    println!("  No edge to enter!");
                 }
             }
         }
@@ -955,7 +1095,7 @@ mod tests {
         let neg_edge = graph.leave_edge_for_simplex(0).unwrap();
         let neg_edge2 = graph.leave_edge_for_simplex(neg_edge + 1).unwrap();
 
-        let new_edge = graph.enter_edge_for_simplex(neg_edge).unwrap();
+        let (new_edge, _) = graph.enter_edge_for_simplex(neg_edge).unwrap();
         assert_eq!(new_edge, neg_edge1_idx);
 
         // let new_edge = graph.get_edge(new_edge);
@@ -964,7 +1104,7 @@ mod tests {
         // println!("{graph}");
         // println!("Next edge 1: {} -> {}", src_node, dst_node);
 
-        let new_edge2 = graph.enter_edge_for_simplex(neg_edge2).unwrap();
+        let (new_edge2, _) = graph.enter_edge_for_simplex(neg_edge2).unwrap();
         assert_eq!(new_edge2, neg_edge2_idx);
 
         // let new_edge2 = graph.get_edge(new_edge2);

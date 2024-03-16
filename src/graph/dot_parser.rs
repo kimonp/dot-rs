@@ -79,6 +79,12 @@ impl From<&str> for Graph {
     }
 }
 
+impl From<&String> for Graph {
+    fn from(string: &String) -> Self {
+        Self::new_from_str(string)
+    }
+}
+
 /// Given an edge_stmt (e.g. a -> b;), get the src and dst node names.
 fn get_edge(edge_stmt: Pair<'_, Rule>) -> (String, String) {
     let mut edge_rule = edge_stmt.into_inner();

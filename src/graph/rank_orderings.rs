@@ -497,7 +497,6 @@ mod test {
         graph.rank_nodes_vertically();
         let order = graph.init_horizontal_order();
 
-        let node_a = graph.name_to_node_idx("a").unwrap();
         let node_f = graph.name_to_node_idx("f").unwrap();
         let node_g = graph.name_to_node_idx("g").unwrap();
 

@@ -20,9 +20,9 @@ impl SubTree {
         SubTree(Rc::new(RefCell::new(InternalSubTree::new(node_idx))))
     }
 
-    pub fn strong_count(&self) -> usize {
-        Rc::strong_count(&self.0)
-    }
+    // pub fn strong_count(&self) -> usize {
+    //     Rc::strong_count(&self.0)
+    // }
 
     /// Number of nodes within the subtree.
     pub fn size(&self) -> u32 {

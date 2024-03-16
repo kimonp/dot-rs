@@ -12,7 +12,7 @@ fn main() {
     // launch the dioxus app in a webview
     // dioxus_desktop::launch(App);
 
-    let size = PhysicalSize::new(2000, 1000);
+    let size = PhysicalSize::new(2000, 4000);
     let position = LogicalPosition::new(10, 10);
     let window = WindowBuilder::new()
         .with_title("GraphViz Comparison")
@@ -69,18 +69,41 @@ fn dot_to_svg(graph: &str, custom_dot: bool) -> String {
     String::from_utf8(output.stdout).expect("Output of dot not UTF-8")
 }
 
+const DOT_EXAMPLES: [(&'static str, &'static str); 5] = [
+    ("2 spread", "digraph {a -> c; b -> c;}"),
+    ("4 spread", "digraph {a -> b; a -> c; a -> d; a -> e;}"),
+    (
+        "example 2.3",
+        "digraph {
+            a -> e; a -> f; a -> b;
+            e -> g; f -> g; b -> c;
+            c -> d; d -> h;
+            g -> h
+        }",
+    ),
+    (
+        "example 2.3 scrambled",
+        "digraph {
+            a -> b; a -> e; a -> f;
+            e -> g; f -> g; b -> c;
+            c -> d; d -> h;
+            g -> h;
+        }",
+    ),
+    (
+        "in spread",
+        "digraph {
+            a -> b; a -> c; a -> d;
+            a -> i; a -> j; a -> k;
+            i -> l; j -> l; k -> l;
+            l -> h
+        }",
+    ),
+];
+
 // define a component that renders a div with the text "Hello, world!"
 #[component]
 fn App(cx: Scope) -> Element {
-    // let dot_str = "digraph {
-    //     a -> e; a -> f; a -> b;
-    //     e -> g; f -> g; b -> c;
-    //     c -> d; d -> h;
-    //     g -> h;
-    // }";
-    // let dot_str = "digraph {
-    //     a -> c; b -> c
-    // }";
     let dot_str = "digraph {
         a -> b; a -> e; a -> f;
         e -> g; f -> g; b -> c;
@@ -89,44 +112,37 @@ fn App(cx: Scope) -> Element {
     }";
     let dot_str = "digraph {
         a -> b; a -> c; a -> d;
+        a -> i; a -> j; a -> k;
+        i -> l; j -> l; k -> l;
+        l -> h;
     }";
-    //     a -> i; a -> j; a -> k;
-    //     i -> l; j -> l; k -> l;
-    //     l -> h;
-    // }";
-    let dot_str = "digraph {
-        a -> b; a -> c; a -> d; a -> e;
-    }";
+    let rows = DOT_EXAMPLES
+        .iter()
+        .map(|(title, dot)| rsx! { DotSet { title: title.to_string(), dot: dot.to_string() } });
 
-    let mut graph = Graph::from(dot_str);
+    cx.render(rsx! {rows})
+}
+
+#[component]
+fn DotSet(cx: Scope, title: String, dot: String) -> Element {
+    let mut graph = Graph::from(dot);
 
     graph.layout_nodes();
 
     let svg = SVG::new(graph.clone(), false);
-    let svg_debug = SVG::new(graph, false);
+    // let svg_debug = SVG::new(graph, false);
     let dot_rs = svg.to_string();
-    let dot_rs_debug = svg_debug.to_string();
+    //let dot_rs_debug = svg_debug.to_string();
 
-    let custom_dot_svg = dot_to_svg(dot_str, true);
-    let std_dot_svg = dot_to_svg(dot_str, false);
+    // let custom_dot_svg = dot_to_svg(dot, true);
+    let std_dot_svg = dot_to_svg(dot, false);
 
     cx.render(rsx! {
         div { display: "flex", flex_flow: "column nowrap",
+            div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "left", "{title}" } }
             div { display: "flex", flex_flow: "row nowrap", width: "100%",
-                div { display: "flex", flex: 1, justify_content: "center", "dot-rs" }
-                div { display: "flex", flex: 1, justify_content: "center", "dot-rs debug" }
-            }
-            div { display: "flex", flex_flow: "row nowrap", width: "100%",
-                div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{dot_rs}" }
-                div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{dot_rs_debug}" }
-            }
-            div { display: "flex", flex_flow: "row nowrap", width: "100%",
-                div { display: "flex", flex: 1, justify_content: "center", "graphviz & dot" }
-                div { display: "flex", flex: 1, justify_content: "center", "customized graphviz & dot" }
-            }
-            div { display: "flex", flex_flow: "row nowrap", width: "100%",
-                div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{std_dot_svg}" }
-                div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{custom_dot_svg}" }
+                div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{dot_rs}" } }
+                div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{std_dot_svg}" } }
             }
         }
     })
