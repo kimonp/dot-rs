@@ -69,7 +69,7 @@ fn dot_to_svg(graph: &str, custom_dot: bool) -> String {
     String::from_utf8(output.stdout).expect("Output of dot not UTF-8")
 }
 
-const DOT_EXAMPLES: [(&'static str, &'static str); 5] = [
+const DOT_EXAMPLES: [(&str, &str); 5] = [
     ("2 spread", "digraph {a -> c; b -> c;}"),
     ("4 spread", "digraph {a -> b; a -> c; a -> d; a -> e;}"),
     (
@@ -104,18 +104,6 @@ const DOT_EXAMPLES: [(&'static str, &'static str); 5] = [
 // define a component that renders a div with the text "Hello, world!"
 #[component]
 fn App(cx: Scope) -> Element {
-    let dot_str = "digraph {
-        a -> b; a -> e; a -> f;
-        e -> g; f -> g; b -> c;
-        c -> d; d -> h;
-        g -> h;
-    }";
-    let dot_str = "digraph {
-        a -> b; a -> c; a -> d;
-        a -> i; a -> j; a -> k;
-        i -> l; j -> l; k -> l;
-        l -> h;
-    }";
     let rows = DOT_EXAMPLES
         .iter()
         .map(|(title, dot)| rsx! { DotSet { title: title.to_string(), dot: dot.to_string() } });

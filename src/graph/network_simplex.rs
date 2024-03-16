@@ -749,27 +749,27 @@ impl Graph {
         //     BECAUSE SETTING THIS BEFORE THE RERANK IS DONE CAUSES AN INFINITE LOOP
     }
 
-    /// Set the least rank of the tree to zero.
-    /// * finding the current least rank
-    /// * subtracking the least rank from all ranks
-    ///
-    /// Documentation from paper:
-    /// The solution is normalized setting the least rank to zero.
-    ///
-    /// In GraphVis Code: scan_and_normalize()
-    fn normalize_simplex_rank(&mut self) {
-        if let Some(min_node) = self.real_nodes_iter().map(|(_idx, node)| node).min() {
-            if let Some(least_rank) = min_node.simplex_rank() {
-                for node in self.nodes.iter_mut() {
-                    if let Some(rank) = node.simplex_rank() {
-                        if let Some(new_rank) = rank.checked_sub(least_rank) {
-                            node.set_simplex_rank(Some(new_rank));
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // /// Set the least rank of the tree to zero.
+    // /// * finding the current least rank
+    // /// * subtracking the least rank from all ranks
+    // ///
+    // /// Documentation from paper:
+    // /// The solution is normalized setting the least rank to zero.
+    // ///
+    // /// In GraphVis Code: scan_and_normalize()
+    // fn normalize_simplex_rank(&mut self) {
+    //     if let Some(min_node) = self.real_nodes_iter().map(|(_idx, node)| node).min() {
+    //         if let Some(least_rank) = min_node.simplex_rank() {
+    //             for node in self.nodes.iter_mut() {
+    //                 if let Some(rank) = node.simplex_rank() {
+    //                     if let Some(new_rank) = rank.checked_sub(least_rank) {
+    //                         node.set_simplex_rank(Some(new_rank));
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     /// Balance nodes either top to bottom or left to right
     fn balance_for_simplex(&mut self, target: SimplexNodeTarget) {

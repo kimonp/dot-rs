@@ -141,14 +141,14 @@ impl Graph {
         Rect::new(min, max)
     }
     
-    // Return the maximum verticial rank in the graph.
-    fn max_rank(&self) -> Option<i32> {
-        if let Some(order) = self.rank_orderings.as_ref() {
-            order.max_rank()
-        } else {
-            None 
-        }
-    }
+    // // Return the maximum verticial rank in the graph.
+    // fn max_rank(&self) -> Option<i32> {
+    //     if let Some(order) = self.rank_orderings.as_ref() {
+    //         order.max_rank()
+    //     } else {
+    //         None 
+    //     }
+    // }
 
     fn get_vertical_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
         let mut above_nodes = vec![];
