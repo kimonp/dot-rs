@@ -51,8 +51,17 @@ impl Graph {
     /// In the graphviz 9.0 code, this function is: dfs_range_init()
     /// It assumes that graph is fully connected.
     pub(super) fn init_spanning_tree(&mut self) {
+        // XXX This is kind of crazy.  The order in which the tree is build
+        //     effects how it is laid out, apparently.  In GraphViz, new virtual nodes
+        //     are added at the beginning of the list.  In dot-rs, they are necessarily
+        //     added at the end because we don't want the indexes to change.
+        //     So we want to pick the last virtual node...
+        let last_node_idx = self.node_count()-1;
+        // let last_node = self.get_node(last_node_idx);
+        // let start_node = if last_node.is_virtual() { last_node_idx } else {0};
+
         if self.node_count() != 0 {
-            self.set_tree_ranges(true, 0, None, 1);
+            self.set_tree_ranges(true, last_node_idx, None, 1);
         }
     }
 
@@ -372,7 +381,7 @@ impl Graph {
     fn find_tight_subtree(&self, node_idx: usize) -> SubTree {
         let tree = SubTree::new(node_idx);
 
-        println!("find_tight_subtree for: {node_idx} for {tree}");
+        println!("find_tight_subtree() for node: {node_idx} for {tree}");
         // Update the tree size to the combined size of all the nodes we found.
         tree.set_size(self.tight_subtree_search(node_idx, tree.clone()));
 
@@ -391,7 +400,7 @@ impl Graph {
     fn tight_subtree_search(&self, node_idx: usize, sub_tree: SubTree) -> u32 {
         let mut subtree_size = 1;
 
-        println!("    tight subtree search for {}", self.get_node(node_idx));
+        println!("    tight_subtree_search() for {}", self.get_node(node_idx));
 
         // set this node to be in the given sub_tree.
         self.get_node(node_idx).set_sub_tree(sub_tree.clone());
@@ -487,10 +496,10 @@ impl Graph {
     /// Re-rank the given node by adding delta to the rank, and all sub_nodes in the tree.
     pub(super) fn rerank_by_tree(&self, node_idx: usize, delta: i32) {
         let node = self.get_node(node_idx);
-        println!("Reranking {} by {delta}", node.name);
 
         if let Some(cur_rank) = node.simplex_rank() {
             let new_rank = cur_rank - delta;
+            println!("Reranking {} by {delta} from {cur_rank} to {new_rank}", node.name);
             node.set_simplex_rank(Some(new_rank));
 
             let children = self.non_parent_tree_nodes(node_idx).iter().map(|(node_idx, _)| self.get_node(*node_idx).name.clone()).collect::<Vec<String>>();
@@ -499,6 +508,8 @@ impl Graph {
             for (node_idx, _) in self.non_parent_tree_nodes(node_idx) {
                 self.rerank_by_tree(node_idx, delta)
             }
+        } else {
+            panic!("Rank not set for node {} in rerank.", node.name);
         }
     }
 
@@ -530,6 +541,7 @@ impl Graph {
             In => &node.in_edges,
             Out => &node.out_edges,
         };
+        use itertools::Itertools;
 
         edges
             .iter()

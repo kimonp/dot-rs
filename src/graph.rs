@@ -141,14 +141,14 @@ impl Graph {
         Rect::new(min, max)
     }
     
-    // // Return the maximum verticial rank in the graph.
-    // fn max_rank(&self) -> Option<i32> {
-    //     if let Some(order) = self.rank_orderings.as_ref() {
-    //         order.max_rank()
-    //     } else {
-    //         None 
-    //     }
-    // }
+    // Return the maximum verticial rank in the graph.
+    fn max_rank(&self) -> Option<i32> {
+        if let Some(order) = self.rank_orderings.as_ref() {
+            order.max_rank()
+        } else {
+            None 
+        }
+    }
 
     fn get_vertical_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
         let mut above_nodes = vec![];
@@ -780,7 +780,7 @@ impl Graph {
         // }
 
         // We set the y coorinate in reverse rank to match what GraphViz does.
-        // let max_rank = self.max_rank().unwrap_or(0);
+        let max_rank = self.max_rank().unwrap_or(0);
         for (node_idx, node) in self.nodes.iter_mut().enumerate() {
             let min_x = node.min_separation_x();
             let min_y = node.min_separation_y();
@@ -790,6 +790,7 @@ impl Graph {
                 panic!("Node {node_idx}: position not set");
             };
             let new_y = if let Some(rank) = node.vertical_rank {
+                // XXX
                 // GraphViz code does this backwards, and later flips it back...
                 // but no need for us to do that foolishness.
                 // (max_rank - rank) * min_y + NODE_START_HEIGHT
@@ -800,6 +801,7 @@ impl Graph {
 
             node.set_coordinates(new_x, new_y);
         }
+        self.print_nodes("after set_y_coordinates()");
     }
 
     /// Documentation from paper: 4.2 Optimal Node Placement page 20
@@ -874,14 +876,20 @@ impl Graph {
         for edge in self.edges.iter() {
             let src_node_idx = edge.src_node;
             let dst_node_idx = edge.dst_node;
-            let src_node = self.get_node(src_node_idx);
-            let dst_node = self.get_node(dst_node_idx);
+            // Must use aux_graph because it is already different from self
+            let src_node = aux_graph.get_node(src_node_idx).clone();
+            let dst_node = aux_graph.get_node(dst_node_idx).clone();
 
-            let src_rank = src_node.vertical_rank.unwrap();
-            let dst_rank = dst_node.vertical_rank.unwrap();
+            // As well, must use simplex_rank() instead of vertical_rank, beacause it may have been
+            // changed.
+            let src_rank = src_node.simplex_rank().unwrap();
+            let dst_rank = dst_node.simplex_rank().unwrap();
             let new_rank = (src_rank - 1).min(dst_rank - 1);
 
             let new_node_idx = aux_graph.add_virtual_node(new_rank, NodeType::XCoordCalc);
+            //let new_node = aux_graph.get_node(new_node_idx);
+            //println!("Adding virtual node {} with rank {:?}: {src_rank} from {} and {dst_rank} from {}", new_node.name, new_node.simplex_rank(), src_node.name, dst_node.name);
+            //println!("COMPARE Self\n{self}To Aux:\n{aux_graph}");
 
             // The paper described setting the new weight edge.weight*omega, but the GraphViz code does
             // not seem to do this, and just passes on the weight of the existing edge:
@@ -1086,9 +1094,14 @@ impl Graph {
         } else {
             "NOT IN TREE"
         };
+        let ignored = if edge.ignored {
+            "IGNORED"
+        } else {
+            ""
+        };
 
         format!(
-            "{: >3} ->{: >3}: cut_value:{:?} slack:{:?} weight:{} min_len:{} {in_tree}",
+            "{ignored}{: >3} ->{: >3}: cut_value:{:?} slack:{:?} weight:{} min_len:{} {in_tree}",
             src_node.name,
             dst_node.name,
             edge.cut_value,
@@ -1149,13 +1162,17 @@ impl Display for Graph {
         for (node_idx, node) in self.nodes.iter().enumerate().filter(|(_,node)| node.is_virtual() ) {
             let _ = writeln!(fmt, "{}", self.node_to_string(node_idx));
             for (edge_idx, disp) in node.get_all_edges_with_disposition() {
-                let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
+                if !self.get_edge(*edge_idx).ignored {
+                    let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
+                }
             }
         }
         for (node_idx, node) in self.nodes.iter().enumerate().filter(|(_,node)| !node.is_virtual() ) {
             let _ = writeln!(fmt, "{}", self.node_to_string(node_idx));
             for (edge_idx, disp) in node.get_all_edges_with_disposition() {
-                let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
+                if !self.get_edge(*edge_idx).ignored {
+                    let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
+                }
             }
         }
         Ok(())
@@ -1594,6 +1611,11 @@ pub mod tests {
 
     #[rstest(graph,
         case::a_and_b_to_c(          Graph::from("digraph { a -> c; b -> c; }")),
+        case::a_to_b_to_a(           Graph::from("digraph { a -> b; b -> a; }")),
+        case::flux_capacitor(        Graph::from("digraph {a -> c; b -> c; c -> d;}")),
+        case::back_and_forth(        Graph::from("digraph { a -> c; b -> a; }")),
+        case::t1_2_1(                Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }")),
+        case::simple_scramble(       Graph::from("digraph { a -> b; a -> c; c -> d; b -> e; }")),
         case::a_to_4_nodes(          Graph::from("digraph { a -> b; a -> c; a -> d; a -> e; }")),
         case::odd_spline(            Graph::from("digraph {
                                         a -> e; a -> f; a -> b;
@@ -1608,12 +1630,19 @@ pub mod tests {
                                         g -> h;
                                      }")),
         case::paper_2_3(             Graph::example_graph_from_paper_2_3()),
-        case::paper_2_3_extended(    Graph::example_graph_from_paper_2_3_extended()),
+        case::paper_extended_2_3(    Graph::example_graph_from_paper_2_3_extended()),
+        case::simple_failing_test( Graph::from(
+            "digraph {
+                a -> b; a -> e; a -> f;
+                e -> g; f -> g; b -> c;
+                c -> d; d -> h;
+            }"
+        ))
     )]
     fn test_draw_graph(mut graph: Graph) {
         graph.layout_nodes();
 
-        // let svg = crate::svg::SVG::new(graph, false);
-        // svg.write_to_file("foo");
+        let svg = crate::svg::SVG::new(graph, false);
+        svg.write_to_file("foo");
     }
 }

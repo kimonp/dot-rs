@@ -147,7 +147,9 @@ impl Graph {
             .sub_tree_idx_min()
             .expect("lca does not have a sub_tree_idx_min");
 
-        // TODO: invalidate_path for (lca, sel_src_node_idx), (lca, sel_dst_node_idx)
+        // TODO, XXX: should implement to copy GraphViz:
+        // * invalidate_path for (lca, sel_src_node_idx), (lca, sel_dst_node_idx)
+        // * When this is done, she set_tree_ranges() initializing flag can be set to "false".
 
         self.exchange_edges_for_simplex(neg_cut_edge_idx, selected_edge_idx);
 
@@ -818,13 +820,13 @@ impl Graph {
 
         for (tree_edge_idx, tree_edge) in self.tree_edge_iter() {
             if tree_edge.cut_value == Some(0) {
-                print!("Looking at edge with cut of zero:");
+                println!("Looking at edge with cut of zero:");
                 self.print_edge(tree_edge_idx);
 
                 if let Some((replace_edge_idx, delta)) = self.enter_edge_for_simplex(tree_edge_idx)
                 {
                     if delta > 1 {
-                        println!("  balance_left_right: replace {tree_edge_idx} with {replace_edge_idx}, slack: {delta}\n    replace: {}\n      with: {}",
+                        println!("  balance_left_right(): replace {tree_edge_idx} with {replace_edge_idx}, slack: {delta}\n    replace: {}\n      with: {}",
                                 self.edge_to_string(tree_edge_idx),
                                 self.edge_to_string(replace_edge_idx),
                             );
@@ -832,11 +834,11 @@ impl Graph {
                         let src_node = self.get_node(tree_edge.src_node);
                         let dst_node = self.get_node(tree_edge.dst_node);
 
-                        if let (Some(src_idx_min), Some(dst_idx_max)) =
-                            (src_node.sub_tree_idx_min(), dst_node.sub_tree_idx_max())
+                        if let (Some(src_idx_max), Some(dst_idx_max)) =
+                            (src_node.sub_tree_idx_max(), dst_node.sub_tree_idx_max())
                         {
-                            if src_idx_min < dst_idx_max {
-                                println!("  rerank by tail: {}", delta / 2);
+                            if src_idx_max < dst_idx_max {
+                                println!("  rerank by tail ({src_idx_max} < {dst_idx_max}): {}", delta / 2);
                                 self.rerank_by_tree(tree_edge.src_node, delta / 2);
                             } else {
                                 println!("  rerank by head: {}", delta / 2);
@@ -846,11 +848,13 @@ impl Graph {
                             panic!("Not all nodes in spanning tree!");
                         }
                     } else {
-                        println!("  skipping edge: {}", self.edge_to_string(replace_edge_idx));
+                        println!("  balance_left_right(): skipping edge with delta <= 1: {}", self.edge_to_string(replace_edge_idx));
                     }
                 } else {
                     println!("  No edge to enter!");
                 }
+            } else {
+                println!("balance_left_right(): skipping edge with cut of zero: {}", self.edge_to_string(tree_edge_idx));
             }
         }
     }

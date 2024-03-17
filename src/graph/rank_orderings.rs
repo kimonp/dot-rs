@@ -161,10 +161,10 @@ impl RankOrderings {
         self.ranks.get(&rank)
     }
     
-    // /// Return the maximum rank currently in RankOrder.
-    // pub fn max_rank(&self) -> Option<i32> {
-    //     self.ranks.last_key_value().map(|(rank, _)| *rank)
-    // }
+    /// Return the maximum rank currently in RankOrder.
+    pub fn max_rank(&self) -> Option<i32> {
+        self.ranks.last_key_value().map(|(rank, _)| *rank)
+    }
 
     /// Documentation from paper: page 14
     /// * wmedian re-orders the nodes within each rank based on the weighted median heuristic.
@@ -236,9 +236,14 @@ impl RankOrderings {
         // Static items (indicated by medium == NONE) stay in their original positions.
         // Place them in order so that they can be inserted into their original places, one by one
         static_pos.sort_by(|a, b| a.borrow().position.cmp(&b.borrow().position));
+
         for node_pos in static_pos {
             let orig_pos = node_pos.borrow().position;
-            ordering.insert(orig_pos, node_pos);
+            if ordering.len() < orig_pos {
+                ordering.push(node_pos);
+            } else {
+                ordering.insert(orig_pos, node_pos);
+            }
         }
 
         // Set the values of all the newly calculated positions
