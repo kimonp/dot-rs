@@ -95,7 +95,7 @@ impl Graph {
                 self.enter_edge_for_simplex(neg_cut_edge_idx)
             {
                 println!(
-                    "Exchanging edges with slack {selected_slack}\n    remove from tree: {}\n        add to tree: {}",
+                    "Exchanging edges with slack {selected_slack}\n  remove from tree: {}\n       add to tree: {}",
                     self.edge_to_string(neg_cut_edge_idx),
                     self.edge_to_string(selected_edge_idx),
                 );
@@ -247,19 +247,19 @@ impl Graph {
     fn rerank_for_simplex(&self, prev_tree_edge_idx: usize, delta: i32) {
         if delta > 0 {
             let edge = self.get_edge(prev_tree_edge_idx);
-            let src_idx = edge.src_node;
-            let dst_idx = edge.dst_node;
+            let src_idx = edge.src_node; // tail
+            let dst_idx = edge.dst_node; // head
 
-            let dst_node_in_cnt = self.node_tree_edges(dst_idx, EdgeDisposition::In).len();
+            let src_node_in_cnt = self.node_tree_edges(src_idx, EdgeDisposition::In).len();
             let src_node_out_cnt = self.node_tree_edges(src_idx, EdgeDisposition::Out).len();
-            let size = (dst_node_in_cnt + src_node_out_cnt) as i32;
+            let size = (src_node_in_cnt + src_node_out_cnt) as i32;
 
             let (rerank_idx, rerank_delta) = if size == 1 {
                 (src_idx, delta)
             } else {
-                let src_node_in_cnt = self.node_tree_edges(src_idx, EdgeDisposition::In).len();
+                let dst_node_in_cnt = self.node_tree_edges(dst_idx, EdgeDisposition::In).len();
                 let dst_node_out_cnt = self.node_tree_edges(dst_idx, EdgeDisposition::Out).len();
-                let size = (dst_node_out_cnt + src_node_in_cnt) as i32;
+                let size = (dst_node_in_cnt + dst_node_out_cnt) as i32;
 
                 if size == 1 {
                     (dst_idx, -delta)
