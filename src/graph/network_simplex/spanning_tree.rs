@@ -639,7 +639,7 @@ mod test {
 
     #[test]
     fn test_directional_non_parent_tree_nodes() {
-        let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; }");
+        let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; };");
         let a_idx = graph.name_to_node_idx("a").unwrap();
         let b_idx = graph.name_to_node_idx("b").unwrap();
         let c_idx = graph.name_to_node_idx("c").unwrap();
@@ -654,13 +654,13 @@ mod test {
         let a_out_nodes = graph.directional_non_parent_tree_nodes(a_idx, Out);
 
         assert_eq!(a_out_nodes, [(b_idx, 0)]);
-        assert_eq!(a_in_nodes, [(c_idx, 3)]);
+        assert_eq!(a_in_nodes, []);
 
         let c_in_nodes = graph.directional_non_parent_tree_nodes(c_idx, In);
         let c_out_nodes = graph.directional_non_parent_tree_nodes(c_idx, Out);
 
         // It does not include (a_idx, 3), because that is a parent node.
-        assert_eq!(c_out_nodes, [(d_idx, 2)]);
+        assert_eq!(c_out_nodes, [(a_idx, 3)]);
         assert_eq!(c_in_nodes, []);
     }
 

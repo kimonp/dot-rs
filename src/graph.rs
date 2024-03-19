@@ -1141,7 +1141,7 @@ impl Graph {
         };
 
         format!(
-            "{ignored}{: >3} ->{: >3}: cut_value: {cut_value} slack: {slack} weight: {} min_len: {} {in_tree}",
+            "{ignored}{: >3} ->{: >3}: ({edge_idx}) cut_value: {cut_value} slack: {slack} weight: {} min_len: {} {in_tree}",
             src_node.name,
             dst_node.name,
             edge.weight,
