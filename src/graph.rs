@@ -53,6 +53,8 @@ pub struct Graph {
     rank_orderings: Option<RankOrderings>,
     /// Separation of nodes horizontally in pixels, assuming 72 pixels per inch.
     horizontal_node_separation: u32,
+    /// First node_idx in the graph that is virutal.  All subsequent nodes must be virtual too.
+    first_virtual_idx: Option<usize>,
 }
 
 impl Default for Graph {
@@ -68,6 +70,7 @@ impl Graph {
             edges: vec![],
             rank_orderings: None,
             horizontal_node_separation: NODE_MIN_SEP_X as u32,
+            first_virtual_idx: None,
         }
     }
 
@@ -140,14 +143,10 @@ impl Graph {
         }
         Rect::new(min, max)
     }
-    
-    // Return the maximum verticial rank in the graph.
-    fn max_rank(&self) -> Option<i32> {
-        if let Some(order) = self.rank_orderings.as_ref() {
-            order.max_rank()
-        } else {
-            None 
-        }
+
+    // Return the number of verticial ranks.
+    fn num_ranks(&self) -> Option<usize> {
+        self.rank_orderings.as_ref().map(|order| order.num_ranks())
     }
 
     fn get_vertical_adjacent_nodes(&self, node_idx: usize) -> (Vec<usize>, Vec<usize>) {
@@ -221,6 +220,11 @@ impl Graph {
 
         let name = format!("v{}", self.node_count());
         let idx = self.add_node(&name);
+
+        if self.first_virtual_idx.is_none() {
+            self.first_virtual_idx = Some(idx);
+        }
+
         let v_node = self.get_node_mut(idx);
 
         v_node.node_type = node_type;
@@ -445,33 +449,38 @@ impl Graph {
         let order = self.init_horizontal_order();
         let mut best = order.clone();
 
-        for i in 0..MAX_ITERATIONS {
-            // println!("Ordering pass {i}: cross count: {}", order.crossing_count());
+        if best.crossing_count() != 0 {
+            for i in 0..MAX_ITERATIONS {
+                // println!("Ordering pass {i}: cross count: {}", order.crossing_count());
 
-            order.weighted_median(i);
-            // println!(
-            //     "  After weighed_median: {}\n{order}",
-            //     order.crossing_count()
-            // );
+                order.weighted_median(i);
+                // println!(
+                //     "  After weighed_median: {}\n{order}",
+                //     order.crossing_count()
+                // );
 
-            order.transpose();
-            // println!("  After transpose: {}\n{order}", order.crossing_count());
+                order.transpose();
+                // println!("  After transpose: {}\n{order}", order.crossing_count());
 
-            let new_crossing_count = order.crossing_count();
-            if new_crossing_count < best.crossing_count() {
-                best = order.clone();
+                let new_crossing_count = order.crossing_count();
+                if new_crossing_count < best.crossing_count() {
+                    best = order.clone();
 
-                if new_crossing_count == 0 {
-                    break;
+                    if new_crossing_count == 0 {
+                        break;
+                    }
                 }
             }
+        } else {
+            println!("No reason to reduce crosses starting with zero...");
         }
-        // println!(
-        //     "-- Final order (crosses: {}): --\n{best}",
-        //     best.crossing_count()
-        // );
+        println!(
+            "-- Final order (crosses: {}): --\n{best}",
+            best.crossing_count()
+        );
 
         self.set_node_positions(&best);
+        self.print_nodes("After set_horizontal_ordering");
 
         self.rank_orderings = Some(best);
 
@@ -604,7 +613,9 @@ impl Graph {
                 .filter_map(|edge_idx| {
                     let edge = self.get_edge(edge_idx);
 
-                    if assigned.get(&edge.dst_node).is_none() {
+                    if edge.ignored {
+                        None
+                    } else if assigned.get(&edge.dst_node).is_none() {
                         Some(edge.dst_node)
                     } else {
                         None
@@ -726,7 +737,7 @@ impl Graph {
         aux_graph.network_simplex_ranking(XCoordinate);
         self.set_x_coordinates_from_aux(&aux_graph);
 
-        self.print_nodes("after Xcoordinate network_simplex_ranking");
+        self.print_nodes("after set_coordinates in network_simplex_ranking (dot_position())");
     }
 
     fn set_x_coordinates_from_aux(&mut self, aux_graph: &Graph) {
@@ -780,7 +791,7 @@ impl Graph {
         // }
 
         // We set the y coorinate in reverse rank to match what GraphViz does.
-        let max_rank = self.max_rank().unwrap_or(0);
+        let _num_ranks = self.num_ranks().unwrap();
         for (node_idx, node) in self.nodes.iter_mut().enumerate() {
             let min_x = node.min_separation_x();
             let min_y = node.min_separation_y();
@@ -793,8 +804,8 @@ impl Graph {
                 // XXX
                 // GraphViz code does this backwards, and later flips it back...
                 // but no need for us to do that foolishness.
-                // (max_rank - rank) * min_y + NODE_START_HEIGHT
-                rank * min_y + NODE_START_HEIGHT
+                ((_num_ranks as i32 - 1) - rank) * min_y + NODE_START_HEIGHT
+                // rank * min_y + NODE_START_HEIGHT
             } else {
                 panic!("Node {node_idx}: rank not set");
             };
@@ -939,25 +950,49 @@ impl Graph {
         let node_sep = self.horizontal_node_separation; // Same as GraphViz because 72 dpi is standard.
 
         // make edges to separate nodes on the same rank
-        for (_rank, node_order) in self.rank_orderings.as_ref().unwrap().iter() {
-            let mut prev_rank = None;
-            let mut prev_node_idx = None;
-            for node_idx in node_order.borrow().iter().cloned() {
-                let new_rank: i32 = if let Some(prev_rank) = prev_rank {
-                    prev_rank + node_sep as i32
-                } else {
-                    0
-                };
-                if let Some(prev_node_idx) = prev_node_idx {
-                    aux_graph.add_edge_with_details(prev_node_idx, node_idx, node_sep as i32, 0);
+        //
+        // But also, critially, switch the simplex rank on AuxGraph to be the x coordinate:
+        // * Start with the position
+        // * Multiply by node separation
+        //
+        if let Some(rank_orderings) = self.rank_orderings.as_ref() {
+            for rank in 0..rank_orderings.num_ranks() as i32 {
+                let mut prev_rank = None;
+                let mut prev_node_idx = None;
+                // To do this correctly, we mist
+                let rank_by_position = rank_orderings
+                    .rank_to_positions(rank)
+                    .expect("all rank have position");
+
+                for node_idx in rank_by_position {
+                    let new_rank: i32 = if let Some(prev_rank) = prev_rank {
+                        prev_rank + node_sep as i32
+                    } else {
+                        0
+                    };
+                    if let Some(prev_node_idx) = prev_node_idx {
+                        aux_graph.add_edge_with_details(
+                            prev_node_idx,
+                            node_idx,
+                            node_sep as i32,
+                            0,
+                        );
+                    }
+
+                    let node = self.get_node(node_idx);
+                    assert_eq!(Some(rank), node.simplex_rank());
+                    println!(
+                        "rank{rank}: Setting rank for node {}: pos:{:?} to: {new_rank}",
+                        node.name, node.horizontal_position
+                    );
+
+                    aux_graph
+                        .get_node(node_idx)
+                        .set_simplex_rank(Some(new_rank));
+
+                    prev_node_idx = Some(node_idx);
+                    prev_rank = Some(new_rank);
                 }
-
-                aux_graph
-                    .get_node(node_idx)
-                    .set_simplex_rank(Some(new_rank));
-
-                prev_node_idx = Some(node_idx);
-                prev_rank = Some(new_rank);
             }
         }
     }
@@ -1011,10 +1046,11 @@ impl Graph {
     fn get_node_edges_and_adjacent_node(
         &self,
         node_idx: usize,
+        out_first: bool,
     ) -> impl Iterator<Item = (usize, usize)> + '_ {
         let node = self.get_node(node_idx);
 
-        node.get_all_edges_with_disposition()
+        node.get_all_edges_with_disposition(out_first)
             .filter_map(|(edge_idx, disposition)| {
                 let edge_idx = *edge_idx;
                 let edge = self.get_edge(edge_idx);
@@ -1031,37 +1067,35 @@ impl Graph {
             })
     }
 
-    fn get_node_edges_and_adjacent_node_with_disposition(
-        &self,
-        node_idx: usize,
-        requested_disposition: EdgeDisposition,
-    ) -> impl Iterator<Item = (usize, usize)> + '_ {
-        let node = self.get_node(node_idx);
-
-        node.get_all_edges_with_disposition()
-            .filter_map(move |(edge_idx, disposition)| {
-                let edge_idx = *edge_idx;
-                let edge = self.get_edge(edge_idx);
-
-                if edge.ignored {
-                    None
-                } else {
-                    match (disposition, requested_disposition) {
-                        (In, Out) => None,
-                        (Out, In) => None,
-                        (In, In) => Some((edge_idx, edge.src_node)),
-                        (Out, Out) => Some((edge_idx, edge.dst_node)),
-                    }
-                }
-            })
-    }
-
     pub fn edges_iter(&self) -> impl Iterator<Item = &Edge> {
         self.edges.iter()
     }
 
     pub fn nodes_iter(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter()
+    }
+
+    /// Return a vector of node indexes, starting with the virtual nodes
+    /// listed in reverse order they were added, followed by the non-virtual
+    /// nodes in the order they were added.
+    ///
+    /// This mirrors the order of nodes in GraphViz (which is most useful for display)
+    ///
+    /// If we are relying on this function for something other than display, it will mean
+    /// we are brittle because it can break if we add nodes in a different order that GraphViz.
+    fn node_indexes_in_graphviz_order(&self) -> Vec<usize> {
+        if let Some(first_virtual_idx) = self.first_virtual_idx {
+            let mut v1 = (first_virtual_idx..self.node_count())
+                .rev()
+                .collect::<Vec<usize>>();
+            let mut v2 = (0..first_virtual_idx).collect::<Vec<usize>>();
+
+            v1.append(&mut v2);
+
+            v1
+        } else {
+            (0..self.node_count()).collect::<Vec<usize>>()
+        }
     }
 
     /// An iterator that returns only tree edges (not all graph edges).
@@ -1094,18 +1128,22 @@ impl Graph {
         } else {
             "NOT IN TREE"
         };
-        let ignored = if edge.ignored {
-            "IGNORED"
+        let ignored = if edge.ignored { "IGNORED" } else { "" };
+        let cut_value = if let Some(cut_value) = edge.cut_value {
+            format!("{cut_value}")
         } else {
-            ""
+            "None".to_string()
+        };
+        let slack = if let Some(slack) = self.simplex_slack(edge_idx) {
+            format!("{slack}")
+        } else {
+            "None".to_string()
         };
 
         format!(
-            "{ignored}{: >3} ->{: >3}: cut_value:{:?} slack:{:?} weight:{} min_len:{} {in_tree}",
+            "{ignored}{: >3} ->{: >3}: cut_value: {cut_value} slack: {slack} weight: {} min_len: {} {in_tree}",
             src_node.name,
             dst_node.name,
-            edge.cut_value,
-            self.simplex_slack(edge_idx),
             edge.weight,
             edge.min_len()
         )
@@ -1138,16 +1176,17 @@ impl Graph {
             } else {
                 "NO SUB_TREE".to_string()
             };
-            
+
             format!("TreeParent:{parent} {sub_tree}")
         } else {
             "NOT IN TREE".to_string()
         };
         format!(
-            "{node_idx}: {}: type={:?} rank={:?} coord:{coords} {tree_node}",
+            "{node_idx}: {}: type={:?} rank={:?} x_pos:{:?} coord:{coords} {tree_node}",
             node.name,
             node.node_type,
             node.simplex_rank(),
+            node.horizontal_position,
         )
     }
 
@@ -1159,17 +1198,10 @@ impl Graph {
 
 impl Display for Graph {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        for (node_idx, node) in self.nodes.iter().enumerate().filter(|(_,node)| node.is_virtual() ) {
+        for node_idx in self.node_indexes_in_graphviz_order() {
+            let node = self.get_node(node_idx);
             let _ = writeln!(fmt, "{}", self.node_to_string(node_idx));
-            for (edge_idx, disp) in node.get_all_edges_with_disposition() {
-                if !self.get_edge(*edge_idx).ignored {
-                    let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
-                }
-            }
-        }
-        for (node_idx, node) in self.nodes.iter().enumerate().filter(|(_,node)| !node.is_virtual() ) {
-            let _ = writeln!(fmt, "{}", self.node_to_string(node_idx));
-            for (edge_idx, disp) in node.get_all_edges_with_disposition() {
+            for (edge_idx, disp) in node.get_all_edges_with_disposition(false) {
                 if !self.get_edge(*edge_idx).ignored {
                     let _ = writeln!(fmt, "    {disp: <8}: {}", self.edge_to_string(*edge_idx));
                 }
@@ -1183,8 +1215,8 @@ impl Display for Graph {
 pub mod tests {
     use super::*;
 
-    use std::ops::RangeInclusive;
     use rstest::rstest;
+    use std::ops::RangeInclusive;
     use tests::edge::MIN_EDGE_WEIGHT;
 
     /// Additional test only functions for Graph to make graph construction testing easier.
@@ -1609,29 +1641,35 @@ pub mod tests {
         }
     }
 
-    #[rstest(graph,
-        case::a_and_b_to_c(          Graph::from("digraph { a -> c; b -> c; }")),
-        case::a_to_b_to_a(           Graph::from("digraph { a -> b; b -> a; }")),
-        case::flux_capacitor(        Graph::from("digraph {a -> c; b -> c; c -> d;}")),
-        case::back_and_forth(        Graph::from("digraph { a -> c; b -> a; }")),
-        case::t1_2_1(                Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }")),
-        case::simple_scramble(       Graph::from("digraph { a -> b; a -> c; c -> d; b -> e; }")),
-        case::a_to_4_nodes(          Graph::from("digraph { a -> b; a -> c; a -> d; a -> e; }")),
-        case::odd_spline(            Graph::from("digraph {
+    #[rstest(
+        graph,
+        case::a_and_b_to_c(Graph::from("digraph { a -> c; b -> c; }")),
+        case::a_to_b_to_a(Graph::from("digraph { a -> b; b -> a; }")),
+        case::flux_capacitor(Graph::from("digraph {a -> c; b -> c; c -> d;}")),
+        case::back_and_forth(Graph::from("digraph { a -> c; b -> a; }")),
+        case::t1_2_1(Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }")),
+        case::simple_scramble(Graph::from("digraph { a -> b; a -> c; c -> d; b -> e; }")),
+        case::reverse_scramble(Graph::from("digraph { a -> b; a -> c; b -> e; c -> d; }")),
+        case::a_to_4_nodes(Graph::from("digraph { a -> b; a -> c; a -> d; a -> e; }")),
+        case::odd_spline(Graph::from(
+            "digraph {
                                         a -> e; a -> f; a -> b;
                                         e -> g; f -> g; b -> c;
                                         c -> d; d -> h;
                                         g -> h;
-                                     }")),
-        case::odd2_spline(           Graph::from("digraph {
+                                     }"
+        )),
+        case::odd2_spline(Graph::from(
+            "digraph {
                                         a -> b; a -> e; a -> f;
                                         e -> g; f -> g; b -> c;
                                         c -> d; d -> h;
                                         g -> h;
-                                     }")),
-        case::paper_2_3(             Graph::example_graph_from_paper_2_3()),
-        case::paper_extended_2_3(    Graph::example_graph_from_paper_2_3_extended()),
-        case::simple_failing_test( Graph::from(
+                                     }"
+        )),
+        case::paper_2_3(Graph::example_graph_from_paper_2_3()),
+        case::paper_extended_2_3(Graph::example_graph_from_paper_2_3_extended()),
+        case::simple_failing_test(Graph::from(
             "digraph {
                 a -> b; a -> e; a -> f;
                 e -> g; f -> g; b -> c;

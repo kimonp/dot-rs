@@ -45,7 +45,7 @@ impl Display for RankOrderings {
                 }
             }) {
                 if let Some(node) = self.nodes.borrow().get(node_idx) {
-                    let _ = writeln!(fmt, "  {node_idx}: {}", node.borrow());
+                    let _ = writeln!(fmt, "  {}", node.borrow());
                 } else {
                     let _ = writeln!(fmt, "  {node_idx}: BAD INDEX");
                 }
@@ -92,8 +92,8 @@ impl Display for NodePosition {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         write!(
             fmt,
-            "idx:{} pos:{} med:{:?} above:{:?} bellow:{:?}",
-            self.node_idx, self.position, self.median, self.above_adjacents, self.below_adjacents
+            "pos:{} idx:{} med:{:?} above:{:?} bellow:{:?}",
+            self.position, self.node_idx, self.median, self.above_adjacents, self.below_adjacents
         )
     }
 }
@@ -129,6 +129,11 @@ impl RankOrderings {
 
         let position = rank_set.borrow().len();
         rank_set.borrow_mut().insert(node_idx);
+        
+        if self.nodes.borrow().get(&node_idx).is_some() {
+            panic!("Node {node_idx} already exists in rank {rank}");
+        }
+
         self.nodes.borrow_mut().insert(
             node_idx,
             RefCell::new(NodePosition::new(node_idx, position)),
@@ -160,10 +165,16 @@ impl RankOrderings {
     fn get_rank(&self, rank: i32) -> Option<&RankOrder> {
         self.ranks.get(&rank)
     }
-    
-    /// Return the maximum rank currently in RankOrder.
-    pub fn max_rank(&self) -> Option<i32> {
-        self.ranks.last_key_value().map(|(rank, _)| *rank)
+
+    // Given a rank, return a Vec of node_idx sorted by node position.
+    pub fn rank_to_positions(&self, rank: i32) -> Option<Vec<usize>> {
+        self.get_rank(rank)
+            .map(|rank_order| self.rank_order_to_vec(rank_order))
+    }
+
+    /// Return the number of ranks in RankOrder.
+    pub fn num_ranks(&self) -> usize {
+        self.ranks.len()
     }
 
     /// Documentation from paper: page 14
@@ -424,7 +435,7 @@ impl RankOrderings {
                             rank_position.swap(position, position + 1);
                             improved = true
                         } else {
-                            //  println!("{_rank}: no exchange for {position}");
+                            // println!("{_rank}: no exchange for {position}");
                         }
                     }
                 }

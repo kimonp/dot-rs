@@ -95,7 +95,7 @@ impl Graph {
                 self.enter_edge_for_simplex(neg_cut_edge_idx)
             {
                 println!(
-                    "Exchanging edges with slack {selected_slack}\n    {}\n    {}",
+                    "Exchanging edges with slack {selected_slack}\n    remove from tree: {}\n        add to tree: {}",
                     self.edge_to_string(neg_cut_edge_idx),
                     self.edge_to_string(selected_edge_idx),
                 );
@@ -139,7 +139,7 @@ impl Graph {
         assert_eq!(lca_idx, lca_idx2, "Least common ancestor must match");
 
         self.get_edge_mut(neg_cut_edge_idx).cut_value = None;
-        self.get_edge_mut(sel_dst_node_idx).cut_value = Some(-cutvalue);
+        self.get_edge_mut(selected_edge_idx).cut_value = Some(-cutvalue);
 
         let lca = self.get_node(lca_idx);
         let lca_parent_edge_idx = lca.spanning_tree_parent_edge_idx();
@@ -151,9 +151,14 @@ impl Graph {
         // * invalidate_path for (lca, sel_src_node_idx), (lca, sel_dst_node_idx)
         // * When this is done, she set_tree_ranges() initializing flag can be set to "false".
 
-        self.exchange_edges_for_simplex(neg_cut_edge_idx, selected_edge_idx);
+        self.exchange_edges_in_spanning_tree(neg_cut_edge_idx, selected_edge_idx);
 
-        println!("LCA of {} and {} is: {}", self.get_node(sel_src_node_idx).name, self.get_node(sel_dst_node_idx).name, self.get_node(lca_idx).name);
+        println!(
+            "LCA of {} and {} is: {}",
+            self.get_node(sel_src_node_idx).name,
+            self.get_node(sel_dst_node_idx).name,
+            self.get_node(lca_idx).name
+        );
         self.set_tree_ranges(true, lca_idx, lca_parent_edge_idx, lca_min);
     }
 
@@ -742,10 +747,14 @@ impl Graph {
 
     /// Documentation from paper:
     /// * The edges are exchanged, updating the tree and cut values.
-    fn exchange_edges_for_simplex(&mut self, neg_cut_edge_idx: usize, non_tree_edge_idx: usize) {
+    fn exchange_edges_in_spanning_tree(
+        &mut self,
+        neg_cut_edge_idx: usize,
+        non_tree_edge_idx: usize,
+    ) {
         self.get_edge(neg_cut_edge_idx).set_in_spanning_tree(false);
         self.get_edge(non_tree_edge_idx).set_in_spanning_tree(true);
-        
+
         // LOOK AT EDGE C.
         // XXX IT SEEMS LIKE WHILE IT SHOULD BE SET INTO THE TREE, THIS NEEDS TO BE DONE LATER, AFTER THE RERANK LOGIC...
         //     BECAUSE SETTING THIS BEFORE THE RERANK IS DONE CAUSES AN INFINITE LOOP
@@ -838,7 +847,10 @@ impl Graph {
                             (src_node.sub_tree_idx_max(), dst_node.sub_tree_idx_max())
                         {
                             if src_idx_max < dst_idx_max {
-                                println!("  rerank by tail ({src_idx_max} < {dst_idx_max}): {}", delta / 2);
+                                println!(
+                                    "  rerank by tail ({src_idx_max} < {dst_idx_max}): {}",
+                                    delta / 2
+                                );
                                 self.rerank_by_tree(tree_edge.src_node, delta / 2);
                             } else {
                                 println!("  rerank by head: {}", delta / 2);
@@ -848,13 +860,19 @@ impl Graph {
                             panic!("Not all nodes in spanning tree!");
                         }
                     } else {
-                        println!("  balance_left_right(): skipping edge with delta <= 1: {}", self.edge_to_string(replace_edge_idx));
+                        println!(
+                            "  balance_left_right(): skipping edge with delta <= 1: {}",
+                            self.edge_to_string(replace_edge_idx)
+                        );
                     }
                 } else {
                     println!("  No edge to enter!");
                 }
             } else {
-                println!("balance_left_right(): skipping edge with cut of zero: {}", self.edge_to_string(tree_edge_idx));
+                println!(
+                    "balance_left_right(): skipping edge with cut of zero: {}",
+                    self.edge_to_string(tree_edge_idx)
+                );
             }
         }
     }

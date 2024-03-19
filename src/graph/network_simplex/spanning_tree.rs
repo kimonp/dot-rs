@@ -51,16 +51,17 @@ impl Graph {
     /// In the graphviz 9.0 code, this function is: dfs_range_init()
     /// It assumes that graph is fully connected.
     pub(super) fn init_spanning_tree(&mut self) {
-        // XXX This is kind of crazy.  The order in which the tree is build
-        //     effects how it is laid out, apparently.  In GraphViz, new virtual nodes
-        //     are added at the beginning of the list.  In dot-rs, they are necessarily
-        //     added at the end because we don't want the indexes to change.
-        //     So we want to pick the last virtual node...
-        let last_node_idx = self.node_count()-1;
         // let last_node = self.get_node(last_node_idx);
         // let start_node = if last_node.is_virtual() { last_node_idx } else {0};
 
         if self.node_count() != 0 {
+            // XXX This is kind of crazy.  The order in which the tree is build
+            //     effects how it is laid out, apparently.  In GraphViz, new virtual nodes
+            //     are added at the beginning of the list.  In dot-rs, they are necessarily
+            //     added at the end because we don't want the indexes to change.
+            //     So we want to pick the last virtual node...
+            let last_node_idx = self.node_count() - 1;
+
             self.set_tree_ranges(true, last_node_idx, None, 1);
         }
     }
@@ -84,7 +85,10 @@ impl Graph {
         } else {
             "None".to_string()
         };
-        println!("set_tree_ranges({}, {parent_edge_idx:?}, {min})\n    {par_str}", node.name);
+        println!(
+            "set_tree_ranges({}, {parent_edge_idx:?}, {min})\n    {par_str}",
+            node.name
+        );
 
         if !initializing {
             if let Some(tree_data) = node.spanning_tree() {
@@ -162,34 +166,53 @@ impl Graph {
 
         // Whether you are in the spanning tree or not, create as subtree
         // for all nodes.
-        self.print_nodes("BEFORE find_tight_subtree() in set_feasible_tree()");
-        for node_idx in 0..self.node_count() {
+        self.print_nodes("before find_tight_subtree() in set_feasible_tree()");
+
+        // We use node_idx_virtual_first() to mirror the order that GraphViz uses.
+        for node_idx in self.node_indexes_in_graphviz_order() {
             // Don't place this exclusion in a filter, as it can change from the preivous call.
             if !self.get_node(node_idx).has_sub_tree() {
                 let sub_tree = self.find_tight_subtree(node_idx);
                 min_heap.insert_unordered_item(sub_tree);
             }
         }
+        // for node_idx in 0..self.node_count() {
+        //     // Don't place this exclusion in a filter, as it can change from the preivous call.
+        //     if !self.get_node(node_idx).has_sub_tree() {
+        //         let sub_tree = self.find_tight_subtree(node_idx);
+        //         min_heap.insert_unordered_item(sub_tree);
+        //     }
+        // }
 
         min_heap.order_heap();
 
-        self.print_nodes(&format!("AFTER find_tight_subtree(): heap_size:{} in set_feasible_tree", min_heap.len()));
+        self.print_nodes(&format!(
+            "after find_tight_subtree(): heap_size:{} in set_feasible_tree",
+            min_heap.len()
+        ));
 
         while min_heap.len() > 1 {
             let sub_tree = min_heap.pop().expect("can't be empty");
-            println!("finding edge for: {:?} with heap of {}", sub_tree, min_heap.len());
+            println!(
+                "finding edge for: {:?} with heap of {}",
+                sub_tree,
+                min_heap.len()
+            );
             let edge_idx = self
                 .find_tightest_incident_edge(sub_tree)
                 .expect("cant find inter tree edge");
 
-            println!("Merging: {edge_idx}");
+            println!("Merging with edge: {edge_idx}");
             let modified_sub_tree_idx = self.merge_sub_trees(edge_idx);
             println!("Reording: {modified_sub_tree_idx}");
             min_heap.reorder_item(modified_sub_tree_idx);
             println!("reorder done");
         }
         self.init_cutvalues();
-        self.print_nodes(&format!("AFTER init_cut_vals() in set_feasible_tree:{}", min_heap.len()));
+        self.print_nodes(&format!(
+            "after init_cutvalues() in set_feasible_tree:{}",
+            min_heap.len()
+        ));
     }
 
     /// Given and edge, merge the two subtrees pointed to by each edge's nodes.
@@ -245,7 +268,7 @@ impl Graph {
 
         node.set_simplex_rank(Some(new_rank));
 
-        for (edge_idx, next_node_idx) in self.get_node_edges_and_adjacent_node(node_idx) {
+        for (edge_idx, next_node_idx) in self.get_node_edges_and_adjacent_node(node_idx, true) {
             let edge = self.get_edge(edge_idx);
 
             if edge.in_spanning_tree() && from_idx != Some(next_node_idx) {
@@ -318,7 +341,9 @@ impl Graph {
 
         println!("tigtest_incident_edge_search: {search_node_idx}");
         let search_sub_tree_root = self.find_node_sub_tree_root(search_node_idx);
-        for (edge_idx, next_node_idx) in self.get_node_edges_and_adjacent_node(search_node_idx) {
+        for (edge_idx, next_node_idx) in
+            self.get_node_edges_and_adjacent_node(search_node_idx, true)
+        {
             if self.get_edge(edge_idx).in_spanning_tree() {
                 // Already in spanning tree...continue the search
                 if Some(next_node_idx) == from_node_idx {
@@ -405,7 +430,8 @@ impl Graph {
         // set this node to be in the given sub_tree.
         self.get_node(node_idx).set_sub_tree(sub_tree.clone());
 
-        for (edge_idx, adjacent_node_idx) in self.get_node_edges_and_adjacent_node(node_idx) {
+        for (edge_idx, adjacent_node_idx) in self.get_node_edges_and_adjacent_node(node_idx, false)
+        {
             let edge = self.get_edge(edge_idx);
             // let adjacent_node = self.get_node(adjacent_node_idx);
 
@@ -499,10 +525,17 @@ impl Graph {
 
         if let Some(cur_rank) = node.simplex_rank() {
             let new_rank = cur_rank - delta;
-            println!("Reranking {} by {delta} from {cur_rank} to {new_rank}", node.name);
+            println!(
+                "Reranking {} by {delta} from {cur_rank} to {new_rank}",
+                node.name
+            );
             node.set_simplex_rank(Some(new_rank));
 
-            let children = self.non_parent_tree_nodes(node_idx).iter().map(|(node_idx, _)| self.get_node(*node_idx).name.clone()).collect::<Vec<String>>();
+            let children = self
+                .non_parent_tree_nodes(node_idx)
+                .iter()
+                .map(|(node_idx, _)| self.get_node(*node_idx).name.clone())
+                .collect::<Vec<String>>();
             println!("   {} reranking to: {:?}", node.name, children);
 
             for (node_idx, _) in self.non_parent_tree_nodes(node_idx) {
@@ -529,7 +562,7 @@ impl Graph {
     /// parent node of the given node from either in_edges or out_edges depending on disposition.
     ///
     /// Only returns non-ignored nodes.
-    /// 
+    ///
     /// TODO: Rewrite this to call: node_tree_edges(node_idx, disposition)
     fn directional_non_parent_tree_nodes(
         &self,
@@ -574,7 +607,11 @@ impl Graph {
     }
 
     /// Return all of a node's tree edges that are of the given disposition.
-    pub(super) fn node_tree_edges(&self, node_idx: usize, disposition: EdgeDisposition) -> Vec<&Edge> {
+    pub(super) fn node_tree_edges(
+        &self,
+        node_idx: usize,
+        disposition: EdgeDisposition,
+    ) -> Vec<&Edge> {
         let node = self.get_node(node_idx);
         let edges = match disposition {
             In => &node.in_edges,
@@ -594,7 +631,6 @@ impl Graph {
             })
             .collect()
     }
-
 }
 
 #[cfg(test)]

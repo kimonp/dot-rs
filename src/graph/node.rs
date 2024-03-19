@@ -2,7 +2,11 @@
 
 use std::{cell::RefCell, collections::HashSet, fmt::Display};
 
-use super::{edge::EdgeDisposition, network_simplex::sub_tree::SubTree};
+use super::{
+    edge::EdgeDisposition,
+    edge::EdgeDisposition::{In, Out},
+    network_simplex::sub_tree::SubTree,
+};
 use crate::graph::network_simplex::SimplexNodeTarget;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -21,7 +25,7 @@ impl Rect {
     pub fn new(min: Point, max: Point) -> Self {
         Rect { min, max }
     }
-    
+
     pub fn min(&self) -> Point {
         self.min
     }
@@ -29,7 +33,7 @@ impl Rect {
     pub fn max(&self) -> Point {
         self.max
     }
-    
+
     pub fn height(&self) -> i32 {
         println!("HEIGHT: {} vs {}", self.max.y(), self.min.y());
         self.max.y() - self.min.y()
@@ -38,12 +42,11 @@ impl Rect {
     pub fn width(&self) -> i32 {
         self.max.x() - self.min.x()
     }
-    
+
     /// Normalize a point to be placed inside of this Rect.
     pub fn normalize(&self, point: Point) -> Point {
         Point::new(point.x() - self.min().x(), point.y() - self.min().y())
     }
-
 }
 
 /// Separation of nodes horizontally in pixels, assuming 72 pixels per inch.
@@ -213,19 +216,19 @@ impl Node {
     pub fn coordinates(&self) -> Option<Point> {
         self.coordinates
     }
-    
+
     /// Remove edge_idx from either the in_edges or out_edges depending on disposition.
-    /// 
+    ///
     /// Return the position of the removed edge, or None if it could not be found.
     pub fn remove_edge(&mut self, edge_idx: usize, disposition: EdgeDisposition) -> Option<usize> {
         let mut edges_iter = match disposition {
-            EdgeDisposition::In => self.in_edges.iter_mut(),
-            EdgeDisposition::Out => self.in_edges.iter_mut(),
+            In => self.in_edges.iter_mut(),
+            Out => self.in_edges.iter_mut(),
         };
         if let Some(position) = edges_iter.position(|x| *x == edge_idx) {
             let edges = match disposition {
-                EdgeDisposition::In => &mut self.in_edges,
-                EdgeDisposition::Out => &mut self.out_edges,
+                In => &mut self.in_edges,
+                Out => &mut self.out_edges,
             };
 
             Some(edges.swap_remove(position))
@@ -356,8 +359,8 @@ impl Node {
     /// Add either an in our out edge to the node.
     pub(super) fn add_edge(&mut self, edge: usize, disposition: EdgeDisposition) {
         match disposition {
-            EdgeDisposition::In => &self.in_edges.push(edge),
-            EdgeDisposition::Out => &self.out_edges.push(edge),
+            In => &self.in_edges.push(edge),
+            Out => &self.out_edges.push(edge),
         };
     }
 
@@ -386,8 +389,8 @@ impl Node {
     /// Return the list of In our Out edges.
     pub(super) fn get_edges(&self, disposition: EdgeDisposition) -> &Vec<usize> {
         match disposition {
-            EdgeDisposition::In => &self.in_edges,
-            EdgeDisposition::Out => &self.out_edges,
+            In => &self.in_edges,
+            Out => &self.out_edges,
         }
     }
 
@@ -400,15 +403,21 @@ impl Node {
     /// the disposition (in our out) of each edge.
     pub(super) fn get_all_edges_with_disposition(
         &self,
+        out_first: bool
     ) -> impl Iterator<Item = (&usize, EdgeDisposition)> {
-        self.out_edges
+        let (first_edges, second_edges, first_dir, second_dir) = if out_first {
+            (&self.out_edges, &self.in_edges, Out, In)
+        } else {
+            (&self.in_edges, &self.out_edges, In, Out)
+        };
+
+        first_edges
             .iter()
-            .map(|edge_idx| (edge_idx, EdgeDisposition::Out))
-            .chain(
-                self.in_edges
-                    .iter()
-                    .map(|edge_idx| (edge_idx, EdgeDisposition::In)),
-            )
+            .map(move |edge_idx| (edge_idx, first_dir)).chain(
+            second_edges
+            .iter()
+            .map(move |edge_idx| (edge_idx, second_dir)))
+
     }
 
     /// Swap an edge from in_edges to out_edges or vice versa, depending on disposition.

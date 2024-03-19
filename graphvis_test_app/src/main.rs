@@ -69,13 +69,14 @@ fn dot_to_svg(graph: &str, custom_dot: bool) -> String {
     String::from_utf8(output.stdout).expect("Output of dot not UTF-8")
 }
 
-const DOT_EXAMPLES: [(&str, &str); 9] = [
+const DOT_EXAMPLES: [(&str, &str); 10] = [
     ("2 spread", "digraph {a -> c; b -> c;}"),
     ("symbiosis", "digraph {a -> b; b -> a;}"),
     ("flux capacitor", "digraph {a -> c; b -> c; c -> d}"),
     ("4 spread", "digraph {a -> b; a -> c; a -> d; a -> e;}"),
     ( "1-2-1", "digraph { a -> b; a -> c; b -> d; c -> d; }"),
     ( "simple scramble", "digraph { a -> b; a -> c; c -> d; b -> e; }"),
+    ( "reverse scramble", "digraph { a -> b; a -> c; b -> e; c -> d; }"),
     (
         "example 2.3",
         "digraph {
