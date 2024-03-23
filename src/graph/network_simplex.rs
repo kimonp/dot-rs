@@ -85,7 +85,10 @@ impl Graph {
     /// }
     ///
     pub(super) fn network_simplex_ranking(&mut self, target: SimplexNodeTarget) {
-        self.set_feasible_tree_for_simplex(target == SimplexNodeTarget::VerticalRank);
+        // TODO: Uncomment!!!
+        //if target == SimplexNodeTarget::VerticalRank {
+            self.set_feasible_tree_for_simplex(target == SimplexNodeTarget::VerticalRank);
+        //}
 
         let mut start_idx = 0;
         while let Some(neg_cut_edge_idx) = self.leave_edge_for_simplex(start_idx) {
@@ -726,7 +729,7 @@ impl Graph {
         let mut min_slack = i32::MAX;
         let mut replacement_edge_idx = None;
 
-        for (edge_idx, edge) in self.edges.iter().enumerate() {
+        for (edge_idx, edge) in self.not_tree_edge_iter() {
             if head_nodes.contains(&edge.src_node) && tail_nodes.contains(&edge.dst_node) {
                 let edge_slack = self.simplex_slack(edge_idx).unwrap_or_else(|| {
                     panic!(
@@ -736,9 +739,14 @@ impl Graph {
                 });
 
                 if edge_slack < min_slack {
+                    println!("   enter_edge(): lowest slack so far: {edge_slack} < {min_slack}: {}", self.edge_to_string(edge_idx));
                     replacement_edge_idx = Some((edge_idx, edge_slack));
                     min_slack = edge_slack;
+                } else {
+                    println!("   enter_edge(): rejected: {edge_slack} >= {min_slack}: {}", self.edge_to_string(edge_idx));
                 }
+            } else {
+                println!("   enter_edge(): rejected: wrong head and tail: {}", self.edge_to_string(edge_idx));
             }
         }
 
@@ -829,7 +837,7 @@ impl Graph {
 
         for (tree_edge_idx, tree_edge) in self.tree_edge_iter() {
             if tree_edge.cut_value == Some(0) {
-                println!("Looking at edge with cut of zero:");
+                print!("Looking at edge with cut of zero:");
                 self.print_edge(tree_edge_idx);
 
                 if let Some((replace_edge_idx, delta)) = self.enter_edge_for_simplex(tree_edge_idx)
@@ -861,7 +869,7 @@ impl Graph {
                         }
                     } else {
                         println!(
-                            "  balance_left_right(): skipping edge with delta <= 1: {}",
+                            "  balance_left_right(): skipping candidate replacement edge with slack <= 1: slack={delta}: {}",
                             self.edge_to_string(replace_edge_idx)
                         );
                     }
@@ -870,7 +878,7 @@ impl Graph {
                 }
             } else {
                 println!(
-                    "balance_left_right(): skipping edge with cut of zero: {}",
+                    "balance_left_right(): skipping candidate removal edge with cutval != Some(0): {}",
                     self.edge_to_string(tree_edge_idx)
                 );
             }

@@ -756,40 +756,10 @@ impl Graph {
     }
 
     /// Set the y coordinates of all nodes.
-    /// XXX START WORK HERE: we need to copy position.c set_y_coords
-    ///     Looks like we can skip a bunch of the code for different
-    ///     heights and clusters.
-    /// XXX Then review set_x_coords
+    /// 
+    /// TODO: this currently set's x and y coordinates, but the x coordinate
+    ///       will be overwritten later.  This should be cleaned up.
     fn set_y_coordinates(&mut self) {
-        // /* make the initial assignment of ycoords to leftmost nodes by ranks */
-        // maxht = 0;
-        // r = GD_maxrank(g);
-        // (ND_coord(rank[r].v[0])).y = rank[r].ht1;
-        // while (--r >= GD_minrank(g))
-        // {
-        //     d0 = rank[r + 1].pht2 + rank[r].pht1 + GD_ranksep(g); /* prim node sep */
-        //     d1 = rank[r + 1].ht2 + rank[r].ht1 + CL_OFFSET;       /* cluster sep */
-        //     delta = fmax(d0, d1);
-        //     if (rank[r].n > 0) /* this may reflect some problem */
-        //         (ND_coord(rank[r].v[0])).y = (ND_coord(rank[r + 1].v[0])).y + delta;
-        //         maxht = fmax(maxht, delta);
-
-        // let order = self.rank_orderings.as_ref().unwrap();
-        // let first_column = order.iter().rev()
-        //     .map(|(rank, nodes)| (*rank, nodes.borrow().first().copied()))
-        //     .collect::<Vec<(i32, Option<usize>)>>();
-
-        // for (rank, node_idx) in first_column {
-        //     if let Some(node_idx) = node_idx {
-        //         self.get_node_mut(node_idx).set_y_coordinate(0);
-        //     }
-        // }
-
-        // make the initial assignment of ycoords to leftmost nodes by ranks
-        // for (rank, nodes) in order.iter().rev() {
-
-        // }
-
         // We set the y coorinate in reverse rank to match what GraphViz does.
         let _num_ranks = self.num_ranks().unwrap();
         for (node_idx, node) in self.nodes.iter_mut().enumerate() {
@@ -804,8 +774,8 @@ impl Graph {
                 // XXX
                 // GraphViz code does this backwards, and later flips it back...
                 // but no need for us to do that foolishness.
-                ((_num_ranks as i32 - 1) - rank) * min_y + NODE_START_HEIGHT
-                // rank * min_y + NODE_START_HEIGHT
+                // ((_num_ranks as i32 - 1) - rank) * min_y + NODE_START_HEIGHT
+                rank * min_y + NODE_START_HEIGHT
             } else {
                 panic!("Node {node_idx}: rank not set");
             };
@@ -964,7 +934,7 @@ impl Graph {
                     .rank_to_positions(rank)
                     .expect("all rank have position");
 
-                for node_idx in rank_by_position {
+                for node_idx in rank_by_position.iter().rev().cloned() {
                     let new_rank: i32 = if let Some(prev_rank) = prev_rank {
                         prev_rank + node_sep as i32
                     } else {
@@ -1103,7 +1073,14 @@ impl Graph {
         self.edges
             .iter()
             .enumerate()
-            .filter(|(_, edge)| edge.in_spanning_tree())
+            .filter(|(_, edge)| !edge.ignored && edge.in_spanning_tree())
+    }
+
+    fn not_tree_edge_iter(&self) -> impl Iterator<Item = (usize, &Edge)> {
+        self.edges
+            .iter()
+            .enumerate()
+            .filter(|(_, edge)| !edge.ignored && !edge.in_spanning_tree())
     }
 
     /// An iterator that returns only nodes that are "real" (not virtual nodes added
@@ -1509,6 +1486,128 @@ pub mod tests {
         println!("{graph}");
     }
 
+    /// This test sets a feasible_tree to match what GraphViz chooses to see if
+    /// the choice of feasible tree is responsible for how it is graphed (and it appears to be)
+    /// 
+    /// Ignored because for this to work, the feasible tree must not be reset during the XCoordinate
+    /// run of network simplex.
+    #[ignore]
+    #[test]
+    fn test_advanced_cutvalues() {
+        let mut graph = Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }");
+        graph.rank_nodes_vertically();
+        graph.set_horizontal_ordering();
+        graph.set_y_coordinates();
+
+        let mut aux_graph = graph.create_positioning_aux_graph();
+        aux_graph.make_asyclic();
+        let v7_idx = 7;
+        let v6_idx = 6;
+        let v5_idx = 5;
+        let v4_idx = 4;
+        let a_idx = 0;
+        let b_idx = 1;
+        let c_idx = 2;
+        let d_idx = 3;
+
+        aux_graph
+            .get_node_mut(d_idx)
+            .set_tree_data(Some(v7_idx), None, None);
+        aux_graph
+            .get_node_mut(v6_idx)
+            .set_tree_data(Some(d_idx), None, None);
+        aux_graph
+            .get_node_mut(b_idx)
+            .set_tree_data(Some(v6_idx), None, None);
+        aux_graph
+            .get_node_mut(c_idx)
+            .set_tree_data(Some(b_idx), None, None);
+        aux_graph
+            .get_node_mut(v4_idx)
+            .set_tree_data(Some(b_idx), None, None);
+        aux_graph
+            .get_node_mut(a_idx)
+            .set_tree_data(Some(v4_idx), None, None);
+        aux_graph
+            .get_node_mut(v5_idx)
+            .set_tree_data(Some(a_idx), None, None);
+
+        for (src_name, dst_name) in [
+            ("v7", "d"),
+            ("v6", "d"),
+            ("v6", "b"),
+            ("b", "c"),
+            ("v4", "b"),
+            ("v4", "a"),
+            ("v5", "a"),
+        ] {
+            let (_, edge_idx) = aux_graph.get_named_edge(src_name, dst_name);
+            aux_graph.get_edge_mut(edge_idx).set_in_spanning_tree(true);
+        }
+        println!("--------START HERE------");
+        println!("{aux_graph}");
+
+        aux_graph.init_cutvalues();
+        aux_graph.network_simplex_ranking(XCoordinate);
+
+        println!("AUX: {aux_graph}");
+        graph.set_x_coordinates_from_aux(&aux_graph);
+        println!("GRAPH{graph}");
+
+        let svg = crate::svg::SVG::new(graph, false);
+        svg.write_to_file("foo");
+    }
+
+    /// This test sets a feasible_tree to match what GraphViz chooses to see if
+    /// the choice of feasible tree is responsible for how it is graphed (and it appears to be)
+    /// 
+    /// Ignored because for this to work, the feasible tree must not be reset during the XCoordinate
+    /// run of network simplex.
+    #[ignore]
+    #[test]
+    fn test_cutvalues_b_and_c_to_a() {
+        let mut graph = Graph::from("digraph { b -> a; c -> a; }");
+        graph.rank_nodes_vertically();
+        graph.set_horizontal_ordering();
+        graph.set_y_coordinates();
+
+        let mut aux_graph = graph.create_positioning_aux_graph();
+        aux_graph.make_asyclic();
+        let v4_idx = 4;
+        let v3_idx = 3;
+        let b_idx = 0;
+        let a_idx = 1;
+        let c_idx = 2;
+
+        for (child_idx, parent_idx) in [(a_idx, v4_idx), (v3_idx, a_idx), (v3_idx, b_idx), (b_idx, c_idx)] {
+            aux_graph
+                .get_node_mut(child_idx)
+                .set_tree_data(Some(parent_idx), None, None);
+        }
+
+        for (src_name, dst_name) in [
+            ("v4", "a"),
+            ("v3", "a"),
+            ("v3", "b"),
+            ("b", "c"),
+        ] {
+            let (_, edge_idx) = aux_graph.get_named_edge(src_name, dst_name);
+            aux_graph.get_edge_mut(edge_idx).set_in_spanning_tree(true);
+        }
+        aux_graph.init_cutvalues();
+        println!("--------START HERE------");
+        println!("{aux_graph}");
+
+        aux_graph.network_simplex_ranking(XCoordinate);
+
+        println!("AUX: {aux_graph}");
+        graph.set_x_coordinates_from_aux(&aux_graph);
+        println!("GRAPH: {graph}");
+
+        let svg = crate::svg::SVG::new(graph, false);
+        svg.write_to_file("foo");
+    }
+
     #[test]
     fn test_merge_edges() {
         let mut graph = Graph::new();
@@ -1643,7 +1742,9 @@ pub mod tests {
 
     #[rstest(
         graph,
-        case::a_and_b_to_c(Graph::from("digraph { a -> c; b -> c; }")),
+        case::a_to_b_and_c(Graph::from("digraph { a -> b; a -> c; }")),
+        case::b_and_c_to_a(Graph::from("digraph { b -> a; c -> a; }")),
+        case::spread_2(Graph::from("digraph { a -> b; a -> c; }")),
         case::a_to_b_to_a(Graph::from("digraph { a -> b; b -> a; }")),
         case::flux_capacitor(Graph::from("digraph {a -> c; b -> c; c -> d;}")),
         case::back_and_forth(Graph::from("digraph { a -> c; b -> a; }")),

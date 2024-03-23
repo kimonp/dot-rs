@@ -176,13 +176,6 @@ impl Graph {
                 min_heap.insert_unordered_item(sub_tree);
             }
         }
-        // for node_idx in 0..self.node_count() {
-        //     // Don't place this exclusion in a filter, as it can change from the preivous call.
-        //     if !self.get_node(node_idx).has_sub_tree() {
-        //         let sub_tree = self.find_tight_subtree(node_idx);
-        //         min_heap.insert_unordered_item(sub_tree);
-        //     }
-        // }
 
         min_heap.order_heap();
 
@@ -194,7 +187,7 @@ impl Graph {
         while min_heap.len() > 1 {
             let sub_tree = min_heap.pop().expect("can't be empty");
             println!(
-                "finding edge for: {:?} with heap of {}",
+                "   finding edge for: {:?} with heap of {}",
                 sub_tree,
                 min_heap.len()
             );
@@ -202,11 +195,11 @@ impl Graph {
                 .find_tightest_incident_edge(sub_tree)
                 .expect("cant find inter tree edge");
 
-            println!("Merging with edge: {edge_idx}");
+            println!("   Merging with edge: {edge_idx}");
             let modified_sub_tree_idx = self.merge_sub_trees(edge_idx);
-            println!("Reording: {modified_sub_tree_idx}");
+            println!("   Reording: {modified_sub_tree_idx}");
             min_heap.reorder_item(modified_sub_tree_idx);
-            println!("reorder done");
+            println!("   reorder done");
         }
         self.init_cutvalues();
         self.print_nodes(&format!(
@@ -406,7 +399,8 @@ impl Graph {
     fn find_tight_subtree(&self, node_idx: usize) -> SubTree {
         let tree = SubTree::new(node_idx);
 
-        println!("find_tight_subtree() for node: {node_idx} for {tree}");
+        println!("find_tight_subtree() for node: {}", self.node_to_string(node_idx));
+
         // Update the tree size to the combined size of all the nodes we found.
         tree.set_size(self.tight_subtree_search(node_idx, tree.clone()));
 
@@ -425,7 +419,7 @@ impl Graph {
     fn tight_subtree_search(&self, node_idx: usize, sub_tree: SubTree) -> u32 {
         let mut subtree_size = 1;
 
-        println!("    tight_subtree_search() for {}", self.get_node(node_idx));
+        println!("    tight_subtree_search() for {}", self.node_to_string(node_idx));
 
         // set this node to be in the given sub_tree.
         self.get_node(node_idx).set_sub_tree(sub_tree.clone());
@@ -643,7 +637,7 @@ mod test {
         let a_idx = graph.name_to_node_idx("a").unwrap();
         let b_idx = graph.name_to_node_idx("b").unwrap();
         let c_idx = graph.name_to_node_idx("c").unwrap();
-        let d_idx = graph.name_to_node_idx("d").unwrap();
+        let _d_idx = graph.name_to_node_idx("d").unwrap();
 
         graph.make_asyclic();
         graph.merge_edges();
