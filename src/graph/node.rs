@@ -105,8 +105,10 @@ impl NodeType {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct SpanningTreeData {
     edge_idx_to_parent: Option<usize>,
-    sub_tree_idx_min: Option<usize>,
-    sub_tree_idx_max: Option<usize>,
+    // minimum distance to the root node of all nodes under this node.
+    tree_dist_min: Option<usize>,
+    // maximum distance to the root node of all nodes under this node.
+    tree_dist_max: Option<usize>,
     /// Reference to the subtree that this node is a member of.
     sub_tree: Option<SubTree>,
 }
@@ -118,11 +120,11 @@ impl Display for SpanningTreeData {
             .map(|p| p.to_string())
             .unwrap_or("-".to_string());
         let min = self
-            .sub_tree_idx_min
+            .tree_dist_min
             .map(|m| m.to_string())
             .unwrap_or("-".to_string());
         let max = self
-            .sub_tree_idx_max
+            .tree_dist_max
             .map(|m| m.to_string())
             .unwrap_or("-".to_string());
 
@@ -139,8 +141,8 @@ impl SpanningTreeData {
     ) -> SpanningTreeData {
         SpanningTreeData {
             edge_idx_to_parent,
-            sub_tree_idx_min,
-            sub_tree_idx_max,
+            tree_dist_min: sub_tree_idx_min,
+            tree_dist_max: sub_tree_idx_max,
             sub_tree: None,
         }
     }
@@ -152,14 +154,14 @@ impl SpanningTreeData {
         self.edge_idx_to_parent
     }
 
-    /// The minimal tree index of all nodes for which this node is an ancestor.
-    pub fn sub_tree_idx_min(&self) -> Option<usize> {
-        self.sub_tree_idx_min
+    /// The minimal distance to the root of all nodes for which this node is an ancestor.
+    pub fn tree_dist_min(&self) -> Option<usize> {
+        self.tree_dist_min
     }
 
-    /// The maximum tree index of all nodes for which this node is an ancestor.
-    pub fn sub_tree_idx_max(&self) -> Option<usize> {
-        self.sub_tree_idx_max
+    /// The maximum distance to the root of all nodes for which this node is an ancestor.
+    pub fn tree_dist_max(&self) -> Option<usize> {
+        self.tree_dist_max
     }
 }
 
@@ -267,19 +269,32 @@ impl Node {
         }
     }
 
-    pub(super) fn sub_tree_idx_max(&self) -> Option<usize> {
+    pub(super) fn tree_dist_max(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
-            tree_data.sub_tree_idx_max()
+            tree_data.tree_dist_max()
         } else {
             None
         }
     }
 
-    pub(super) fn sub_tree_idx_min(&self) -> Option<usize> {
+    pub(super) fn tree_dist_min(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
-            tree_data.sub_tree_idx_min()
+            tree_data.tree_dist_min()
         } else {
             None
+        }
+    }
+
+    /// Return a internally mutable subtree if one is set for this node.
+    pub(super) fn set_tree_dist_min(&self, min: Option<usize>) {
+        // if !self.in_spanning_tree() {
+        //     self.set_empty_tree_node();
+        // }
+
+        if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
+            data.tree_dist_min = min
+        } else {
+            panic!("trying to set tree_dist_min but node not in spanning tree");
         }
     }
 
@@ -303,8 +318,8 @@ impl Node {
     ) {
         *self.spanning_tree.borrow_mut() = Some(SpanningTreeData {
             edge_idx_to_parent: parent,
-            sub_tree_idx_min: min,
-            sub_tree_idx_max: max,
+            tree_dist_min: min,
+            tree_dist_max: max,
             sub_tree: self.sub_tree(),
         });
     }
@@ -403,7 +418,7 @@ impl Node {
     /// the disposition (in our out) of each edge.
     pub(super) fn get_all_edges_with_disposition(
         &self,
-        out_first: bool
+        out_first: bool,
     ) -> impl Iterator<Item = (&usize, EdgeDisposition)> {
         let (first_edges, second_edges, first_dir, second_dir) = if out_first {
             (&self.out_edges, &self.in_edges, Out, In)
@@ -413,11 +428,12 @@ impl Node {
 
         first_edges
             .iter()
-            .map(move |edge_idx| (edge_idx, first_dir)).chain(
-            second_edges
-            .iter()
-            .map(move |edge_idx| (edge_idx, second_dir)))
-
+            .map(move |edge_idx| (edge_idx, first_dir))
+            .chain(
+                second_edges
+                    .iter()
+                    .map(move |edge_idx| (edge_idx, second_dir)),
+            )
     }
 
     /// Swap an edge from in_edges to out_edges or vice versa, depending on disposition.
@@ -429,6 +445,7 @@ impl Node {
                 panic!("Could not find edge {disposition:?}:{edge_idx} to reverse in src node.");
             };
 
+        println!("SWAPPING EDGE for node {}: {edge_idx}", self.name());
         match disposition {
             EdgeDisposition::In => {
                 self.in_edges.remove(local_idx);

@@ -93,16 +93,16 @@ impl Graph {
         if !initializing {
             if let Some(tree_data) = node.spanning_tree() {
                 if tree_data.edge_idx_to_parent() == parent_edge_idx
-                    && tree_data.sub_tree_idx_min() == Some(min)
+                    && tree_data.tree_dist_min() == Some(min)
                 {
-                    return tree_data.sub_tree_idx_max().unwrap_or(0) + 1;
+                    return tree_data.tree_dist_max().unwrap_or(0) + 1;
                 }
             } else {
                 panic!("Setting tree ranges on a node that is not in the tree!");
             }
         }
 
-        let cur_max = node.sub_tree_idx_max();
+        let cur_max = node.tree_dist_max();
         self.get_node_mut(node_idx)
             .set_tree_data(parent_edge_idx, Some(min), cur_max);
 
@@ -118,6 +118,51 @@ impl Graph {
             .set_tree_data(parent_edge_idx, Some(min), Some(max));
 
         max + 1
+    }
+
+    ///
+    /// GraphViz comment for invalidate_path():
+    ///   Invalidate DFS attributes by walking up the tree from to_node till lca
+    ///   (inclusively). Called when updating tree to improve pruning in dfs_range().
+    ///   Assigns ND_low(n) = -1 for the affected nodes.
+    ///
+    pub(super) fn invalidate_path(&self, lca_node_idx: usize, to_node_idx: usize) {
+        let mut to_node_idx = to_node_idx;
+        
+        println!("Invalidate path for node {lca_node_idx}: {}", self.node_to_string(lca_node_idx));
+        println!("  to note {to_node_idx}: {}", self.node_to_string(to_node_idx));
+        loop {
+            let to_node = self.get_node(to_node_idx);
+
+            if to_node.tree_dist_min().is_none() {
+                break;
+            }
+
+            to_node.set_tree_dist_min(None);
+
+            if let Some(parent_edge_idx) = to_node.spanning_tree_parent_edge_idx() {
+                let lca_node = self.get_node(lca_node_idx);
+
+                if to_node.tree_dist_max() >= lca_node.tree_dist_max() {
+                    if to_node_idx != lca_node_idx {
+                        panic!("invalidate_path: skipped over LCA");
+                    }
+                    break;
+                }
+
+                let parent_edge = self.get_edge(parent_edge_idx);
+                let parent_src = self.get_node(parent_edge.src_node);
+                let parent_dst = self.get_node(parent_edge.dst_node);
+
+                to_node_idx = if parent_src.tree_dist_max() > parent_dst.tree_dist_max() {
+                    parent_edge.src_node
+                } else {
+                    parent_edge.dst_node
+                };
+            } else {
+                break;
+            }
+        }
     }
 
     /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
@@ -399,7 +444,10 @@ impl Graph {
     fn find_tight_subtree(&self, node_idx: usize) -> SubTree {
         let tree = SubTree::new(node_idx);
 
-        println!("find_tight_subtree() for node: {}", self.node_to_string(node_idx));
+        println!(
+            "find_tight_subtree() for node: {}",
+            self.node_to_string(node_idx)
+        );
 
         // Update the tree size to the combined size of all the nodes we found.
         tree.set_size(self.tight_subtree_search(node_idx, tree.clone()));
@@ -419,7 +467,10 @@ impl Graph {
     fn tight_subtree_search(&self, node_idx: usize, sub_tree: SubTree) -> u32 {
         let mut subtree_size = 1;
 
-        println!("    tight_subtree_search() for {}", self.node_to_string(node_idx));
+        println!(
+            "    tight_subtree_search() for {}",
+            self.node_to_string(node_idx)
+        );
 
         // set this node to be in the given sub_tree.
         self.get_node(node_idx).set_sub_tree(sub_tree.clone());

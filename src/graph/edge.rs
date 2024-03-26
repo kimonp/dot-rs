@@ -17,6 +17,15 @@ pub enum EdgeDisposition {
     Out,
 }
 
+impl EdgeDisposition {
+    pub fn opposite(&self) -> Self {
+        match self {
+            EdgeDisposition::In => EdgeDisposition::Out,
+            EdgeDisposition::Out => EdgeDisposition::In,
+        }
+    }
+}
+
 impl Display for EdgeDisposition {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         let disp = match self {
