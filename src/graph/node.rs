@@ -285,16 +285,19 @@ impl Node {
         }
     }
 
-    /// Return a internally mutable subtree if one is set for this node.
     pub(super) fn set_tree_dist_min(&self, min: Option<usize>) {
-        // if !self.in_spanning_tree() {
-        //     self.set_empty_tree_node();
-        // }
-
         if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
             data.tree_dist_min = min
         } else {
             panic!("trying to set tree_dist_min but node not in spanning tree");
+        }
+    }
+
+    pub(super) fn set_tree_dist_max(&self, max: Option<usize>) {
+        if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
+            data.tree_dist_max = max
+        } else {
+            panic!("trying to set tree_dist_max but node not in spanning tree");
         }
     }
 

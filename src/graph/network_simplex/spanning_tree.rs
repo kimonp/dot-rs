@@ -62,16 +62,16 @@ impl Graph {
             //     So we want to pick the last virtual node...
             let last_node_idx = self.node_count() - 1;
 
-            self.set_tree_ranges(true, last_node_idx, None, 1);
+            self.set_tree_parents_and_ranges(true, last_node_idx, None, 1);
         }
     }
 
     /// In the graphviz 9.0 code, there are two functions:
     /// * dfs_range_init()
     /// * dfs_range()
-    /// They are identical code, expect for the exit condition.  set_tree_ranges()
+    /// They are identical code, expect for the exit condition.  set_tree_parents_and_ranges()
     /// does either depending on the "initializing flag"
-    pub(super) fn set_tree_ranges(
+    pub(super) fn set_tree_parents_and_ranges(
         &mut self,
         initializing: bool,
         node_idx: usize,
@@ -86,7 +86,7 @@ impl Graph {
             "None".to_string()
         };
         println!(
-            "set_tree_ranges({}, {parent_edge_idx:?}, {min})\n    {par_str}",
+            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min})\n  parent_edge:{par_str}",
             node.name
         );
 
@@ -111,11 +111,15 @@ impl Graph {
         // println!("Setting range for: {node_idx}: {:?}", self.non_parent_tree_nodes(node_idx));
 
         for (node_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
-            max = max.max(self.set_tree_ranges(initializing, node_idx, Some(edge_idx), max));
+            max = max.max(self.set_tree_parents_and_ranges(
+                initializing,
+                node_idx,
+                Some(edge_idx),
+                max,
+            ));
         }
 
-        self.get_node_mut(node_idx)
-            .set_tree_data(parent_edge_idx, Some(min), Some(max));
+        self.get_node_mut(node_idx).set_tree_dist_max(Some(max));
 
         max + 1
     }
@@ -128,9 +132,15 @@ impl Graph {
     ///
     pub(super) fn invalidate_path(&self, lca_node_idx: usize, to_node_idx: usize) {
         let mut to_node_idx = to_node_idx;
-        
-        println!("Invalidate path for node {lca_node_idx}: {}", self.node_to_string(lca_node_idx));
-        println!("  to note {to_node_idx}: {}", self.node_to_string(to_node_idx));
+
+        println!(
+            "Invalidate path for node {lca_node_idx}: {}",
+            self.node_to_string(lca_node_idx)
+        );
+        println!(
+            "  to note {to_node_idx}: {}",
+            self.node_to_string(to_node_idx)
+        );
         loop {
             let to_node = self.get_node(to_node_idx);
 
@@ -246,9 +256,9 @@ impl Graph {
             min_heap.reorder_item(modified_sub_tree_idx);
             println!("   reorder done");
         }
-        self.init_cutvalues();
+        self.init_spanning_tree_and_cutvalues();
         self.print_nodes(&format!(
-            "after init_cutvalues() in set_feasible_tree:{}",
+            "after init_spanning_tree_and_cutvalues() in set_feasible_tree:{}",
             min_heap.len()
         ));
     }

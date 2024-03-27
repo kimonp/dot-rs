@@ -56,7 +56,7 @@ pub struct Graph {
     /// First node_idx in the graph that is virutal.  All subsequent nodes must be virtual too.
     first_virtual_idx: Option<usize>,
     #[cfg(test)]
-    skip_tree_init: bool
+    skip_tree_init: bool,
 }
 
 impl Default for Graph {
@@ -430,6 +430,13 @@ impl Graph {
         self.nodes.len()
     }
 
+    /// Set the rank_orderings field of graph and set the horizontal position of each node.
+    ///
+    /// TODO: Note that the horizontal position of each node is not used.  It is taken from the
+    ///       rank_orderings again later.  This should be cleaned up once debugging is complete.
+    ///
+    /// GraphViz: essentially the fuction: dot_mincross(), though this does more.
+    ///
     /// Documentation from paper: page 14
     ///
     /// * TODO: In an actual implementation, one might prefer an adaptive strategy that
@@ -484,7 +491,7 @@ impl Graph {
         );
 
         self.set_node_positions(&best);
-        self.print_nodes("After set_horizontal_ordering");
+        self.print_nodes("After set_horizontal_ordering (dot_min_cross())");
 
         self.rank_orderings = Some(best);
 
@@ -587,15 +594,19 @@ impl Graph {
     ///     as the node_idx.
     ///
     /// * Start with the nodes in the minimal rank (presumably rank 0)
-    ///  * Do a depth first seach by following edges that point to nodes that
+    ///  * Do a breadth first seach by following edges that point to nodes that
     ///    have not yet been assigned an ordering
-    ///    * When we find a node that has no edges that have not been assigned
+    ///    * Pull a node of of the queue.  If it has not yet been assigned:
     ///      * Add it to the rank_order BTreeMap under it's given rank
     ///      * Mark it assigned
-    ///    * When we find a node that has edges that have not yet been assigned
-    ///      * push the found node back onto the front of the queue.
-    ///      * push the all the unassinged nodes the node's edges point to on the front of the queue
+    ///      * push the all the unassinged nodes the node's edges point to on the back of the queue
     /// * Continue until the queue in empty and return the rank order.
+    ///
+    /// NOTE: I initially implemented this as a depth first search.  But a depth first search
+    ///       sometimes reverses the initial ranking implied by the user's input string.
+    ///       Thus coult cause incorrent horizontal coordinates in the assign coordinate phase.
+    ///       I am unclear what causes this side effect, but switching to a breadth first search
+    ///       resolved it.  Hopefully I can figure out why!
     ///
     /// Documentation from paper: page 14
     /// init_order initially orders the nodes in each rank.
@@ -627,16 +638,14 @@ impl Graph {
                 })
                 .collect::<Vec<usize>>();
 
-            if unassigned_dst_nodes.is_empty() {
-                if let Some(rank) = node.vertical_rank {
-                    assigned.insert(node_idx);
-                    rank_order.add_node_idx_to_rank(rank, node_idx);
-                }
-            } else {
-                dfs_queue.push_front(node_idx);
-                for node_idx in unassigned_dst_nodes {
-                    dfs_queue.push_front(node_idx);
-                }
+            if assigned.get(&node_idx).is_none() {
+                let rank = node.vertical_rank.expect("All nodes must have a vertical rank");
+                rank_order.add_node_idx_to_rank(rank, node_idx);
+                assigned.insert(node_idx);
+            }
+
+            for node_idx in unassigned_dst_nodes {
+                dfs_queue.push_back(node_idx);
             }
         }
         rank_order
@@ -760,7 +769,7 @@ impl Graph {
     }
 
     /// Set the y coordinates of all nodes.
-    /// 
+    ///
     /// TODO: this currently set's x and y coordinates, but the x coordinate
     ///       will be overwritten later.  This should be cleaned up.
     fn set_y_coordinates(&mut self) {
@@ -938,7 +947,7 @@ impl Graph {
                     .rank_to_positions(rank)
                     .expect("all rank have position");
 
-                for node_idx in rank_by_position.iter().rev().cloned() {
+                for node_idx in rank_by_position.iter().cloned() {
                     let new_rank: i32 = if let Some(prev_rank) = prev_rank {
                         prev_rank + node_sep as i32
                     } else {
@@ -1492,7 +1501,7 @@ pub mod tests {
 
     /// This test sets a feasible_tree to match what GraphViz chooses to see if
     /// the choice of feasible tree is responsible for how it is graphed (and it appears to be)
-    /// 
+    ///
     /// Ignored because for this to work, the feasible tree must not be reset during the XCoordinate
     /// run of network simplex.
     #[ignore]
@@ -1553,7 +1562,7 @@ pub mod tests {
         println!("--------START HERE------");
         println!("{aux_graph}");
 
-        aux_graph.init_cutvalues();
+        aux_graph.init_spanning_tree_and_cutvalues();
         aux_graph.network_simplex_ranking(XCoordinate);
 
         println!("AUX: {aux_graph}");
@@ -1566,7 +1575,7 @@ pub mod tests {
 
     /// This test sets a feasible_tree to match what GraphViz chooses to see if
     /// the choice of feasible tree is responsible for how it is graphed (and it appears to be)
-    /// 
+    ///
     /// Ignored because for this to work, the feasible tree must not be reset during the XCoordinate
     /// run of network simplex.
     #[ignore]
@@ -1587,22 +1596,22 @@ pub mod tests {
         let a_idx = 1;
         let c_idx = 2;
 
-        for (child_idx, parent_idx) in [(a_idx, v4_idx), (v3_idx, a_idx), (v3_idx, b_idx), (b_idx, c_idx)] {
+        for (child_idx, parent_idx) in [
+            (a_idx, v4_idx),
+            (v3_idx, a_idx),
+            (v3_idx, b_idx),
+            (b_idx, c_idx),
+        ] {
             aux_graph
                 .get_node_mut(child_idx)
                 .set_tree_data(Some(parent_idx), None, None);
         }
 
-        for (src_name, dst_name) in [
-            ("v4", "a"),
-            ("v3", "a"),
-            ("v3", "b"),
-            ("b", "c"),
-        ] {
+        for (src_name, dst_name) in [("v4", "a"), ("v3", "a"), ("v3", "b"), ("b", "c")] {
             let (_, edge_idx) = aux_graph.get_named_edge(src_name, dst_name);
             aux_graph.get_edge_mut(edge_idx).set_in_spanning_tree(true);
         }
-        aux_graph.init_cutvalues();
+        aux_graph.init_spanning_tree_and_cutvalues();
         println!("--------START HERE------");
         println!("{aux_graph}");
 
@@ -1734,7 +1743,7 @@ pub mod tests {
         use crate::graph::edge::MIN_EDGE_LENGTH;
 
         let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a();
-        graph.init_cutvalues();
+        graph.init_spanning_tree_and_cutvalues();
         let order = graph.get_initial_horizontal_orderings();
 
         println!("{graph}");
@@ -1777,7 +1786,7 @@ pub mod tests {
                                      }"
         )),
         case::paper_2_3(Graph::example_graph_from_paper_2_3()),
-        // case::paper_extended_2_3(Graph::example_graph_from_paper_2_3_extended()),
+        case::paper_extended_2_3(Graph::example_graph_from_paper_2_3_extended()),
         case::simple_failing_test(Graph::from(
             "digraph {
                 a -> b; a -> e; a -> f;

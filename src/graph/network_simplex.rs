@@ -169,7 +169,7 @@ impl Graph {
             self.get_node(sel_dst_node_idx).name,
             self.get_node(lca_idx).name
         );
-        self.set_tree_ranges(false, lca_idx, lca_parent_edge_idx, lca_min);
+        self.set_tree_parents_and_ranges(false, lca_idx, lca_parent_edge_idx, lca_min);
     }
 
     /// Adjust cutvalues by the given amount from node_idx1 up to the least commmon ancestor of nodes node_idx1 and node_idx2,
@@ -348,7 +348,7 @@ impl Graph {
     ///   node was reached (see ﬁgure 2-5).
     ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
     ///     and thus whether a non-tree edge crosses between the two components.
-    pub(super) fn init_cutvalues(&mut self) {
+    pub(super) fn init_spanning_tree_and_cutvalues(&mut self) {
         // init_spanning_tree() is here for now because it mirrors the GraphViz code calling dfs_range_init()
         // of which init_spanning_tree() is the equivalent.
         //
@@ -669,49 +669,6 @@ impl Graph {
         }
     }
 
-    // pub(super) fn init_simplex_rank_old(&mut self) {
-    //     let mut nodes_to_rank = Vec::new();
-    //     let mut scanned_edges = HashSet::new();
-
-    //     // Initialize the queue with all nodes with no incoming edges (since no edges
-    //     // are scanned yet)
-    //     for (index, node) in self.nodes.iter_mut().enumerate() {
-    //         node.set_simplex_rank(None);
-    //         node.set_tree_node(false);
-
-    //         if node.no_in_edges() {
-    //             nodes_to_rank.push(index);
-    //         }
-    //     }
-
-    //     let mut cur_rank = 0;
-    //     while !nodes_to_rank.is_empty() {
-    //         let mut next_nodes_to_rank = Vec::new();
-    //         while let Some(node_idx) = nodes_to_rank.pop() {
-    //             let node = self.get_node_mut(node_idx);
-
-    //             if node.simplex_rank.is_none() {
-    //                 node.set_simplex_rank(Some(cur_rank));
-
-    //                 for edge_idx in node.out_edges.clone() {
-    //                     scanned_edges.insert(edge_idx);
-
-    //                     let edge = self.get_edge(edge_idx);
-    //                     let dst_node = self.get_node(edge.dst_node);
-    //                     if dst_node.no_unscanned_in_edges(&scanned_edges) {
-    //                         next_nodes_to_rank.push(edge.dst_node);
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         cur_rank += 1;
-    //         next_nodes_to_rank
-    //             .iter()
-    //             .for_each(|idx| nodes_to_rank.push(*idx));
-    //     }
-    // }
-
     /// If any edge has a negative cut value, return the first one found starting with start_idx.
     /// Otherwise, return None.
     ///
@@ -741,54 +698,6 @@ impl Graph {
         }
 
         None
-    }
-
-    /// Given a tree edge, return the non-tree edge with the lowest remaining cut-value.
-    ///
-    /// XXX: This can be updated to use GraphViz like code, which is much more effecient, but uglier.
-    ///
-    /// Documentation from paper:
-    /// * enter_edge ﬁnds a non-tree edge to replace e.
-    ///   * This is done by breaking the edge e, which divides the tree into a head and tail component.
-    ///   * All edges going from the head component to the tail are considered, with an edge of minimum slack being chosen.
-    ///   * This is necessary to maintain feasibility.
-    fn enter_edge_for_simplex_old(&self, tree_edge_idx: usize) -> Option<(usize, i32)> {
-        let (head_nodes, tail_nodes) = self.get_components(tree_edge_idx);
-
-        let mut min_slack = i32::MAX;
-        let mut replacement_edge_idx = None;
-
-        for (edge_idx, edge) in self.not_tree_edge_iter() {
-            if head_nodes.contains(&edge.src_node) && tail_nodes.contains(&edge.dst_node) {
-                let edge_slack = self.simplex_slack(edge_idx).unwrap_or_else(|| {
-                    panic!(
-                        "Can't calculate slack for edge {tree_edge_idx} between {} and {}",
-                        edge.src_node, edge.dst_node
-                    )
-                });
-
-                if edge_slack < min_slack {
-                    println!(
-                        "   enter_edge(): lowest slack so far: {edge_slack} < {min_slack}: {}",
-                        self.edge_to_string(edge_idx)
-                    );
-                    replacement_edge_idx = Some((edge_idx, edge_slack));
-                    min_slack = edge_slack;
-                } else {
-                    println!(
-                        "   enter_edge(): rejected: {edge_slack} >= {min_slack}: {}",
-                        self.edge_to_string(edge_idx)
-                    );
-                }
-            } else {
-                println!(
-                    "   enter_edge(): rejected: wrong head and tail: {}",
-                    self.edge_to_string(edge_idx)
-                );
-            }
-        }
-
-        replacement_edge_idx
     }
 
     /// Given a tree edge, return the non-tree edge with the lowest remaining cut-value.
@@ -823,7 +732,10 @@ impl Graph {
             }
         };
 
-        println!("Going to select: {disposition}: search_node {min}-{max}: {}", self.node_to_string(search_node_idx));
+        println!(
+            "Going to select: {disposition}: search_node {min}-{max}: {}",
+            self.node_to_string(search_node_idx)
+        );
 
         self.select_edge_for_simplex(disposition, search_node_idx, min, max, None)
             .map(|selected_edge| {
@@ -1239,7 +1151,7 @@ mod tests {
     fn test_init_cut_values_2_3_a() {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a();
 
-        graph.init_cutvalues();
+        graph.init_spanning_tree_and_cutvalues();
         graph.assert_expected_cutvals(expected_cutvals);
     }
 
@@ -1247,7 +1159,7 @@ mod tests {
     fn setup_init_cut_values_2_3_b() {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_b();
 
-        graph.init_cutvalues();
+        graph.init_spanning_tree_and_cutvalues();
         graph.assert_expected_cutvals(expected_cutvals);
     }
 
@@ -1255,14 +1167,14 @@ mod tests {
     fn setup_init_cut_values_2_3_extended() {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a_extended();
 
-        graph.init_cutvalues();
+        graph.init_spanning_tree_and_cutvalues();
         graph.assert_expected_cutvals(expected_cutvals);
     }
 
     #[test]
     fn test_leave_edge_for_simplex() {
         let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a_extended();
-        graph.init_cutvalues();
+        graph.init_spanning_tree_and_cutvalues();
 
         let (_, neg_edge1_idx) = graph.get_named_edge("g", "h");
         let (_, neg_edge2_idx) = graph.get_named_edge("l", "h");

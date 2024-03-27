@@ -35,16 +35,8 @@ impl Display for RankOrderings {
                 let _ = writeln!(fmt, "Rank {rank_idx}:");
             }
 
-            for node_idx in rank.borrow().iter().sorted_by(|a, b| {
-                let nodes = self.nodes.borrow();
-                {
-                    let a_pos = nodes.get(a).unwrap().borrow().position;
-                    let b_pos = nodes.get(b).unwrap().borrow().position;
-
-                    a_pos.cmp(&b_pos)
-                }
-            }) {
-                if let Some(node) = self.nodes.borrow().get(node_idx) {
+            for node_idx in self.rank_to_positions(*rank_idx).unwrap() {
+                if let Some(node) = self.nodes.borrow().get(&node_idx) {
                     let _ = writeln!(fmt, "  {}", node.borrow());
                 } else {
                     let _ = writeln!(fmt, "  {node_idx}: BAD INDEX");
@@ -526,11 +518,10 @@ mod test {
         let below_g = order.adjacent_position(node_g_pos, Below);
 
         assert_eq!(above_f, vec![0]);
-        assert_eq!(below_f, vec![0]);
-        assert_eq!(above_g, vec![0, 1]);
+        assert_eq!(below_f, vec![1]);
+        assert_eq!(above_g, vec![1, 2]);
         assert_eq!(below_g, vec![1]);
 
-        // order.weighted_median(1);
         graph.set_horizontal_ordering();
     }
 
@@ -644,6 +635,10 @@ mod test {
     }
 
     // Test that the 2_3 example from the paper has zero crosses after ordering.
+    //
+    // After switching to breadth first search, this test is a bit bogus becase
+    // it does not have any crosses to begin with.  TODO: find an initial graph
+    // that starts with crosses which are removed.
     #[test]
     fn test_order_example_from_paper_2_3() {
         let mut graph = Graph::example_graph_from_paper_2_3();
@@ -653,7 +648,7 @@ mod test {
         graph.rank_nodes_vertically();
         let order = graph.init_horizontal_order();
 
-        assert_eq!(order.crossing_count(), 1);
+        assert_eq!(order.crossing_count(), 0);
         println!("ORDER: {order}");
         println!("Nodes: {:?}", order.nodes().borrow().keys().sorted());
         println!("Node Zero: {:?}", order.nodes().borrow().get(&0));
