@@ -307,7 +307,7 @@ impl Graph {
         self.ignore_node_loops();
         self.print_nodes("after ignore_loops()");
 
-        let mut queue = self.get_source_nodes();
+        let mut queue = self.get_source_nodes_and_fix_cyclic();
         self.set_asyclic_tree(&mut queue);
         self.print_nodes("after set_asyclic_tree()");
 
@@ -341,20 +341,12 @@ impl Graph {
     }
 
     /// Return a queue of nodes that don't have incoming edges (source nodes).
-    fn get_source_nodes(&mut self) -> VecDeque<usize> {
-        let mut queue = VecDeque::new();
+    fn get_source_nodes_and_fix_cyclic(&mut self) -> VecDeque<usize> {
         let node_count = self.node_count();
+        let mut queue;
 
         loop {
-            for (node_idx, _node) in self
-                .nodes
-                .iter()
-                .enumerate()
-                .filter(|(_i, n)| n.no_in_edges())
-            {
-                self.get_node(node_idx).set_asyclic_check(node_idx, 0);
-                queue.push_back(node_idx);
-            }
+            queue = self.get_source_nodes();
 
             // Ensure we have at least one source node
             if queue.is_empty() && node_count != 0 {
@@ -365,6 +357,21 @@ impl Graph {
             } else {
                 break;
             }
+        }
+        queue
+    }
+
+    fn get_source_nodes(&self) -> VecDeque<usize> {
+        let mut queue = VecDeque::new();
+
+        for (node_idx, _node) in self
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_i, n)| n.no_in_edges())
+        {
+            self.get_node(node_idx).set_asyclic_check(node_idx, 0);
+            queue.push_back(node_idx);
         }
         queue
     }
@@ -664,6 +671,8 @@ impl Graph {
         let mut dfs_queue = self.get_min_vertical_rank_nodes();
         let mut assigned = HashSet::new();
 
+        println!("Starting Queue: {dfs_queue:?}");
+
         while let Some(node_idx) = dfs_queue.pop_front() {
             let node = self.get_node(node_idx);
             let unassigned_dst_nodes = node
@@ -683,12 +692,14 @@ impl Graph {
                 })
                 .collect::<Vec<usize>>();
 
+            println!("Ordering node: {node_idx}");
             if assigned.get(&node_idx).is_none() {
                 let rank = node
                     .vertical_rank
                     .expect("All nodes must have a vertical rank");
                 rank_order.add_node_idx_to_rank(rank, node_idx);
                 assigned.insert(node_idx);
+                println!("  Assigned node: {node_idx}");
             }
 
             for node_idx in unassigned_dst_nodes {
@@ -710,6 +721,11 @@ impl Graph {
     /// Return a VecDequeue of nodes which have minimum rank.
     ///
     /// * Assumes that the graph has been ranked
+    /// * Since this will be used to populate ranks, we must
+    ///   include all source nodes (nodes with no in edges) otherwise
+    ///   they will not be ranked.  The initial ranking might
+    ///   not rank all source nodes as rank zero, so we need to check
+    ///   that they are all included.
     fn get_min_vertical_rank_nodes(&self) -> VecDeque<usize> {
         let mut min_rank_nodes = VecDeque::new();
         let min_rank = self
@@ -717,12 +733,19 @@ impl Graph {
             .iter()
             .min()
             .and_then(|min_node| min_node.vertical_rank);
+        let mut source_nodes: HashSet<usize> = HashSet::from_iter(self.get_source_nodes().iter().cloned());
 
         for (node_idx, node) in self.nodes.iter().enumerate() {
             if node.vertical_rank == min_rank {
                 min_rank_nodes.push_back(node_idx);
+                source_nodes.remove(&node_idx);
             }
         }
+        // Include any source nodes that have not yet been included.
+        for node_idx in source_nodes {
+            min_rank_nodes.push_back(node_idx);
+        }
+
         min_rank_nodes
     }
 
@@ -1680,7 +1703,7 @@ pub mod tests {
         let edges = vec![("a", "b"), ("c", "d"), ("d", "c")];
         graph.add_edges(&edges, &node_map);
 
-        let source_nodes = graph.get_source_nodes();
+        let source_nodes = graph.get_source_nodes_and_fix_cyclic();
         let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
 
         assert_eq!(source_nodes, vec![0]);
@@ -1693,7 +1716,7 @@ pub mod tests {
         let edges = vec![("a", "b"), ("c", "b")];
         graph.add_edges(&edges, &node_map);
 
-        let source_nodes = graph.get_source_nodes();
+        let source_nodes = graph.get_source_nodes_and_fix_cyclic();
         let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
 
         assert_eq!(source_nodes, vec![0, 2]);
