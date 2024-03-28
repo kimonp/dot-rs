@@ -8,6 +8,8 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str;
 
+use dot_rs::dot_examples::DOT_EXAMPLES;
+
 fn main() {
     // launch the dioxus app in a webview
     // dioxus_desktop::launch(App);
@@ -69,46 +71,6 @@ fn dot_to_svg(graph: &str, custom_dot: bool) -> String {
     String::from_utf8(output.stdout).expect("Output of dot not UTF-8")
 }
 
-const DOT_EXAMPLES: [(&str, &str); 13] = [
-    ("2 spread", "digraph {a -> b; a -> c;}"),
-    ("2 spread rev", "digraph {b -> a; c -> a;}"),
-    ("2 cyclic", "digraph {a -> b; b -> a;}"),
-    ("3 cyclic", "digraph {a -> b; b -> c; c -> a; }"),
-    ("complex cyclic", "digraph { a -> c; b -> d; c -> e; e -> d; d -> c; }"),
-    ("flux capacitor", "digraph {a -> c; b -> c; c -> d}"),
-    ("4 spread", "digraph {a -> b; a -> c; a -> d; a -> e;}"),
-    ( "1-2-1", "digraph { a -> b; a -> c; b -> d; c -> d; }"),
-    ( "simple scramble", "digraph { a -> b; a -> c; c -> d; b -> e; }"),
-    ( "reverse scramble", "digraph { a -> b; a -> c; b -> e; c -> d; }"),
-    (
-        "example 2.3",
-        "digraph {
-            a -> b; a -> e; a -> f;
-            e -> g; f -> g; b -> c;
-            c -> d; d -> h;
-            g -> h;
-        }",
-    ),
-    (
-        "example 2.3 scrambled",
-        "digraph {
-            a -> e; a -> f; a -> b;
-            e -> g; f -> g; b -> c;
-            c -> d; d -> h;
-            g -> h;
-        }",
-    ),
-    (
-        "in spread",
-        "digraph {
-            a -> b; a -> c; a -> d;
-            a -> i; a -> j; a -> k;
-            i -> l; j -> l; k -> l;
-            l -> h
-        }",
-    ),
-];
-
 // define a component that renders a div with the text "Hello, world!"
 #[component]
 fn App(cx: Scope) -> Element {
@@ -137,6 +99,7 @@ fn DotSet(cx: Scope, title: String, dot: String) -> Element {
         div { display: "flex", flex_flow: "column nowrap",
             div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "left", "{title}" } }
             div { display: "flex", flex_flow: "row nowrap", width: "100%",
+                div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "left", pre { "{dot}" } } }
                 div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{dot_rs}" } }
                 div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{std_dot_svg}" } }
             }

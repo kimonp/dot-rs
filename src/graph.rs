@@ -1244,9 +1244,9 @@ impl Display for Graph {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
+    use crate::dot_examples::dot_example_graph;
 
-    use rstest::rstest;
+    use super::*;
     use std::ops::RangeInclusive;
     use tests::edge::MIN_EDGE_WEIGHT;
 
@@ -1321,28 +1321,11 @@ pub mod tests {
         }
 
         pub fn example_graph_from_paper_2_3() -> Graph {
-            Graph::from(
-                "digraph {
-                    a -> b; a -> e; a -> f;
-                    e -> g; f -> g; b -> c;
-                    c -> d; d -> h;
-                    g -> h;
-                }",
-            )
+            dot_example_graph("tse_paper_example_2_3")
         }
 
         pub fn example_graph_from_paper_2_3_extended() -> Graph {
-            Graph::from(
-                "digraph {
-                    a -> b; a -> e; a -> f;
-                    e -> g; f -> g; b -> c;
-                    c -> d; d -> h;
-                    g -> h;
-                    a -> i; a -> j; a -> k;
-                    i -> l; j -> l; k -> l;
-                    l -> h;
-                }",
-            )
+            dot_example_graph("tse_paper_example_2_3_extended")
         }
 
         // Set the ranks /ngiven in example 2-3 (a)
@@ -1800,60 +1783,5 @@ pub mod tests {
                 assert!(len.abs() <= MIN_EDGE_LENGTH)
             }
         }
-    }
-
-    #[rstest(
-        graph,
-        case::a_to_b_and_c(Graph::from("digraph { a -> b; a -> c; }")),
-        case::b_and_c_to_a(Graph::from("digraph { b -> a; c -> a; }")),
-        case::spread_2(Graph::from("digraph { a -> b; a -> c; }")),
-        case::two_cyclic(Graph::from("digraph { a -> b; b -> a; }")),
-        case::three_cyclic(Graph::from("digraph { a -> b; b -> c; c -> a; }")),
-        case::complex_cyclic(Graph::from("digraph { a -> c; b -> d; c -> e; e -> d; d -> c; }")),
-        case::flux_capacitor(Graph::from("digraph {a -> c; b -> c; c -> d;}")),
-        case::back_and_forth(Graph::from("digraph { a -> c; b -> a; }")),
-        case::t1_2_1(Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }")),
-        case::simple_scramble(Graph::from("digraph { a -> b; a -> c; c -> d; b -> e; }")),
-        case::reverse_scramble(Graph::from("digraph { a -> b; a -> c; b -> e; c -> d; }")),
-        case::a_to_4_nodes(Graph::from("digraph { a -> b; a -> c; a -> d; a -> e; }")),
-        case::odd_spline(Graph::from(
-            "digraph {
-                a -> e; a -> f; a -> b;
-                e -> g; f -> g; b -> c;
-                c -> d; d -> h;
-                g -> h;
-            }"
-        )),
-        case::odd2_spline(Graph::from(
-            "digraph {
-                a -> b; a -> e; a -> f;
-                e -> g; f -> g; b -> c;
-                c -> d; d -> h;
-                g -> h;
-            }"
-        )),
-        case::paper_2_3(Graph::example_graph_from_paper_2_3()),
-        case::paper_2_3_scrambled(Graph::from(
-            "digraph {
-                a -> e; a -> f; a -> b;
-                e -> g; f -> g; b -> c;
-                c -> d; d -> h;
-                g -> h;
-            }"
-        )),
-        case::paper_extended_2_3(Graph::example_graph_from_paper_2_3_extended()),
-        case::simple_failing_test(Graph::from(
-            "digraph {
-                a -> b; a -> e; a -> f;
-                e -> g; f -> g; b -> c;
-                c -> d; d -> h;
-            }"
-        ))
-    )]
-    fn test_draw_graph(mut graph: Graph) {
-        graph.layout_nodes();
-
-        let svg = crate::svg::SVG::new(graph, false);
-        svg.write_to_file("foo");
     }
 }
