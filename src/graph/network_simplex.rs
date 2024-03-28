@@ -9,11 +9,10 @@ use super::{
     edge::{
         EdgeDisposition,
         EdgeDisposition::{In, Out},
-        MIN_EDGE_LENGTH,
     },
     Graph,
 };
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 mod heap;
 pub(super) mod spanning_tree;
@@ -614,9 +613,10 @@ impl Graph {
     ///   \-----/
     /// Should rank: 0:a 2:b 3:c, because c is only ranked on the third round.
     pub(super) fn init_simplex_rank(&mut self) {
-        let mut nodes_to_rank = Vec::new();
+        let mut nodes_to_rank = VecDeque::new();
         let mut scanned_edges = HashSet::new();
 
+        self.print_nodes("before init_simplex_rank()");
         // Lets not assume the tree fields are clear to begin with
         for edge in self.edges.iter_mut() {
             edge.set_in_spanning_tree(false)
@@ -629,44 +629,42 @@ impl Graph {
             node.clear_tree_data();
 
             if node.no_in_edges() {
-                nodes_to_rank.push(index);
+                nodes_to_rank.push_back(index);
             }
         }
 
-        while !nodes_to_rank.is_empty() {
-            let mut next_nodes_to_rank = Vec::new();
-            while let Some(node_idx) = nodes_to_rank.pop() {
-                let node = self.get_node(node_idx);
-                if node.simplex_rank().is_none() {
-                    let mut new_rank = 0;
+        while let Some(node_idx) = nodes_to_rank.pop_front() {
+            let node = self.get_node(node_idx);
+            println!("  init_simplex_rank(): Processing: {}", self.node_to_string(node_idx));
 
-                    for edge_idx in node.in_edges.clone() {
-                        let edge = self.get_edge(edge_idx);
-                        let src_node = self.get_node(edge.src_node);
+            if node.simplex_rank().is_none() {
+                let mut new_rank = 0;
 
-                        new_rank = if let Some(src_rank) = src_node.simplex_rank() {
-                            new_rank.max(src_rank + MIN_EDGE_LENGTH)
-                        } else {
-                            new_rank
-                        };
-                    }
-                    for edge_idx in node.out_edges.clone() {
-                        scanned_edges.insert(edge_idx);
+                for edge_idx in node.in_edges.clone() {
+                    let edge = self.get_edge(edge_idx);
+                    let src_node = self.get_node(edge.src_node);
 
-                        let edge = self.get_edge(edge_idx);
-                        let dst_node = self.get_node(edge.dst_node);
-                        if dst_node.no_unscanned_in_edges(&scanned_edges) {
-                            next_nodes_to_rank.push(edge.dst_node);
-                        }
-                    }
-                    self.get_node_mut(node_idx).set_simplex_rank(Some(new_rank));
+                    new_rank = if let Some(src_rank) = src_node.simplex_rank() {
+                        new_rank.max(src_rank + edge.min_len())
+                    } else {
+                        new_rank.max(edge.min_len())
+                    };
                 }
-            }
+                for edge_idx in node.out_edges.clone() {
+                    scanned_edges.insert(edge_idx);
 
-            next_nodes_to_rank
-                .iter()
-                .for_each(|idx| nodes_to_rank.push(*idx));
+                    let edge = self.get_edge(edge_idx);
+                    let dst_node = self.get_node(edge.dst_node);
+                    if dst_node.no_unscanned_in_edges(&scanned_edges) {
+                        println!("  init_simples_rank():    queueing: {}", self.get_node(edge.dst_node).name);
+                        nodes_to_rank.push_back(edge.dst_node)
+                    }
+                }
+                self.get_node_mut(node_idx).set_simplex_rank(Some(new_rank));
+            }
         }
+
+        self.print_nodes("after init_simplex_rank()");
     }
 
     /// If any edge has a negative cut value, return the first one found starting with start_idx.

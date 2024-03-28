@@ -77,11 +77,11 @@ const DOT_EXAMPLES: [(&str, &str); 11] = [
     ("4 spread", "digraph {a -> b; a -> c; a -> d; a -> e;}"),
     ( "1-2-1", "digraph { a -> b; a -> c; b -> d; c -> d; }"),
     ( "simple scramble", "digraph { a -> b; a -> c; c -> d; b -> e; }"),
-    ( "reverse scramble", "digraph { a -> b; a -> c; b -> e; c -> d; e -> f; d -> g; }"),
+    ( "reverse scramble", "digraph { a -> b; a -> c; b -> e; c -> d; }"),
     (
         "example 2.3",
         "digraph {
-            a -> e; a -> f; a -> b;
+            a -> b; a -> e; a -> f;
             e -> g; f -> g; b -> c;
             c -> d; d -> h;
             g -> h;
@@ -90,7 +90,7 @@ const DOT_EXAMPLES: [(&str, &str); 11] = [
     (
         "example 2.3 scrambled",
         "digraph {
-            a -> b; a -> e; a -> f;
+            a -> e; a -> f; a -> b;
             e -> g; f -> g; b -> c;
             c -> d; d -> h;
             g -> h;

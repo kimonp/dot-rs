@@ -111,6 +111,28 @@ pub struct SpanningTreeData {
     tree_dist_max: Option<usize>,
     /// Reference to the subtree that this node is a member of.
     sub_tree: Option<SubTree>,
+
+    /// Reference to the source node set this node was found with
+    /// Used to convert to a acyclic graph.
+    asyclic_check: Option<AsyclicCheck>,
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub(super) struct AsyclicCheck {
+    root_idx: usize,
+    depth: u32,
+}
+
+impl AsyclicCheck {
+    pub fn root_idx(&self) -> usize {
+        self.root_idx
+    }
+    pub fn depth(&self) -> u32 {
+        self.depth
+    }
+    pub fn is_asyclic(&self, dst_check: AsyclicCheck) -> bool {
+        self.root_idx() == dst_check.root_idx() && self.depth() > dst_check.depth()
+    }
 }
 
 impl Display for SpanningTreeData {
@@ -136,14 +158,15 @@ impl SpanningTreeData {
     #[cfg(test)]
     fn new(
         edge_idx_to_parent: Option<usize>,
-        sub_tree_idx_min: Option<usize>,
-        sub_tree_idx_max: Option<usize>,
+        tree_dist_min: Option<usize>,
+        tree_dist_max: Option<usize>,
     ) -> SpanningTreeData {
         SpanningTreeData {
             edge_idx_to_parent,
-            tree_dist_min: sub_tree_idx_min,
-            tree_dist_max: sub_tree_idx_max,
+            tree_dist_min,
+            tree_dist_max,
             sub_tree: None,
+            asyclic_check: None,
         }
     }
 
@@ -152,6 +175,10 @@ impl SpanningTreeData {
     /// None if this node has no tree parent.
     pub fn edge_idx_to_parent(&self) -> Option<usize> {
         self.edge_idx_to_parent
+    }
+
+    pub(super) fn asyclic_check(&self) -> Option<AsyclicCheck> {
+        self.asyclic_check
     }
 
     /// The minimal distance to the root of all nodes for which this node is an ancestor.
@@ -269,6 +296,14 @@ impl Node {
         }
     }
 
+    pub(super) fn spanning_tree_asyclic_check(&self) -> Option<AsyclicCheck> {
+        if let Some(tree_data) = self.spanning_tree() {
+            tree_data.asyclic_check()
+        } else {
+            None
+        }
+    }
+
     pub(super) fn tree_dist_max(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
             tree_data.tree_dist_max()
@@ -324,6 +359,7 @@ impl Node {
             tree_dist_min: min,
             tree_dist_max: max,
             sub_tree: self.sub_tree(),
+            asyclic_check: self.asyclic_check(),
         });
     }
 
@@ -337,6 +373,25 @@ impl Node {
             .borrow()
             .as_ref()
             .and_then(|data| data.sub_tree.clone())
+    }
+
+    pub(super) fn asyclic_check(&self) -> Option<AsyclicCheck> {
+        self.spanning_tree
+            .borrow()
+            .as_ref()
+            .and_then(|data| data.asyclic_check)
+    }
+
+    pub(super) fn set_asyclic_check(&self, root_idx: usize, depth: u32) {
+        if !self.in_spanning_tree() {
+            self.set_empty_tree_node();
+        }
+
+        if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
+            data.asyclic_check = Some(AsyclicCheck { root_idx, depth });
+        } else {
+            panic!("trying to set asyclic_check but node not in spanning tree");
+        }
     }
 
     /// Return true if this node has a sub_tree set.
@@ -535,6 +590,14 @@ impl Node {
             self.coordinates = Some(Point::new(x, coords.y()));
         } else {
             self.coordinates = Some(Point::new(x, 0));
+        }
+    }
+
+    pub(super) fn assign_y_coord(&mut self, y: i32) {
+        if let Some(coords) = self.coordinates {
+            self.coordinates = Some(Point::new(coords.x(), y));
+        } else {
+            self.coordinates = Some(Point::new(0, y));
         }
     }
 }
