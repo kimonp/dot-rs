@@ -42,7 +42,6 @@ use self::{
 /// * with the other edge set to ignore, but the graph_node() does not take into account
 ///   ignored nodes.
 /// * Add an error type and remove all unwrap(), expect() and panic() code.
-/// * Make runtime effecient
 #[derive(Debug, Clone)]
 pub struct Graph {
     /// All nodes in the graph.
