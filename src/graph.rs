@@ -398,6 +398,7 @@ impl Graph {
     /// * Because reversing back edges makes them into forward edges, all cycles are
     ///   broken by this procedure.
     fn set_asyclic_tree(&mut self, queue: &mut VecDeque<usize>) {
+        println!("Initial nodes for set_asyclic: {:?}", queue);
         while let Some(node_idx) = queue.pop_front() {
             let node = self.get_node(node_idx);
             let mut edges_to_reverse = Vec::new();
@@ -411,16 +412,15 @@ impl Graph {
                 let dst_node = self.get_node(edge.dst_node);
                 let dst_asyclic_check = dst_node.spanning_tree_asyclic_check();
 
-                if let Some(dst_asyclic_check) =  dst_asyclic_check {
-                    if asyclic_check.is_asyclic(dst_asyclic_check) {
+                if let Some(dst_asyclic_check) = dst_asyclic_check {
+                    if asyclic_check.is_cyclic(dst_asyclic_check) {
                         edges_to_reverse.push(edge_idx);
                     }
                 } else {
-                    dst_node.set_asyclic_check(asyclic_check.root_idx(), asyclic_check.depth()+1);
+                    dst_node.set_asyclic_check(asyclic_check.root_idx(), asyclic_check.depth() + 1);
 
                     queue.push_front(edge.dst_node);
                 }
-
             }
             for edge_idx in edges_to_reverse {
                 self.reverse_edge(edge_idx);
@@ -436,6 +436,11 @@ impl Graph {
         };
 
         // Swap the references in src and dst nodes
+        println!(
+            "SWAPPING from {} to {}",
+            self.get_node(src_node_idx).name,
+            self.get_node(dst_node_idx).name
+        );
         self.get_node_mut(src_node_idx)
             .swap_edge_in_list(edge_idx_to_reverse, Out);
         self.get_node_mut(dst_node_idx)
@@ -732,7 +737,8 @@ impl Graph {
             .iter()
             .min()
             .and_then(|min_node| min_node.vertical_rank);
-        let mut source_nodes: HashSet<usize> = HashSet::from_iter(self.get_source_nodes().iter().cloned());
+        let mut source_nodes: HashSet<usize> =
+            HashSet::from_iter(self.get_source_nodes().iter().cloned());
 
         for (node_idx, node) in self.nodes.iter().enumerate() {
             if node.vertical_rank == min_rank {

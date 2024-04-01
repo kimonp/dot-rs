@@ -117,6 +117,7 @@ pub struct SpanningTreeData {
     asyclic_check: Option<AsyclicCheck>,
 }
 
+/// Used to determine if a graph of unranked nodes is asyclic.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub(super) struct AsyclicCheck {
     root_idx: usize,
@@ -124,14 +125,22 @@ pub(super) struct AsyclicCheck {
 }
 
 impl AsyclicCheck {
+    /// Index of the root node of this node
     pub fn root_idx(&self) -> usize {
         self.root_idx
     }
+
+    /// Depth of this node from the root (root.depth == 0)
     pub fn depth(&self) -> u32 {
         self.depth
     }
-    pub fn is_asyclic(&self, dst_check: AsyclicCheck) -> bool {
-        self.root_idx() == dst_check.root_idx() && self.depth() > dst_check.depth()
+
+    /// True if an edge from this node to dst_node is asyclic:
+    ///
+    /// * If dst_node has the same root, but we have reduced our depth,
+    ///   we have a cycle.
+    pub fn is_cyclic(&self, dst_check: AsyclicCheck) -> bool {
+        self.root_idx() == dst_check.root_idx() && dst_check.depth() == 0
     }
 }
 
@@ -503,7 +512,7 @@ impl Node {
                 panic!("Could not find edge {disposition:?}:{edge_idx} to reverse in src node.");
             };
 
-        println!("SWAPPING EDGE for node {}: {edge_idx}", self.name());
+        println!("  SWAPPING EDGE for node {}: {edge_idx}", self.name());
         match disposition {
             EdgeDisposition::In => {
                 self.in_edges.remove(local_idx);

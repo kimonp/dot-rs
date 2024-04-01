@@ -50,11 +50,10 @@ impl<T: Ord + HeapIndex + Eq> MinHeap<T> {
             let right = 2 * (cur_item_idx + 1);
             let left = right - 1;
 
-            let mut smallest = if left < self.len() && self.data[left] < self.data[cur_item_idx] {
-                left
-            } else {
-                cur_item_idx
-            };
+            let mut smallest = cur_item_idx;
+            if left < self.len() && self.data[left] < self.data[smallest] {
+                smallest = left;
+            }
             if right < self.len() && self.data[right] < self.data[smallest] {
                 smallest = right;
             }
@@ -177,7 +176,7 @@ mod test {
 
     /// Create a vector in "random" order, and insert it into a heap.
     /// Ensure that it pop()s back in min order.
-    /// 
+    ///
     /// This should effectively test the full heap flow:
     /// * new()
     /// * insert_unordered_item()

@@ -26,7 +26,8 @@ use rstest::rstest;
     case::tse_paper_example_2_3_simplified(dot_example_graph(
         "tse_paper_example_2_3_simplified"
     )),
-    case::in_spread(dot_example_graph("in_spread"))
+    case::in_spread(dot_example_graph("in_spread")),
+    case::large_example(dot_example_graph("large_example")),
 )]
 fn dot_to_svg(mut graph: Graph) {
     graph.layout_nodes();

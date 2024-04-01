@@ -9,5 +9,6 @@ edition = "2021"
 dioxus = "0.4.3"
 dioxus-desktop = "0.4.3"
 dot-rs = { path = "../../dot-rs" }
+layout-rs = { path = "../../layout/layout" }
 # petgraph = "0.6.4"
 # petgraph-evcxr = "*"

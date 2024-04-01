@@ -2,7 +2,7 @@
 
 use crate::graph::Graph;
 
-pub const DOT_EXAMPLES: [(&str, &str); 16] = [
+pub const DOT_EXAMPLES: [(&str, &str); 17] = [
     ("a_to_b_and_c",        "digraph {a -> b; a -> c;}"),
     ("b_and_c_to_a",        "digraph {b -> a; c -> a;}"),
     ("a_to_c_and_b_to_a",   "digraph {a -> c; b -> a;}"),
@@ -60,6 +60,39 @@ pub const DOT_EXAMPLES: [(&str, &str); 16] = [
             i -> l; j -> l; k -> l;
             l -> h
         }",
+    ),
+    // Testcase from:
+    //  A Fast Layout Algorithm for k-Level Graphs by
+    //  Christoph Buchheim, Michael Junger and Sebastian Leipert
+    (
+        "large_example",
+        "digraph {
+            1->3;
+            2->3; 2->20;
+            3->5;
+            5->7;
+            7->9;
+            9->12;
+            12->20;
+            3->4;
+            4->6;
+            6->16;
+            16->19;
+            19->22;
+            22->23;
+            3->23;
+            6->23; 6->8;
+            8->11; 8->10;
+            11->16; 11->15;
+            10->15; 10->14; 10->13;
+            16->20; 16->18;
+            14->18;
+            1->13;
+            13->17;
+            18->21;
+            1->21;
+            21->23;
+          }",
     ),
 ];
 

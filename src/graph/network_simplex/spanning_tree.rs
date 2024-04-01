@@ -522,58 +522,6 @@ impl Graph {
         }
     }
 
-    // pub(super) fn old_set_feasible_tree_for_simplex(&mut self) {
-    //     // init_simplex_rank() will set tree_node=false for all nodes.
-    //     self.init_simplex_rank();
-
-    //     // Lets not assume the tree fields are clear to begin with
-    //     for edge in self.edges.iter_mut() {
-    //         edge.set_in_spanning_tree(false)
-    //     }
-
-    //     let mut tree_node_cnt = 0;
-    //     for node in self.nodes.iter_mut() {
-    //         if node.no_out_edges() {
-    //             node.set_tree_root_node();
-    //             tree_node_cnt += 1;
-    //         } else {
-    //             node.clear_tree_data();
-    //         }
-    //     }
-
-    //     while tree_node_cnt < self.node_count() {
-    //         // e = a non-tree edge incident on the tree with a minimal amount of slack
-    //         // delta = slack(e);
-    //         // if includent_node is e.head then delta = -delta
-    //         // for v in Tree do v.rank = v.rank + delta;
-    //         let edge_idx = self
-    //             .get_min_incident_edge()
-    //             .expect("No incident edges left!");
-    //         let delta = if let Some(delta) = self.simplex_slack(edge_idx) {
-    //             if self.edge_head_is_incident(edge_idx) {
-    //                 -delta
-    //             } else {
-    //                 delta
-    //             }
-    //         } else {
-    //             panic!("Can't calculate slack on edge {edge_idx}");
-    //         };
-
-    //         // increase the rank of everyt treenode by the slack
-    //         for node in self.nodes.iter_mut().filter(|node| node.in_spanning_tree()) {
-    //             let new_rank = node.simplex_rank.expect("Node does not have rank") as i32 + delta;
-    //             node.simplex_rank = Some(new_rank as u32);
-    //         }
-
-    //         let node_idx = self
-    //             .get_incident_node(edge_idx)
-    //             .expect("Edge is not incident");
-    //         self.get_node_mut(node_idx).set_tree_root_node();
-    //         self.get_edge_mut(edge_idx).set_in_spanning_tree(true);
-    //         tree_node_cnt += 1;
-    //     }
-    // }
-
     /// Re-rank the given node by adding delta to the rank, and all sub_nodes in the tree.
     pub(super) fn rerank_by_tree(&self, node_idx: usize, delta: i32) {
         let node = self.get_node(node_idx);

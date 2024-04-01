@@ -71,6 +71,27 @@ fn dot_to_svg(graph: &str, custom_dot: bool) -> String {
     String::from_utf8(output.stdout).expect("Output of dot not UTF-8")
 }
 
+fn layout_rs_to_svg(dot: &str) -> String {
+    use layout::gv;
+    use gv::GraphBuilder;
+    use layout::backends::svg::SVGWriter;
+
+    let mut parser = gv::DotParser::new(dot);
+    let graph = parser.process().unwrap();
+    let mut svg = SVGWriter::new();
+    let mut gb = GraphBuilder::new();
+    gb.visit_graph(&graph);
+    let mut vg = gb.get();
+
+    vg.do_it(
+        false,
+        false,
+        false,
+        &mut svg,
+    );
+    svg.finalize()
+}
+
 // define a component that renders a div with the text "Hello, world!"
 #[component]
 fn App(cx: Scope) -> Element {
@@ -94,6 +115,7 @@ fn DotSet(cx: Scope, title: String, dot: String) -> Element {
 
     // let custom_dot_svg = dot_to_svg(dot, true);
     let std_dot_svg = dot_to_svg(dot, false);
+    let layout_svg = layout_rs_to_svg(dot);
 
     cx.render(rsx! {
         div { display: "flex", flex_flow: "column nowrap",
@@ -102,6 +124,7 @@ fn DotSet(cx: Scope, title: String, dot: String) -> Element {
                 div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "left", pre { "{dot}" } } }
                 div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{dot_rs}" } }
                 div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{std_dot_svg}" } }
+                div { display: "flex", flex_flow: "row nowrap", width: "100%", div { display: "flex", flex: 1, justify_content: "center", dangerous_inner_html: "{layout_svg}" } }
             }
         }
     })
