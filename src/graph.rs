@@ -606,6 +606,12 @@ impl Graph {
         }
     }
 
+    // Replace the given edge with a chain virtual nodes and edges.
+    //
+    // * rank is the rank where the edge starts
+    // * slack is the extra distance between ranks.  When slack is zero, they are only
+    //   one rank apart.  If slack is negative, the destination node is up the ranks
+    //   instead of down the ranks.
     fn replace_edge_with_virtual_chain(
         &mut self,
         edge_idx: usize,
@@ -614,12 +620,12 @@ impl Graph {
         order: &RankOrderings,
     ) {
         let mut remaining_slack = slack;
-        let reverse_edge = slack < 0;
+        let up_edge = slack < 0;
 
         let mut cur_edge_idx = edge_idx;
         let mut new_rank = rank;
         while remaining_slack != 0 {
-            new_rank = if reverse_edge {
+            new_rank = if up_edge {
                 new_rank - 1
             } else {
                 new_rank + 1
@@ -628,6 +634,7 @@ impl Graph {
             let virt_node_idx = self.add_virtual_node(new_rank, NodeType::RankFiller);
 
             let old_edge = self.get_edge_mut(cur_edge_idx);
+            let old_edge_reversed_for_asyclic = old_edge.reversed;
             let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
 
             self.get_node_mut(virt_node_idx).add_edge(cur_edge_idx, In);
@@ -636,9 +643,15 @@ impl Graph {
             self.get_node_mut(orig_dst).remove_edge(cur_edge_idx, In);
 
             cur_edge_idx = self.add_edge(virt_node_idx, orig_dst);
+            // If the edge was reversed to keep the graph asyclic, all the edges we add
+            // should be reversed in this way as well.
+            if old_edge_reversed_for_asyclic {
+                self.get_edge_mut(cur_edge_idx).reversed = true;
+            }
+
             order.add_node_idx_to_existing_rank(new_rank, virt_node_idx);
 
-            remaining_slack += if reverse_edge { 1 } else { -1 };
+            remaining_slack += if up_edge { 1 } else { -1 };
         }
     }
 
