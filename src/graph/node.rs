@@ -112,37 +112,41 @@ pub struct SpanningTreeData {
     /// Reference to the subtree that this node is a member of.
     sub_tree: Option<SubTree>,
 
-    /// Reference to the source node set this node was found with
-    /// Used to convert to a acyclic graph.
-    asyclic_check: Option<AsyclicCheck>,
+    // /// Reference to the source node set this node was found with
+    // /// Used to convert to a acyclic graph.
+    // asyclic_check: Option<AsyclicCheck>,
 }
 
 /// Used to determine if a graph of unranked nodes is asyclic.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub(super) struct AsyclicCheck {
-    root_idx: usize,
-    depth: u32,
-}
+// #[derive(Debug, Eq, PartialEq, Copy, Clone)]
+// pub(super) struct AsyclicCheck {
+//     root_idx: usize,
+//     depth: u32,
+// }
 
-impl AsyclicCheck {
-    /// Index of the root node of this node
-    pub fn root_idx(&self) -> usize {
-        self.root_idx
-    }
+// impl AsyclicCheck {
+//     /// Index of the root node of this node
+//     pub fn root_idx(&self) -> usize {
+//         self.root_idx
+//     }
 
-    /// Depth of this node from the root (root.depth == 0)
-    pub fn depth(&self) -> u32 {
-        self.depth
-    }
+//     /// Depth of this node from the root (root.depth == 0)
+//     pub fn depth(&self) -> u32 {
+//         self.depth
+//     }
 
-    /// True if an edge from this node to dst_node is asyclic:
-    ///
-    /// * If dst_node has the same root, but we have reduced our depth,
-    ///   we have a cycle.
-    pub fn is_cyclic(&self, dst_check: AsyclicCheck) -> bool {
-        self.root_idx() == dst_check.root_idx() && dst_check.depth() == 0
-    }
-}
+//     /// True if an edge from this node to dst_node is asyclic:
+//     ///
+//     /// * If dst_node has the same root, we have looped back into our own root
+//     ///   and we have a cycle.
+//     /// * If dst_node has a different root, and that root depts is zero, we have
+//     ///   pointed back to the root of another root, and that is also a cycle.
+//     ///   we have a cycle.
+//     pub fn is_cyclic(&self, dst_check: AsyclicCheck) -> bool {
+//         self.root_idx() == dst_check.root_idx() && dst_check.depth() == 0
+//         // self.root_idx() == dst_check.root_idx() && self.depth() < dst_check.depth() || dst_check.depth() == 0
+//     }
+// }
 
 impl Display for SpanningTreeData {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
@@ -175,7 +179,7 @@ impl SpanningTreeData {
             tree_dist_min,
             tree_dist_max,
             sub_tree: None,
-            asyclic_check: None,
+            // asyclic_check: None,
         }
     }
 
@@ -186,9 +190,9 @@ impl SpanningTreeData {
         self.edge_idx_to_parent
     }
 
-    pub(super) fn asyclic_check(&self) -> Option<AsyclicCheck> {
-        self.asyclic_check
-    }
+    // pub(super) fn asyclic_check(&self) -> Option<AsyclicCheck> {
+    //     self.asyclic_check
+    // }
 
     /// The minimal distance to the root of all nodes for which this node is an ancestor.
     pub fn tree_dist_min(&self) -> Option<usize> {
@@ -305,13 +309,13 @@ impl Node {
         }
     }
 
-    pub(super) fn spanning_tree_asyclic_check(&self) -> Option<AsyclicCheck> {
-        if let Some(tree_data) = self.spanning_tree() {
-            tree_data.asyclic_check()
-        } else {
-            None
-        }
-    }
+    // pub(super) fn spanning_tree_asyclic_check(&self) -> Option<AsyclicCheck> {
+    //     if let Some(tree_data) = self.spanning_tree() {
+    //         tree_data.asyclic_check()
+    //     } else {
+    //         None
+    //     }
+    // }
 
     pub(super) fn tree_dist_max(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
@@ -368,7 +372,7 @@ impl Node {
             tree_dist_min: min,
             tree_dist_max: max,
             sub_tree: self.sub_tree(),
-            asyclic_check: self.asyclic_check(),
+            // asyclic_check: self.asyclic_check(),
         });
     }
 
@@ -384,24 +388,24 @@ impl Node {
             .and_then(|data| data.sub_tree.clone())
     }
 
-    pub(super) fn asyclic_check(&self) -> Option<AsyclicCheck> {
-        self.spanning_tree
-            .borrow()
-            .as_ref()
-            .and_then(|data| data.asyclic_check)
-    }
+    // pub(super) fn asyclic_check(&self) -> Option<AsyclicCheck> {
+    //     self.spanning_tree
+    //         .borrow()
+    //         .as_ref()
+    //         .and_then(|data| data.asyclic_check)
+    // }
 
-    pub(super) fn set_asyclic_check(&self, root_idx: usize, depth: u32) {
-        if !self.in_spanning_tree() {
-            self.set_empty_tree_node();
-        }
+    // pub(super) fn set_asyclic_check(&self, root_idx: usize, depth: u32) {
+    //     if !self.in_spanning_tree() {
+    //         self.set_empty_tree_node();
+    //     }
 
-        if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
-            data.asyclic_check = Some(AsyclicCheck { root_idx, depth });
-        } else {
-            panic!("trying to set asyclic_check but node not in spanning tree");
-        }
-    }
+    //     if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
+    //         data.asyclic_check = Some(AsyclicCheck { root_idx, depth });
+    //     } else {
+    //         panic!("trying to set asyclic_check but node not in spanning tree");
+    //     }
+    // }
 
     /// Return true if this node has a sub_tree set.
     pub(super) fn has_sub_tree(&self) -> bool {
@@ -450,9 +454,9 @@ impl Node {
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
-    pub(super) fn min_separation_x(&self) -> i32 {
-        NODE_MIN_SEP_X
-    }
+    // pub(super) fn min_separation_x(&self) -> i32 {
+    //     NODE_MIN_SEP_X
+    // }
 
     /// Minimum separation of y coordiante from a point to this node.
     ///

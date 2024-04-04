@@ -271,115 +271,58 @@ impl Graph {
         self.network_simplex_ranking(VerticalRank);
     }
 
-    /// make_asyclic() removes cycles from the graph.
-    /// * starting with "source nodes" (nodes with only outgoing edges) it does a depth first search (DFS).
-    ///   * "visited" nodes have their "tree_member" attribute set
-    ///   * when the DFS finds an edge pointing to a visited node, it reverses the direction of the edge,
-    ///     and sets the "reversed" attribute of the edge (so it can be depicted as it was originally)
-    ///     * Trying to reverse an already reversed edge is an error
-    /// * Before finishing, all nodes are checked to see if they have been visited.
-    ///   * If one is found, start a new DFS using this node.
-    ///   * Repeat until all nodes have been visited
-    ///
-    /// Documentation from the paper: page 6: 2.1: Making the graph asyclic
-    /// * A graph must be acyclic to have a consistent rank assignment.
-    /// * Because the input graph may contain cycles, a preprocessing step detects cycles and
-    ///   breaks them by reversing certain edges [RDM].
-    ///   * Of course these edges are only reversed internally; arrowheads in the drawing show
-    ///     the original direction.
-    /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
-    ///   * Edges are searched in the "natural order" of the graph input, starting from some
-    ///     source or sink nodes if any exist.
-    ///     - a source node is a node in a directed graph that has no incoming edges.
-    ///     - a sink node is a node in a directed graph that has no outgoing edges.
-    ///   * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree edges [AHU].
-    ///     * The tree deﬁnes a partial order on nodes.
-    ///     * Given this partial order, the non-tree edges further partition into three sets:
-    ///       cross edges, forward edges, and back edges.
-    ///       * Cross edges connect unrelated nodes in the partial order.
-    ///       * Forward edges connect a node to some of its descendants.
-    ///       * Back edges connect a descendant to some of its ancestors.
-    ///    * It is clear that adding forward and cross edges to the partial order does not create cycles.
-    ///    * Because reversing back edges makes them into forward edges, all cycles are broken by this procedure.
-    fn make_asyclic(&mut self) {
-        self.print_nodes("before make_asyclic()");
-        self.ignore_node_loops();
-        self.print_nodes("after ignore_loops()");
+    // /// make_asyclic() removes cycles from the graph.
+    // /// * starting with "source nodes" (nodes with only outgoing edges) it does a depth first search (DFS).
+    // ///   * "visited" nodes have their "tree_member" attribute set
+    // ///   * when the DFS finds an edge pointing to a visited node, it reverses the direction of the edge,
+    // ///     and sets the "reversed" attribute of the edge (so it can be depicted as it was originally)
+    // ///     * Trying to reverse an already reversed edge is an error
+    // /// * Before finishing, all nodes are checked to see if they have been visited.
+    // ///   * If one is found, start a new DFS using this node.
+    // ///   * Repeat until all nodes have been visited
+    // ///
+    // /// Documentation from the paper: page 6: 2.1: Making the graph asyclic
+    // /// * A graph must be acyclic to have a consistent rank assignment.
+    // /// * Because the input graph may contain cycles, a preprocessing step detects cycles and
+    // ///   breaks them by reversing certain edges [RDM].
+    // ///   * Of course these edges are only reversed internally; arrowheads in the drawing show
+    // ///     the original direction.
+    // /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
+    // ///   * Edges are searched in the "natural order" of the graph input, starting from some
+    // ///     source or sink nodes if any exist.
+    // ///     - a source node is a node in a directed graph that has no incoming edges.
+    // ///     - a sink node is a node in a directed graph that has no outgoing edges.
+    // ///   * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree edges [AHU].
+    // ///     * The tree deﬁnes a partial order on nodes.
+    // ///     * Given this partial order, the non-tree edges further partition into three sets:
+    // ///       cross edges, forward edges, and back edges.
+    // ///       * Cross edges connect unrelated nodes in the partial order.
+    // ///       * Forward edges connect a node to some of its descendants.
+    // ///       * Back edges connect a descendant to some of its ancestors.
+    // ///    * It is clear that adding forward and cross edges to the partial order does not create cycles.
+    // ///    * Because reversing back edges makes them into forward edges, all cycles are broken by this procedure.
+    // fn old_make_asyclic(&mut self) {
+    //     self.print_nodes("before make_asyclic()");
+    //     self.ignore_node_loops();
+    //     self.print_nodes("after ignore_loops()");
 
-        let mut queue = self.get_source_nodes_and_fix_cyclic();
-        self.set_asyclic_tree(&mut queue);
-        self.print_nodes("after set_asyclic_tree()");
+    //     let mut queue = self.get_source_nodes_and_fix_cyclic();
+    //     self.set_asyclic_tree(&mut queue);
+    //     self.print_nodes("after set_asyclic_tree()");
 
-        let mut start = 0;
-        while let Some(non_tree_node_idx) = self.get_next_non_tree_node_idx(start) {
-            queue.push_front(non_tree_node_idx);
-            self.set_asyclic_tree(&mut queue);
+    //     let mut start = 0;
+    //     while let Some(non_tree_node_idx) = self.get_next_non_tree_node_idx(start) {
+    //         queue.push_front(non_tree_node_idx);
+    //         self.set_asyclic_tree(&mut queue);
 
-            start = non_tree_node_idx + 1;
-        }
-        self.print_nodes("after make_asyclic()");
-    }
+    //         start = non_tree_node_idx + 1;
+    //     }
+    //     self.print_nodes("after make_asyclic()");
+    // }
 
-    /// Ignore individual edges that loop to and from the same node.
-    fn ignore_node_loops(&mut self) {
-        self.edges
-            .iter_mut()
-            .filter(|edge| edge.src_node == edge.dst_node)
-            .for_each(|edge| edge.ignored = true);
-    }
 
-    /// Beginning with start, return the first index that is not yet marked as part of the tree.
-    fn get_next_non_tree_node_idx(&self, start: usize) -> Option<usize> {
-        for (index, node) in self.nodes.iter().skip(start).enumerate() {
-            let node_idx = start + index;
-            if !node.in_spanning_tree() {
-                return Some(node_idx);
-            }
-        }
-        None
-    }
-
-    /// Return a queue of nodes that don't have incoming edges (source nodes).
-    fn get_source_nodes_and_fix_cyclic(&mut self) -> VecDeque<usize> {
-        let node_count = self.node_count();
-        let mut queue;
-
-        loop {
-            queue = self.get_source_nodes();
-
-            // Ensure we have at least one source node
-            if queue.is_empty() && node_count != 0 {
-                let node = self.get_node(0);
-                let in_edge_idx = node.in_edges[0];
-
-                self.reverse_edge(in_edge_idx);
-            } else {
-                break;
-            }
-        }
-        queue
-    }
-
-    fn get_source_nodes(&self) -> VecDeque<usize> {
-        let mut queue = VecDeque::new();
-
-        for (node_idx, _node) in self
-            .nodes
-            .iter()
-            .enumerate()
-            .filter(|(_i, n)| n.no_in_edges())
-        {
-            self.get_node(node_idx).set_asyclic_check(node_idx, 0);
-            queue.push_back(node_idx);
-        }
-        queue
-    }
-
-    /// Given a queue of source nodes, mark a tree of asyclic nodes.
-    /// * Do a depth first search starting from the source nodes
-    /// * Mark any nodes visited as "tree_node"
-    /// * If any edges point to a previously visted node, reverse those edges.
-    ///
+    /// Make the graph asyclic by reversing edges to previously visited nodes.
+    /// 
     /// From Paper section 2.1: Making the graph asyclic (page 6)
     ///
     /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
@@ -397,36 +340,171 @@ impl Graph {
     ///   create cycles.
     /// * Because reversing back edges makes them into forward edges, all cycles are
     ///   broken by this procedure.
-    fn set_asyclic_tree(&mut self, queue: &mut VecDeque<usize>) {
-        println!("Initial nodes for set_asyclic: {:?}", queue);
-        while let Some(node_idx) = queue.pop_front() {
-            let node = self.get_node(node_idx);
-            let mut edges_to_reverse = Vec::new();
+    fn make_asyclic(&mut self) {
+        self.print_nodes("before make_asyclic()");
+        self.ignore_node_loops();
 
-            let asyclic_check = node
-                .spanning_tree_asyclic_check()
-                .expect("must have an asyclic_check");
+        let mut visited = vec![false; self.node_count()];
+        let mut rec_stack = vec![false; self.node_count()];
 
-            for edge_idx in node.out_edges.iter().cloned() {
-                let edge = self.get_edge(edge_idx);
-                let dst_node = self.get_node(edge.dst_node);
-                let dst_asyclic_check = dst_node.spanning_tree_asyclic_check();
+        // Start with the source nodes
+        for node_idx in self.get_source_nodes().iter().cloned() {
+            self.make_asyclic_worker(node_idx, &mut visited, &mut rec_stack)
+        }
 
-                if let Some(dst_asyclic_check) = dst_asyclic_check {
-                    if asyclic_check.is_cyclic(dst_asyclic_check) {
-                        edges_to_reverse.push(edge_idx);
-                    }
-                } else {
-                    dst_node.set_asyclic_check(asyclic_check.root_idx(), asyclic_check.depth() + 1);
-
-                    queue.push_front(edge.dst_node);
-                }
-            }
-            for edge_idx in edges_to_reverse {
-                self.reverse_edge(edge_idx);
+        // In case we didn't visit anybody (e.g. there might be no source nodes
+        // as the graph starts as potentially cyclic)
+        for node_idx in 0..self.node_count() {
+            if !visited[node_idx] {
+                self.make_asyclic_worker(node_idx, &mut visited, &mut rec_stack)
             }
         }
+
+        self.print_nodes("after make_asyclic()");
     }
+
+    /// On the given node
+    /// * Mark the node as visited, and mark it on the recursive stack
+    /// * Do a depth first search of it's outbound edges
+    ///   * If an edge has not yet been visited, visit it recursively
+    ///   * If an edge is currently on the stack, reverse the edge
+    ///     (because this would cause a cycle)
+    /// * Remove the node from the recusive stack.
+    fn make_asyclic_worker(&mut self, node_idx: usize, visited: &mut [bool], rec_stack: &mut [bool]) {
+        if !visited[node_idx] {
+            visited[node_idx] = true;
+            rec_stack[node_idx] = true;
+            
+            let out_edges = self.get_node(node_idx).get_edges(Out).clone();
+            for edge_idx in out_edges {
+                let dst_node_idx = self.get_edge(edge_idx).dst_node;
+                
+                if !visited[dst_node_idx] {
+                    self.make_asyclic_worker(dst_node_idx, visited, rec_stack);
+
+                } else if rec_stack[dst_node_idx] {
+                    self.reverse_edge(edge_idx);
+                }
+            }
+
+        }
+        
+        rec_stack[node_idx] = false;
+    }
+    
+    /// Ignore individual edges that loop to and from the same node.
+    fn ignore_node_loops(&mut self) {
+        self.edges
+            .iter_mut()
+            .filter(|edge| edge.src_node == edge.dst_node)
+            .for_each(|edge| edge.ignored = true);
+    }
+
+    fn get_source_nodes(&self) -> VecDeque<usize> {
+        let mut queue = VecDeque::new();
+
+        for (node_idx, _node) in self
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_i, n)| n.no_in_edges())
+        {
+            // self.get_node(node_idx).set_asyclic_check(node_idx, 0);
+            queue.push_back(node_idx);
+        }
+        queue
+    }
+
+    // /// Beginning with start, return the first index that is not yet marked as part of the tree.
+    // fn get_next_non_tree_node_idx(&self, start: usize) -> Option<usize> {
+    //     for (index, node) in self.nodes.iter().skip(start).enumerate() {
+    //         let node_idx = start + index;
+    //         if !node.in_spanning_tree() {
+    //             return Some(node_idx);
+    //         }
+    //     }
+    //     None
+    // }
+
+    // /// Return a queue of nodes that don't have incoming edges (source nodes).
+    // fn get_source_nodes_and_fix_cyclic(&mut self) -> VecDeque<usize> {
+    //     let node_count = self.node_count();
+    //     let mut queue;
+
+    //     loop {
+    //         queue = self.get_source_nodes();
+
+    //         // Ensure we have at least one source node
+    //         if queue.is_empty() && node_count != 0 {
+    //             let node = self.get_node(0);
+    //             let in_edge_idx = node.in_edges[0];
+
+    //             self.reverse_edge(in_edge_idx);
+    //         } else {
+    //             break;
+    //         }
+    //     }
+    //     queue
+    // }
+
+    // /// Given a queue of source nodes, mark a tree of asyclic nodes.
+    // /// * Do a depth first search starting from the source nodes
+    // /// * Mark any nodes visited as "tree_node"
+    // /// * If any edges point to a previously visted node, reverse those edges.
+    // ///
+    // /// From Paper section 2.1: Making the graph asyclic (page 6)
+    // ///
+    // /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
+    // /// * Edges are searched in the "natural order" of the graph input, starting
+    // ///   from some source or sink nodes if any exist.
+    // /// * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree
+    // ///   edges [AHU].
+    // /// * The tree deﬁnes a partial order on nodes.
+    // /// * Given this partial order, the non-tree edges
+    // ///   further partition into three sets: cross edges, forward edges, and back edges.
+    // /// * Cross edges connect unrelated nodes in the partial order.
+    // ///   * Forward edges connect a node to some of its descendants.
+    // ///   * Back edges connect a descendant to some of its ancestors.
+    // /// * It is clear that adding forward and cross edges to the partial order does not
+    // ///   create cycles.
+    // /// * Because reversing back edges makes them into forward edges, all cycles are
+    // ///   broken by this procedure.
+    // fn set_asyclic_tree(&mut self, queue: &mut VecDeque<usize>) {
+    //     let mut path_stack = vec![false; self.node_count()];
+
+    //     println!("Initial nodes for set_asyclic: {:?}", queue);
+    //     while let Some(node_idx) = queue.pop_front() {
+    //         let node = self.get_node(node_idx);
+    //         let mut edges_to_reverse = Vec::new();
+
+    //         let asyclic_check = node
+    //             .spanning_tree_asyclic_check()
+    //             .expect("must have an asyclic_check");
+    //         path_stack[node_idx] = true;
+
+    //         for edge_idx in node.out_edges.iter().cloned() {
+    //             let edge = self.get_edge(edge_idx);
+    //             let dst_node = self.get_node(edge.dst_node);
+    //             let dst_asyclic_check = dst_node.spanning_tree_asyclic_check();
+
+    //             if let Some(dst_asyclic_check) = dst_asyclic_check {
+    //                 if asyclic_check.root_idx() == dst_asyclic_check.root_idx() && path_stack[edge.dst_node] {
+    //                 // if asyclic_check.is_cyclic(dst_asyclic_check) {
+    //                     edges_to_reverse.push(edge_idx);
+    //                 }
+    //             } else {
+    //                 dst_node.set_asyclic_check(asyclic_check.root_idx(), asyclic_check.depth() + 1);
+
+    //                 queue.push_front(edge.dst_node);
+    //             }
+    //         }
+    //         for edge_idx in edges_to_reverse {
+    //             self.reverse_edge(edge_idx);
+    //         }
+    //         path_stack[node_idx] = false;
+    //     }
+    // }
+    
 
     fn reverse_edge(&mut self, edge_idx_to_reverse: usize) {
         let (src_node_idx, dst_node_idx) = {
@@ -1714,31 +1792,31 @@ pub mod tests {
         }
     }
 
-    #[test]
-    fn test_get_source_nodes_single() {
-        let mut graph = Graph::new();
-        let node_map = graph.add_nodes('a'..='d');
-        let edges = vec![("a", "b"), ("c", "d"), ("d", "c")];
-        graph.add_edges(&edges, &node_map);
+    // #[test]
+    // fn test_get_source_nodes_single() {
+    //     let mut graph = Graph::new();
+    //     let node_map = graph.add_nodes('a'..='d');
+    //     let edges = vec![("a", "b"), ("c", "d"), ("d", "c")];
+    //     graph.add_edges(&edges, &node_map);
 
-        let source_nodes = graph.get_source_nodes_and_fix_cyclic();
-        let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
+    //     let source_nodes = graph.get_source_nodes_and_fix_cyclic();
+    //     let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
 
-        assert_eq!(source_nodes, vec![0]);
-    }
+    //     assert_eq!(source_nodes, vec![0]);
+    // }
 
-    #[test]
-    fn test_get_source_nodes_double() {
-        let mut graph = Graph::new();
-        let node_map = graph.add_nodes('a'..='c');
-        let edges = vec![("a", "b"), ("c", "b")];
-        graph.add_edges(&edges, &node_map);
+    // #[test]
+    // fn test_get_source_nodes_double() {
+    //     let mut graph = Graph::new();
+    //     let node_map = graph.add_nodes('a'..='c');
+    //     let edges = vec![("a", "b"), ("c", "b")];
+    //     graph.add_edges(&edges, &node_map);
 
-        let source_nodes = graph.get_source_nodes_and_fix_cyclic();
-        let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
+    //     let source_nodes = graph.get_source_nodes_and_fix_cyclic();
+    //     let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
 
-        assert_eq!(source_nodes, vec![0, 2]);
-    }
+    //     assert_eq!(source_nodes, vec![0, 2]);
+    // }
 
     /// Ignored because we need to handle this with subgraphs: breaking up unconnected asyclic
     /// graphs into separate graphs.
