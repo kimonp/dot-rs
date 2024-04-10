@@ -6,10 +6,10 @@ pub const DOT_EXAMPLES: [(&str, &str); 17] = [
     ("a_to_b_and_c", "digraph {a -> b; a -> c;}"),
     ("b_and_c_to_a", "digraph {b -> a; c -> a;}"),
     ("a_to_c_and_b_to_a", "digraph {a -> c; b -> a;}"),
-    ("two_acyclic", "digraph {a -> b; b -> a;}"),
-    ("three_acyclic", "digraph {a -> b; b -> c; c -> a; }"),
+    ("two_cyclic", "digraph {a -> b; b -> a;}"),
+    ("three_cyclic", "digraph {a -> b; b -> c; c -> a; }"),
     (
-        "complex_acyclic",
+        "complex_cyclic",
         "digraph { a -> c; b -> d; c -> e; e -> d; d -> c; }",
     ),
     ("flux_capacitor", "digraph {a -> c; b -> c; c -> d}"),
