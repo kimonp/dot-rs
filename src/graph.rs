@@ -320,9 +320,8 @@ impl Graph {
     //     self.print_nodes("after make_asyclic()");
     // }
 
-
     /// Make the graph asyclic by reversing edges to previously visited nodes.
-    /// 
+    ///
     /// From Paper section 2.1: Making the graph asyclic (page 6)
     ///
     /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
@@ -370,28 +369,31 @@ impl Graph {
     ///   * If an edge is currently on the stack, reverse the edge
     ///     (because this would cause a cycle)
     /// * Remove the node from the recusive stack.
-    fn make_asyclic_worker(&mut self, node_idx: usize, visited: &mut [bool], rec_stack: &mut [bool]) {
+    fn make_asyclic_worker(
+        &mut self,
+        node_idx: usize,
+        visited: &mut [bool],
+        rec_stack: &mut [bool],
+    ) {
         if !visited[node_idx] {
             visited[node_idx] = true;
             rec_stack[node_idx] = true;
-            
+
             let out_edges = self.get_node(node_idx).get_edges(Out).clone();
             for edge_idx in out_edges {
                 let dst_node_idx = self.get_edge(edge_idx).dst_node;
-                
+
                 if !visited[dst_node_idx] {
                     self.make_asyclic_worker(dst_node_idx, visited, rec_stack);
-
                 } else if rec_stack[dst_node_idx] {
                     self.reverse_edge(edge_idx);
                 }
             }
-
         }
-        
+
         rec_stack[node_idx] = false;
     }
-    
+
     /// Ignore individual edges that loop to and from the same node.
     fn ignore_node_loops(&mut self) {
         self.edges
@@ -504,7 +506,6 @@ impl Graph {
     //         path_stack[node_idx] = false;
     //     }
     // }
-    
 
     fn reverse_edge(&mut self, edge_idx_to_reverse: usize) {
         let (src_node_idx, dst_node_idx) = {
@@ -625,7 +626,7 @@ impl Graph {
         );
 
         self.set_node_positions(&best);
-        self.print_nodes("After set_horizontal_ordering (dot_min_cross())");
+        self.print_nodes("After set_horizontal_ordering (dot_mincross())");
 
         self.rank_orderings = Some(best);
 
@@ -703,11 +704,7 @@ impl Graph {
         let mut cur_edge_idx = edge_idx;
         let mut new_rank = rank;
         while remaining_slack != 0 {
-            new_rank = if up_edge {
-                new_rank - 1
-            } else {
-                new_rank + 1
-            };
+            new_rank = if up_edge { new_rank - 1 } else { new_rank + 1 };
 
             let virt_node_idx = self.add_virtual_node(new_rank, NodeType::RankFiller);
 
@@ -1102,7 +1099,8 @@ impl Graph {
             for rank in 0..rank_orderings.num_ranks() as i32 {
                 let mut prev_rank = None;
                 let mut prev_node_idx = None;
-                // To do this correctly, we mist
+                // To do this correctly, we must step through the nodes in each
+                // rank ordered by their positions which we calculated previously.
                 let rank_by_position = rank_orderings
                     .rank_to_positions(rank)
                     .expect("all rank have position");

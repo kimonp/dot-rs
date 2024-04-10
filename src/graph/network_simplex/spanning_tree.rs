@@ -522,7 +522,15 @@ impl Graph {
         }
     }
 
-    /// Re-rank the given node by adding delta to the rank, and all sub_nodes in the tree.
+    /// Re-rank the given node by subtracting delta to the rank, and all descendent nodes in the tree.
+    /// 
+    /// * First reduces the rank of node_idx by delta
+    /// * Then recursively reduces the rank of all tree descendents of node_idx
+    ///   by delta.
+    ///   
+    /// More intuitively written, this function should add delta rather
+    /// than subtract it, but I have left it as a subtract to keep it similar
+    /// to what GraphVis does.
     pub(super) fn rerank_by_tree(&self, node_idx: usize, delta: i32) {
         let node = self.get_node(node_idx);
 

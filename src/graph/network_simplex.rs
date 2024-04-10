@@ -914,12 +914,57 @@ impl Graph {
         // TODO!
     }
 
+    /// Balance nodes left-right so that nodes in different ranks are balanced against each other.
+    /// 
+    /// So:  A
+    ///      | \
+    ///      B  C
     ///
-    ///From GraphViz 9.0.0:
-    /// * Initializes DFS range attributes (par, low, lim) over tree nodes such that:
-    /// * ND_par(n) - parent tree edge
-    /// * ND_low(n) - min DFS index for nodes in sub-tree (>= 1)
-    /// * ND_lim(n) - max DFS index for nodes in sub-tree
+    /// Becomes:   A
+    ///           /  \
+    ///          B    C
+    /// 
+    /// * In this case, A is "balanced" or centered against B and C
+    /// * balance_left_right() is only called using the "transformed" aux_graph that was modified with
+    ///   network simplex for setting horizontal positions (target == XCoordinate).
+    ///   
+    /// Summary:
+    /// * for each tree_edge with a cutvalue of zero:
+    ///   * find a non_tree_edge with the lowest remaining cutvalue.
+    ///     * if non_tree_edge has a slack > 1:
+    ///       * select the head or tail node of to tree_edge whos has a descendent farther from the root (deepest descendent)
+    ///         * Rerank the selected node and all tree descendent nodes by:
+    ///           * if you selected the tail: -non_tree_edge_slack / 2
+    ///           * if you selected the head: non_tree_edge_slack / 2
+    /// 
+    /// * Note that this only steps through all tree edges once.
+    /// * However, the reranking of nodes can affect subsequent rerankings
+    /// 
+    /// How it works:
+    /// * As of now, I don't fully understand how it works.
+    /// * First, you are using a transformed graph:
+    ///   * The actual edges are replaced with two edges and a virtual node:
+    ///     * A -> B becomes: A <- V -> B
+    ///     * One reason to do this might be that:
+    ///       * Instead of having one arrow that only points from one node to another,
+    ///         you have one arrow that points from V -> A, and one node that points from A -> V
+    ///         * This has a significant affect on the cut value, of the edges between N1 and N2,
+    ///           since the direction of the arrow to be cut is include in the calculation.
+    ///           So for:  N1 <-e1- V -e2-> N2, cutvalue(e1) == cutvalue(e2) +/- 2
+    ///   * Additionally, adjacent nodes in the same rank are connected by an edge
+    ///     which is there to keep the nodes from moving relative to each other 
+    ///     (the original paper says it is to "force the nodes to be sufficiently
+    ///     separate from one another but does not affect the cost of layout").
+    /// * By selecting a cutvalue of zero, you are only considering edges that 
+    /// 
+    /// From the paper: (page 20 section 4.2: Optimal node placement)
+    /// * We can now consider the level assignment problem on G′, which can be solved using the network simplex method.
+    ///   Any solution of the positioning problem on G corresponds to a solution of the level assignment problem on G′ with the same cost.
+    ///   This is achieved by assigning each n e the value uv min (x_u, x_v), using the notation of ﬁgure 4-2 and where x_u  and x_v  are
+    ///   the X coordinates assigned to u and v in G.  Conversely, any level assignment in G′ induces a valid positioning in G.
+    ///   In addition, in an optimal level assignment, one of e u or e must have length 0, and the other has length | x_u − x_v |. This
+    ///   means the cost of an original edge (u, v) in G equals the sum of the cost of the two edges e_u, e_v in G′ and, globally, the
+    ///   two solutions have the same cost, Thus, optimality of G′ implies optimality for G and solving G′ gives us a solution for G.
     ///
     fn balance_left_right(&mut self) {
         self.print_nodes("balance_left_right start");
@@ -929,37 +974,34 @@ impl Graph {
                 print!("Looking at edge with cut of 0:");
                 self.print_edge(tree_edge_idx);
 
-                if let Some((replace_edge_idx, delta)) = self.enter_edge_for_simplex(tree_edge_idx)
+                if let Some((non_tree_edge_idx, non_tree_edge_slack)) = self.enter_edge_for_simplex(tree_edge_idx)
                 {
-                    if delta > 1 {
-                        println!("  balance_left_right(): replace {tree_edge_idx} with {replace_edge_idx}, slack: {delta}\n    replace: {}\n      with: {}",
+                    if non_tree_edge_slack > 1 {
+                        println!("  balance_left_right(): replace {tree_edge_idx} with {non_tree_edge_idx}, slack: {non_tree_edge_slack}\n    replace: {}\n      with: {}",
                                 self.edge_to_string(tree_edge_idx),
-                                self.edge_to_string(replace_edge_idx),
+                                self.edge_to_string(non_tree_edge_idx),
                             );
 
                         let src_node = self.get_node(tree_edge.src_node);
                         let dst_node = self.get_node(tree_edge.dst_node);
 
-                        if let (Some(src_idx_max), Some(dst_idx_max)) =
+                        if let (Some(src_dist_max), Some(dst_dist_max)) =
                             (src_node.tree_dist_max(), dst_node.tree_dist_max())
                         {
-                            if src_idx_max < dst_idx_max {
-                                println!(
-                                    "  rerank by tail ({src_idx_max} < {dst_idx_max}): {}",
-                                    delta / 2
-                                );
-                                self.rerank_by_tree(tree_edge.src_node, delta / 2);
+                            let (rerank_node_idx, delta) = if src_dist_max < dst_dist_max {
+                                (tree_edge.src_node, non_tree_edge_slack / 2)
                             } else {
-                                println!("  rerank by head: {}", delta / 2);
-                                self.rerank_by_tree(tree_edge.dst_node, -delta / 2);
-                            }
+                                (tree_edge.dst_node, -non_tree_edge_slack / 2)
+                            };
+                            println!("  rerank by node {rerank_node_idx} by: {delta}");
+                            self.rerank_by_tree(rerank_node_idx, delta);
                         } else {
                             panic!("Not all nodes in spanning tree!");
                         }
                     } else {
                         println!(
-                            "  balance_left_right(): skipping candidate replacement edge with slack <= 1: slack={delta}: {}",
-                            self.edge_to_string(replace_edge_idx)
+                            "  balance_left_right(): skipping candidate replacement edge with slack <= 1: slack={non_tree_edge_slack}: {}",
+                            self.edge_to_string(non_tree_edge_idx)
                         );
                     }
                 } else {
