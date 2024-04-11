@@ -39,6 +39,55 @@ use crate::graph::edge::{
 };
 
 impl Graph {
+    /// Return true if maybe_ancestor_idx is a common ancestor of child_idx.
+    ///
+    /// This is true only if the max distance from the child node to the root is within
+    /// the min/max distance of the ancestor node.
+    ///
+    /// GraphViz code: SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    ///              : SEQ(maybe_ancestor_node_idx.min, child_idx.max, maybe_ancestor_node_idx.max)
+    pub(super) fn is_common_ancestor(&self, maybe_ancestor_node_idx: usize, child_idx: usize) -> bool {
+        let maybe_ancestor_node = self.get_node(maybe_ancestor_node_idx);
+        let ancestor_dist_min = maybe_ancestor_node
+            .tree_dist_min()
+            .expect("tree distance must be set");
+        let ancestor_dist_max = maybe_ancestor_node
+            .tree_dist_max()
+            .expect("tree distance must be set");
+
+        self.node_distance_within_limits(child_idx, ancestor_dist_min, ancestor_dist_max)
+    }
+
+    /// Return true has a tree_dist_max such that: min <= tree_dist_max <= max
+    ///
+    /// GraphViz code: SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    ///              : SEQ(min, node_idx, max)
+    ///              
+    /// From the paper: page 12: Section 2.4: Implementation details
+    /// 
+    /// Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder
+    /// traversal of the tree, starting from some ﬁxed root node v root, and labeling each node v with its
+    /// postorder traversal number lim(v), the least number low(v) of any descendant in the search, and the
+    /// edge parent(v) by which the node was reached (see ﬁgure 2-5).
+    /// 
+    /// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
+    /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
+    /// edge and v root is in the head component of the edge (i.e., lim (u)< lim (v)), then a node w is in the tail
+    /// component of e if and only if low(u) ≤ lim(w) ≤ lim(u).  These numbers can also be used to update the
+    /// tree efﬁciently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
+    /// whose cut values must be adjusted are those in the path connecting w and x in the tree.  This path is determined
+    /// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the ﬁrst node
+    /// l such that low (l) ≤ lim(w) , lim(x) ≤ lim (l).  Of course, these postorder parameters must also be adjusted
+    /// when exchanging tree edges, but only for nodes below l.
+    pub(super) fn node_distance_within_limits(&self, node_idx: usize, min: usize, max: usize) -> bool {
+        let tree_dist_max = self
+            .get_node(node_idx)
+            .tree_dist_max()
+            .expect("tree_dist_max must be set");
+
+        min <= tree_dist_max && tree_dist_max <= max
+    }
+
     /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
     ///
     /// Documentation from the paper: pages 8-9

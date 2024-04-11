@@ -259,7 +259,7 @@ impl Graph {
         self.nodes[src_node].add_edge(idx, Out);
         self.nodes[dst_node].add_edge(idx, In);
 
-        println!("Added edge: {}", self.edge_to_string(idx));
+        // println!("Added edge: {}", self.edge_to_string(idx));
 
         idx
     }
@@ -270,55 +270,6 @@ impl Graph {
         self.merge_edges();
         self.network_simplex_ranking(VerticalRank);
     }
-
-    // /// make_asyclic() removes cycles from the graph.
-    // /// * starting with "source nodes" (nodes with only outgoing edges) it does a depth first search (DFS).
-    // ///   * "visited" nodes have their "tree_member" attribute set
-    // ///   * when the DFS finds an edge pointing to a visited node, it reverses the direction of the edge,
-    // ///     and sets the "reversed" attribute of the edge (so it can be depicted as it was originally)
-    // ///     * Trying to reverse an already reversed edge is an error
-    // /// * Before finishing, all nodes are checked to see if they have been visited.
-    // ///   * If one is found, start a new DFS using this node.
-    // ///   * Repeat until all nodes have been visited
-    // ///
-    // /// Documentation from the paper: page 6: 2.1: Making the graph asyclic
-    // /// * A graph must be acyclic to have a consistent rank assignment.
-    // /// * Because the input graph may contain cycles, a preprocessing step detects cycles and
-    // ///   breaks them by reversing certain edges [RDM].
-    // ///   * Of course these edges are only reversed internally; arrowheads in the drawing show
-    // ///     the original direction.
-    // /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
-    // ///   * Edges are searched in the "natural order" of the graph input, starting from some
-    // ///     source or sink nodes if any exist.
-    // ///     - a source node is a node in a directed graph that has no incoming edges.
-    // ///     - a sink node is a node in a directed graph that has no outgoing edges.
-    // ///   * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree edges [AHU].
-    // ///     * The tree deﬁnes a partial order on nodes.
-    // ///     * Given this partial order, the non-tree edges further partition into three sets:
-    // ///       cross edges, forward edges, and back edges.
-    // ///       * Cross edges connect unrelated nodes in the partial order.
-    // ///       * Forward edges connect a node to some of its descendants.
-    // ///       * Back edges connect a descendant to some of its ancestors.
-    // ///    * It is clear that adding forward and cross edges to the partial order does not create cycles.
-    // ///    * Because reversing back edges makes them into forward edges, all cycles are broken by this procedure.
-    // fn old_make_asyclic(&mut self) {
-    //     self.print_nodes("before make_asyclic()");
-    //     self.ignore_node_loops();
-    //     self.print_nodes("after ignore_loops()");
-
-    //     let mut queue = self.get_source_nodes_and_fix_cyclic();
-    //     self.set_asyclic_tree(&mut queue);
-    //     self.print_nodes("after set_asyclic_tree()");
-
-    //     let mut start = 0;
-    //     while let Some(non_tree_node_idx) = self.get_next_non_tree_node_idx(start) {
-    //         queue.push_front(non_tree_node_idx);
-    //         self.set_asyclic_tree(&mut queue);
-
-    //         start = non_tree_node_idx + 1;
-    //     }
-    //     self.print_nodes("after make_asyclic()");
-    // }
 
     /// Make the graph asyclic by reversing edges to previously visited nodes.
     ///
@@ -340,7 +291,7 @@ impl Graph {
     /// * Because reversing back edges makes them into forward edges, all cycles are
     ///   broken by this procedure.
     fn make_asyclic(&mut self) {
-        self.print_nodes("before make_asyclic()");
+        // self.print_nodes("before make_asyclic()");
         self.ignore_node_loops();
 
         let mut visited = vec![false; self.node_count()];
@@ -359,7 +310,7 @@ impl Graph {
             }
         }
 
-        self.print_nodes("after make_asyclic()");
+        // self.print_nodes("after make_asyclic()");
     }
 
     /// On the given node
@@ -449,64 +400,6 @@ impl Graph {
     //     queue
     // }
 
-    // /// Given a queue of source nodes, mark a tree of asyclic nodes.
-    // /// * Do a depth first search starting from the source nodes
-    // /// * Mark any nodes visited as "tree_node"
-    // /// * If any edges point to a previously visted node, reverse those edges.
-    // ///
-    // /// From Paper section 2.1: Making the graph asyclic (page 6)
-    // ///
-    // /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
-    // /// * Edges are searched in the "natural order" of the graph input, starting
-    // ///   from some source or sink nodes if any exist.
-    // /// * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree
-    // ///   edges [AHU].
-    // /// * The tree deﬁnes a partial order on nodes.
-    // /// * Given this partial order, the non-tree edges
-    // ///   further partition into three sets: cross edges, forward edges, and back edges.
-    // /// * Cross edges connect unrelated nodes in the partial order.
-    // ///   * Forward edges connect a node to some of its descendants.
-    // ///   * Back edges connect a descendant to some of its ancestors.
-    // /// * It is clear that adding forward and cross edges to the partial order does not
-    // ///   create cycles.
-    // /// * Because reversing back edges makes them into forward edges, all cycles are
-    // ///   broken by this procedure.
-    // fn set_asyclic_tree(&mut self, queue: &mut VecDeque<usize>) {
-    //     let mut path_stack = vec![false; self.node_count()];
-
-    //     println!("Initial nodes for set_asyclic: {:?}", queue);
-    //     while let Some(node_idx) = queue.pop_front() {
-    //         let node = self.get_node(node_idx);
-    //         let mut edges_to_reverse = Vec::new();
-
-    //         let asyclic_check = node
-    //             .spanning_tree_asyclic_check()
-    //             .expect("must have an asyclic_check");
-    //         path_stack[node_idx] = true;
-
-    //         for edge_idx in node.out_edges.iter().cloned() {
-    //             let edge = self.get_edge(edge_idx);
-    //             let dst_node = self.get_node(edge.dst_node);
-    //             let dst_asyclic_check = dst_node.spanning_tree_asyclic_check();
-
-    //             if let Some(dst_asyclic_check) = dst_asyclic_check {
-    //                 if asyclic_check.root_idx() == dst_asyclic_check.root_idx() && path_stack[edge.dst_node] {
-    //                 // if asyclic_check.is_cyclic(dst_asyclic_check) {
-    //                     edges_to_reverse.push(edge_idx);
-    //                 }
-    //             } else {
-    //                 dst_node.set_asyclic_check(asyclic_check.root_idx(), asyclic_check.depth() + 1);
-
-    //                 queue.push_front(edge.dst_node);
-    //             }
-    //         }
-    //         for edge_idx in edges_to_reverse {
-    //             self.reverse_edge(edge_idx);
-    //         }
-    //         path_stack[node_idx] = false;
-    //     }
-    // }
-
     fn reverse_edge(&mut self, edge_idx_to_reverse: usize) {
         let (src_node_idx, dst_node_idx) = {
             let edge = self.get_edge(edge_idx_to_reverse);
@@ -515,11 +408,11 @@ impl Graph {
         };
 
         // Swap the references in src and dst nodes
-        println!(
-            "SWAPPING from {} to {}",
-            self.get_node(src_node_idx).name,
-            self.get_node(dst_node_idx).name
-        );
+        // println!(
+        //     "SWAPPING from {} to {}",
+        //     self.get_node(src_node_idx).name,
+        //     self.get_node(dst_node_idx).name
+        // );
         self.get_node_mut(src_node_idx)
             .swap_edge_in_list(edge_idx_to_reverse, Out);
         self.get_node_mut(dst_node_idx)
@@ -763,7 +656,7 @@ impl Graph {
         let mut dfs_queue = self.get_min_vertical_rank_nodes();
         let mut assigned = HashSet::new();
 
-        println!("Starting Queue: {dfs_queue:?}");
+        // println!("Starting Queue: {dfs_queue:?}");
 
         while let Some(node_idx) = dfs_queue.pop_front() {
             let node = self.get_node(node_idx);
@@ -784,14 +677,14 @@ impl Graph {
                 })
                 .collect::<Vec<usize>>();
 
-            println!("Ordering node: {node_idx}");
+            // println!("Ordering node: {node_idx}");
             if assigned.get(&node_idx).is_none() {
                 let rank = node
                     .vertical_rank
                     .expect("All nodes must have a vertical rank");
                 rank_order.add_node_idx_to_rank(rank, node_idx);
                 assigned.insert(node_idx);
-                println!("  Assigned node: {node_idx}");
+                // println!("  Assigned node: {node_idx}");
             }
 
             for node_idx in unassigned_dst_nodes {
@@ -913,7 +806,7 @@ impl Graph {
         aux_graph.network_simplex_ranking(XCoordinate);
         self.set_x_coordinates_from_aux(&aux_graph);
 
-        self.print_nodes("after set_coordinates in network_simplex_ranking (dot_position())");
+        // self.print_nodes("after set_coordinates in network_simplex_ranking (dot_position())");
     }
 
     fn set_x_coordinates_from_aux(&mut self, aux_graph: &Graph) {
@@ -952,7 +845,7 @@ impl Graph {
 
             node.assign_y_coord(new_y);
         }
-        self.print_nodes("after set_y_coordinates()");
+        // self.print_nodes("after set_y_coordinates()");
     }
 
     /// Documentation from paper: 4.2 Optimal Node Placement page 20
@@ -994,7 +887,7 @@ impl Graph {
     fn create_positioning_aux_graph(&self) -> Graph {
         let mut aux_graph = Graph::new();
 
-        self.print_nodes("before create_positioning_aux_graph() (create_aux_edges)");
+        // self.print_nodes("before create_positioning_aux_graph() (create_aux_edges)");
 
         // Add all the existing nodes from the current graph without edges.
         for node in self.nodes.iter() {
@@ -1005,12 +898,12 @@ impl Graph {
             aux_graph.nodes.push(new_node)
         }
 
-        aux_graph.print_nodes("before set_left_right_constraints() (make_LR_constraints)");
+        // aux_graph.print_nodes("before set_left_right_constraints() (make_LR_constraints)");
         self.set_left_right_constraints(&mut aux_graph);
-        aux_graph.print_nodes("after set_left_right_constraints()");
+        // aux_graph.print_nodes("after set_left_right_constraints()");
 
         self.add_virtual_nodes_for_horizontal_positioning(&mut aux_graph);
-        aux_graph.print_nodes("after add_virtual_nodes_for_horizontal...() (make_edge_pairs)");
+        // aux_graph.print_nodes("after add_virtual_nodes_for_horizontal...() (make_edge_pairs)");
 
         // We need to build a feasible tree from scratch
         for node in aux_graph.nodes.iter_mut() {
@@ -1122,10 +1015,10 @@ impl Graph {
 
                     let node = self.get_node(node_idx);
                     assert_eq!(Some(rank), node.simplex_rank());
-                    println!(
-                        "rank{rank}: Setting rank for node {}: pos:{:?} to: {new_rank}",
-                        node.name, node.horizontal_position
-                    );
+                    // println!(
+                    //     "rank{rank}: Setting rank for node {}: pos:{:?} to: {new_rank}",
+                    //     node.name, node.horizontal_position
+                    // );
 
                     aux_graph
                         .get_node(node_idx)
