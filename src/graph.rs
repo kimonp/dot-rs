@@ -54,8 +54,6 @@ pub struct Graph {
     horizontal_node_separation: u32,
     /// First node_idx in the graph that is virutal.  All subsequent nodes must be virtual too.
     first_virtual_idx: Option<usize>,
-    #[cfg(test)]
-    skip_tree_init: bool,
 }
 
 impl Default for Graph {
@@ -72,8 +70,6 @@ impl Graph {
             rank_orderings: None,
             horizontal_node_separation: NODE_MIN_SEP_X as u32,
             first_virtual_idx: None,
-            #[cfg(test)]
-            skip_tree_init: false,
         }
     }
 
@@ -259,7 +255,7 @@ impl Graph {
         self.nodes[src_node].add_edge(idx, Out);
         self.nodes[dst_node].add_edge(idx, In);
 
-        println!("Added edge: {}", self.edge_to_string(idx));
+        // println!("Added edge: {}", self.edge_to_string(idx));
 
         idx
     }
@@ -270,55 +266,6 @@ impl Graph {
         self.merge_edges();
         self.network_simplex_ranking(VerticalRank);
     }
-
-    // /// make_asyclic() removes cycles from the graph.
-    // /// * starting with "source nodes" (nodes with only outgoing edges) it does a depth first search (DFS).
-    // ///   * "visited" nodes have their "tree_member" attribute set
-    // ///   * when the DFS finds an edge pointing to a visited node, it reverses the direction of the edge,
-    // ///     and sets the "reversed" attribute of the edge (so it can be depicted as it was originally)
-    // ///     * Trying to reverse an already reversed edge is an error
-    // /// * Before finishing, all nodes are checked to see if they have been visited.
-    // ///   * If one is found, start a new DFS using this node.
-    // ///   * Repeat until all nodes have been visited
-    // ///
-    // /// Documentation from the paper: page 6: 2.1: Making the graph asyclic
-    // /// * A graph must be acyclic to have a consistent rank assignment.
-    // /// * Because the input graph may contain cycles, a preprocessing step detects cycles and
-    // ///   breaks them by reversing certain edges [RDM].
-    // ///   * Of course these edges are only reversed internally; arrowheads in the drawing show
-    // ///     the original direction.
-    // /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
-    // ///   * Edges are searched in the "natural order" of the graph input, starting from some
-    // ///     source or sink nodes if any exist.
-    // ///     - a source node is a node in a directed graph that has no incoming edges.
-    // ///     - a sink node is a node in a directed graph that has no outgoing edges.
-    // ///   * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree edges [AHU].
-    // ///     * The tree deﬁnes a partial order on nodes.
-    // ///     * Given this partial order, the non-tree edges further partition into three sets:
-    // ///       cross edges, forward edges, and back edges.
-    // ///       * Cross edges connect unrelated nodes in the partial order.
-    // ///       * Forward edges connect a node to some of its descendants.
-    // ///       * Back edges connect a descendant to some of its ancestors.
-    // ///    * It is clear that adding forward and cross edges to the partial order does not create cycles.
-    // ///    * Because reversing back edges makes them into forward edges, all cycles are broken by this procedure.
-    // fn old_make_asyclic(&mut self) {
-    //     self.print_nodes("before make_asyclic()");
-    //     self.ignore_node_loops();
-    //     self.print_nodes("after ignore_loops()");
-
-    //     let mut queue = self.get_source_nodes_and_fix_cyclic();
-    //     self.set_asyclic_tree(&mut queue);
-    //     self.print_nodes("after set_asyclic_tree()");
-
-    //     let mut start = 0;
-    //     while let Some(non_tree_node_idx) = self.get_next_non_tree_node_idx(start) {
-    //         queue.push_front(non_tree_node_idx);
-    //         self.set_asyclic_tree(&mut queue);
-
-    //         start = non_tree_node_idx + 1;
-    //     }
-    //     self.print_nodes("after make_asyclic()");
-    // }
 
     /// Make the graph asyclic by reversing edges to previously visited nodes.
     ///
@@ -340,7 +287,7 @@ impl Graph {
     /// * Because reversing back edges makes them into forward edges, all cycles are
     ///   broken by this procedure.
     fn make_asyclic(&mut self) {
-        self.print_nodes("before make_asyclic()");
+        // self.print_nodes("before make_asyclic()");
         self.ignore_node_loops();
 
         let mut visited = vec![false; self.node_count()];
@@ -359,7 +306,7 @@ impl Graph {
             }
         }
 
-        self.print_nodes("after make_asyclic()");
+        // self.print_nodes("after make_asyclic()");
     }
 
     /// On the given node
@@ -417,96 +364,6 @@ impl Graph {
         queue
     }
 
-    // /// Beginning with start, return the first index that is not yet marked as part of the tree.
-    // fn get_next_non_tree_node_idx(&self, start: usize) -> Option<usize> {
-    //     for (index, node) in self.nodes.iter().skip(start).enumerate() {
-    //         let node_idx = start + index;
-    //         if !node.in_spanning_tree() {
-    //             return Some(node_idx);
-    //         }
-    //     }
-    //     None
-    // }
-
-    // /// Return a queue of nodes that don't have incoming edges (source nodes).
-    // fn get_source_nodes_and_fix_cyclic(&mut self) -> VecDeque<usize> {
-    //     let node_count = self.node_count();
-    //     let mut queue;
-
-    //     loop {
-    //         queue = self.get_source_nodes();
-
-    //         // Ensure we have at least one source node
-    //         if queue.is_empty() && node_count != 0 {
-    //             let node = self.get_node(0);
-    //             let in_edge_idx = node.in_edges[0];
-
-    //             self.reverse_edge(in_edge_idx);
-    //         } else {
-    //             break;
-    //         }
-    //     }
-    //     queue
-    // }
-
-    // /// Given a queue of source nodes, mark a tree of asyclic nodes.
-    // /// * Do a depth first search starting from the source nodes
-    // /// * Mark any nodes visited as "tree_node"
-    // /// * If any edges point to a previously visted node, reverse those edges.
-    // ///
-    // /// From Paper section 2.1: Making the graph asyclic (page 6)
-    // ///
-    // /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
-    // /// * Edges are searched in the "natural order" of the graph input, starting
-    // ///   from some source or sink nodes if any exist.
-    // /// * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree
-    // ///   edges [AHU].
-    // /// * The tree deﬁnes a partial order on nodes.
-    // /// * Given this partial order, the non-tree edges
-    // ///   further partition into three sets: cross edges, forward edges, and back edges.
-    // /// * Cross edges connect unrelated nodes in the partial order.
-    // ///   * Forward edges connect a node to some of its descendants.
-    // ///   * Back edges connect a descendant to some of its ancestors.
-    // /// * It is clear that adding forward and cross edges to the partial order does not
-    // ///   create cycles.
-    // /// * Because reversing back edges makes them into forward edges, all cycles are
-    // ///   broken by this procedure.
-    // fn set_asyclic_tree(&mut self, queue: &mut VecDeque<usize>) {
-    //     let mut path_stack = vec![false; self.node_count()];
-
-    //     println!("Initial nodes for set_asyclic: {:?}", queue);
-    //     while let Some(node_idx) = queue.pop_front() {
-    //         let node = self.get_node(node_idx);
-    //         let mut edges_to_reverse = Vec::new();
-
-    //         let asyclic_check = node
-    //             .spanning_tree_asyclic_check()
-    //             .expect("must have an asyclic_check");
-    //         path_stack[node_idx] = true;
-
-    //         for edge_idx in node.out_edges.iter().cloned() {
-    //             let edge = self.get_edge(edge_idx);
-    //             let dst_node = self.get_node(edge.dst_node);
-    //             let dst_asyclic_check = dst_node.spanning_tree_asyclic_check();
-
-    //             if let Some(dst_asyclic_check) = dst_asyclic_check {
-    //                 if asyclic_check.root_idx() == dst_asyclic_check.root_idx() && path_stack[edge.dst_node] {
-    //                 // if asyclic_check.is_cyclic(dst_asyclic_check) {
-    //                     edges_to_reverse.push(edge_idx);
-    //                 }
-    //             } else {
-    //                 dst_node.set_asyclic_check(asyclic_check.root_idx(), asyclic_check.depth() + 1);
-
-    //                 queue.push_front(edge.dst_node);
-    //             }
-    //         }
-    //         for edge_idx in edges_to_reverse {
-    //             self.reverse_edge(edge_idx);
-    //         }
-    //         path_stack[node_idx] = false;
-    //     }
-    // }
-
     fn reverse_edge(&mut self, edge_idx_to_reverse: usize) {
         let (src_node_idx, dst_node_idx) = {
             let edge = self.get_edge(edge_idx_to_reverse);
@@ -515,11 +372,11 @@ impl Graph {
         };
 
         // Swap the references in src and dst nodes
-        println!(
-            "SWAPPING from {} to {}",
-            self.get_node(src_node_idx).name,
-            self.get_node(dst_node_idx).name
-        );
+        // println!(
+        //     "SWAPPING from {} to {}",
+        //     self.get_node(src_node_idx).name,
+        //     self.get_node(dst_node_idx).name
+        // );
         self.get_node_mut(src_node_idx)
             .swap_edge_in_list(edge_idx_to_reverse, Out);
         self.get_node_mut(dst_node_idx)
@@ -763,7 +620,7 @@ impl Graph {
         let mut dfs_queue = self.get_min_vertical_rank_nodes();
         let mut assigned = HashSet::new();
 
-        println!("Starting Queue: {dfs_queue:?}");
+        // println!("Starting Queue: {dfs_queue:?}");
 
         while let Some(node_idx) = dfs_queue.pop_front() {
             let node = self.get_node(node_idx);
@@ -784,14 +641,14 @@ impl Graph {
                 })
                 .collect::<Vec<usize>>();
 
-            println!("Ordering node: {node_idx}");
+            // println!("Ordering node: {node_idx}");
             if assigned.get(&node_idx).is_none() {
                 let rank = node
                     .vertical_rank
                     .expect("All nodes must have a vertical rank");
                 rank_order.add_node_idx_to_rank(rank, node_idx);
                 assigned.insert(node_idx);
-                println!("  Assigned node: {node_idx}");
+                // println!("  Assigned node: {node_idx}");
             }
 
             for node_idx in unassigned_dst_nodes {
@@ -842,30 +699,6 @@ impl Graph {
         min_rank_nodes
     }
 
-    // /// Return a hash map of rank -> vec<node_idx> as well as the minimum rank
-    // fn get_rank_map(&self) -> (Option<u32>, HashMap<u32, Vec<usize>>) {
-    //     let mut ranks: HashMap<u32, Vec<usize>> = HashMap::new();
-    //     let mut min_rank = None;
-
-    //     for (node_idx, node) in self.nodes.iter().enumerate() {
-    //         if let Some(rank) = node.simplex_rank {
-    //             if let Some(level) = ranks.get_mut(&rank) {
-    //                 level.push(node_idx);
-    //             } else {
-    //                 ranks.insert(rank, vec![node_idx]);
-    //             }
-
-    //             min_rank = if let Some(min_rank) = min_rank {
-    //                 Some(u32::min(min_rank, rank))
-    //             } else {
-    //                 Some(rank)
-    //             };
-    //         }
-    //     }
-
-    //     (min_rank, ranks)
-    // }
-
     /// Generic Network simplex:
     ///
     /// fn network_simplex_example() {
@@ -913,7 +746,7 @@ impl Graph {
         aux_graph.network_simplex_ranking(XCoordinate);
         self.set_x_coordinates_from_aux(&aux_graph);
 
-        self.print_nodes("after set_coordinates in network_simplex_ranking (dot_position())");
+        // self.print_nodes("after set_coordinates in network_simplex_ranking (dot_position())");
     }
 
     fn set_x_coordinates_from_aux(&mut self, aux_graph: &Graph) {
@@ -952,7 +785,7 @@ impl Graph {
 
             node.assign_y_coord(new_y);
         }
-        self.print_nodes("after set_y_coordinates()");
+        // self.print_nodes("after set_y_coordinates()");
     }
 
     /// Documentation from paper: 4.2 Optimal Node Placement page 20
@@ -994,7 +827,7 @@ impl Graph {
     fn create_positioning_aux_graph(&self) -> Graph {
         let mut aux_graph = Graph::new();
 
-        self.print_nodes("before create_positioning_aux_graph() (create_aux_edges)");
+        // self.print_nodes("before create_positioning_aux_graph() (create_aux_edges)");
 
         // Add all the existing nodes from the current graph without edges.
         for node in self.nodes.iter() {
@@ -1005,12 +838,12 @@ impl Graph {
             aux_graph.nodes.push(new_node)
         }
 
-        aux_graph.print_nodes("before set_left_right_constraints() (make_LR_constraints)");
+        // aux_graph.print_nodes("before set_left_right_constraints() (make_LR_constraints)");
         self.set_left_right_constraints(&mut aux_graph);
-        aux_graph.print_nodes("after set_left_right_constraints()");
+        // aux_graph.print_nodes("after set_left_right_constraints()");
 
         self.add_virtual_nodes_for_horizontal_positioning(&mut aux_graph);
-        aux_graph.print_nodes("after add_virtual_nodes_for_horizontal...() (make_edge_pairs)");
+        // aux_graph.print_nodes("after add_virtual_nodes_for_horizontal...() (make_edge_pairs)");
 
         // We need to build a feasible tree from scratch
         for node in aux_graph.nodes.iter_mut() {
@@ -1122,10 +955,10 @@ impl Graph {
 
                     let node = self.get_node(node_idx);
                     assert_eq!(Some(rank), node.simplex_rank());
-                    println!(
-                        "rank{rank}: Setting rank for node {}: pos:{:?} to: {new_rank}",
-                        node.name, node.horizontal_position
-                    );
+                    // println!(
+                    //     "rank{rank}: Setting rank for node {}: pos:{:?} to: {new_rank}",
+                    //     node.name, node.horizontal_position
+                    // );
 
                     aux_graph
                         .get_node(node_idx)
@@ -1142,43 +975,6 @@ impl Graph {
     fn make_splines(&mut self) {
         todo!();
     }
-
-    // /// Return a value for the graph used to optimize the graph for the selection of x coordiantes for nodes.
-    // ///
-    // /// Documentation from paper: page 17
-    // fn graph_coordinate_optimization_value(&self) -> u32 {
-    //     self.edges
-    //         .iter()
-    //         .map(|edge| self.edge_coordinate_optimization_value(edge))
-    //         .sum()
-    // }
-
-    // /// Return a value for an edge used to optimize the graph for the selection of x coordiantes for nodes.
-    // ///
-    // /// Documentation from paper: page 17
-    // /// * For edge = (v,w): Ω(e)*ω(e)*|Xw − Xv|
-    // /// * Subject to: Xb − Xa ≥ ρ(a,b)
-    // ///   * ρ is a function on pairs of adjacent nodes in the same rank giving the minimum separation
-    // ///     between their center points
-    // fn edge_coordinate_optimization_value(&self, edge: &Edge) -> u32 {
-    //     let src_node = self.get_node(edge.src_node);
-    //     let dst_node = self.get_node(edge.dst_node);
-    //     let omega = Edge::edge_omega_value(src_node.is_virtual(), dst_node.is_virtual());
-    //     let weight = edge.weight;
-    //     let w_x = src_node.coordinates.unwrap().x();
-    //     let v_x = dst_node.coordinates.unwrap().y();
-    //     let x_diff = w_x.abs_diff(v_x);
-
-    //     self.min_node_distance().max(omega * weight * x_diff)
-    // }
-
-    // /// TODO: min_node_distance should be determined by graph context, and perhaps the specific nodes
-    // ///       involved
-    // fn min_node_distance(&self) -> u32 {
-    //     const MIN_NODE_DISTANCE: u32 = 100; // pixels...
-
-    //     MIN_NODE_DISTANCE
-    // }
 
     /// Given a node index, return an iterator to a tuple with each edge_idx, and the node_idx of
     /// the node on the other side of the edge.
@@ -1247,6 +1043,7 @@ impl Graph {
             .filter(|(_, edge)| !edge.ignored && edge.in_spanning_tree())
     }
 
+    #[allow(dead_code)]
     fn not_tree_edge_iter(&self) -> impl Iterator<Item = (usize, &Edge)> {
         self.edges
             .iter()
@@ -1256,6 +1053,7 @@ impl Graph {
 
     /// An iterator that returns only nodes that are "real" (not virtual nodes added
     /// for layout)
+    #[allow(dead_code)]
     fn real_nodes_iter(&self) -> impl Iterator<Item = (usize, &Node)> {
         self.nodes
             .iter()
@@ -1263,6 +1061,7 @@ impl Graph {
             .filter(|(_, node)| node.node_type == NodeType::Real)
     }
 
+    #[allow(dead_code)]
     fn print_edge(&self, edge_idx: usize) {
         println!("{}", self.edge_to_string(edge_idx));
     }
@@ -1611,160 +1410,6 @@ pub mod tests {
         }
     }
 
-    #[test]
-    fn test_cutvalues() {
-        let mut graph = Graph::new();
-        let a_idx = graph.add_node("A");
-        let b_idx = graph.add_node("B");
-        let c_idx = graph.add_node("C");
-        let d_idx = graph.add_node("D");
-        let e_idx = graph.add_node("E");
-        let f_idx = graph.add_node("F");
-        let g_idx = graph.add_node("G");
-        let h_idx = graph.add_node("H");
-
-        graph.add_edge(a_idx, b_idx);
-        graph.add_edge(a_idx, e_idx);
-        graph.add_edge(a_idx, f_idx);
-
-        graph.add_edge(b_idx, c_idx);
-
-        graph.add_edge(e_idx, g_idx);
-        graph.add_edge(f_idx, g_idx);
-        graph.add_edge(c_idx, d_idx);
-
-        graph.add_edge(g_idx, h_idx);
-        graph.add_edge(d_idx, h_idx);
-
-        graph.rank_nodes_vertically();
-        println!("{graph}");
-    }
-
-    /// This test sets a feasible_tree to match what GraphViz chooses to see if
-    /// the choice of feasible tree is responsible for how it is graphed (and it appears to be)
-    ///
-    /// Ignored because for this to work, the feasible tree must not be reset during the XCoordinate
-    /// run of network simplex.
-    #[ignore]
-    #[test]
-    fn test_advanced_cutvalues() {
-        let mut graph = Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }");
-        graph.rank_nodes_vertically();
-        graph.set_horizontal_ordering();
-        graph.set_y_coordinates();
-
-        graph.skip_tree_init = true;
-
-        let mut aux_graph = graph.create_positioning_aux_graph();
-        aux_graph.make_asyclic();
-        let v7_idx = 7;
-        let v6_idx = 6;
-        let v5_idx = 5;
-        let v4_idx = 4;
-        let a_idx = 0;
-        let b_idx = 1;
-        let c_idx = 2;
-        let d_idx = 3;
-
-        aux_graph
-            .get_node_mut(d_idx)
-            .set_tree_data(Some(v7_idx), None, None);
-        aux_graph
-            .get_node_mut(v6_idx)
-            .set_tree_data(Some(d_idx), None, None);
-        aux_graph
-            .get_node_mut(b_idx)
-            .set_tree_data(Some(v6_idx), None, None);
-        aux_graph
-            .get_node_mut(c_idx)
-            .set_tree_data(Some(b_idx), None, None);
-        aux_graph
-            .get_node_mut(v4_idx)
-            .set_tree_data(Some(b_idx), None, None);
-        aux_graph
-            .get_node_mut(a_idx)
-            .set_tree_data(Some(v4_idx), None, None);
-        aux_graph
-            .get_node_mut(v5_idx)
-            .set_tree_data(Some(a_idx), None, None);
-
-        for (src_name, dst_name) in [
-            ("v7", "d"),
-            ("v6", "d"),
-            ("v6", "b"),
-            ("b", "c"),
-            ("v4", "b"),
-            ("v4", "a"),
-            ("v5", "a"),
-        ] {
-            let (_, edge_idx) = aux_graph.get_named_edge(src_name, dst_name);
-            aux_graph.get_edge_mut(edge_idx).set_in_spanning_tree(true);
-        }
-        println!("--------START HERE------");
-        println!("{aux_graph}");
-
-        aux_graph.init_spanning_tree_and_cutvalues();
-        aux_graph.network_simplex_ranking(XCoordinate);
-
-        println!("AUX: {aux_graph}");
-        graph.set_x_coordinates_from_aux(&aux_graph);
-        println!("GRAPH{graph}");
-
-        let svg = crate::svg::SVG::new(graph, false);
-        svg.write_to_file("foo");
-    }
-
-    /// This test sets a feasible_tree to match what GraphViz chooses to see if
-    /// the choice of feasible tree is responsible for how it is graphed (and it appears to be)
-    ///
-    /// Ignored because for this to work, the feasible tree must not be reset during the XCoordinate
-    /// run of network simplex.
-    #[ignore]
-    #[test]
-    fn test_cutvalues_b_and_c_to_a() {
-        let mut graph = Graph::from("digraph { b -> a; c -> a; }");
-        graph.rank_nodes_vertically();
-        graph.set_horizontal_ordering();
-        graph.set_y_coordinates();
-
-        let mut aux_graph = graph.create_positioning_aux_graph();
-        aux_graph.make_asyclic();
-
-        graph.skip_tree_init = true;
-        let v4_idx = 4;
-        let v3_idx = 3;
-        let b_idx = 0;
-        let a_idx = 1;
-        let c_idx = 2;
-
-        for (child_idx, parent_idx) in [
-            (a_idx, v4_idx),
-            (v3_idx, a_idx),
-            (v3_idx, b_idx),
-            (b_idx, c_idx),
-        ] {
-            aux_graph
-                .get_node_mut(child_idx)
-                .set_tree_data(Some(parent_idx), None, None);
-        }
-
-        for (src_name, dst_name) in [("v4", "a"), ("v3", "a"), ("v3", "b"), ("b", "c")] {
-            let (_, edge_idx) = aux_graph.get_named_edge(src_name, dst_name);
-            aux_graph.get_edge_mut(edge_idx).set_in_spanning_tree(true);
-        }
-        aux_graph.init_spanning_tree_and_cutvalues();
-        println!("--------START HERE------");
-        println!("{aux_graph}");
-
-        aux_graph.network_simplex_ranking(XCoordinate);
-
-        println!("AUX: {aux_graph}");
-        graph.set_x_coordinates_from_aux(&aux_graph);
-        println!("GRAPH: {graph}");
-
-        let svg = crate::svg::SVG::new(graph, false);
-        svg.write_to_file("foo");
-    }
 
     #[test]
     fn test_merge_edges() {
@@ -1790,37 +1435,7 @@ pub mod tests {
         }
     }
 
-    // #[test]
-    // fn test_get_source_nodes_single() {
-    //     let mut graph = Graph::new();
-    //     let node_map = graph.add_nodes('a'..='d');
-    //     let edges = vec![("a", "b"), ("c", "d"), ("d", "c")];
-    //     graph.add_edges(&edges, &node_map);
-
-    //     let source_nodes = graph.get_source_nodes_and_fix_cyclic();
-    //     let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
-
-    //     assert_eq!(source_nodes, vec![0]);
-    // }
-
-    // #[test]
-    // fn test_get_source_nodes_double() {
-    //     let mut graph = Graph::new();
-    //     let node_map = graph.add_nodes('a'..='c');
-    //     let edges = vec![("a", "b"), ("c", "b")];
-    //     graph.add_edges(&edges, &node_map);
-
-    //     let source_nodes = graph.get_source_nodes_and_fix_cyclic();
-    //     let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
-
-    //     assert_eq!(source_nodes, vec![0, 2]);
-    // }
-
-    /// Ignored because we need to handle this with subgraphs: breaking up unconnected asyclic
-    /// graphs into separate graphs.
-    ///
     /// Test that two simple cyclic graphs are both made asyclic.
-    #[ignore]
     #[test]
     fn test_make_asyclic() {
         let mut graph = Graph::new();

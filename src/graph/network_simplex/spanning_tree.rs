@@ -38,141 +38,54 @@ use crate::graph::edge::{
     EdgeDisposition::{self, In, Out},
 };
 
-#[allow(unused)]
 impl Graph {
-    /// Initializes the spanning tree data.
+    /// Return true if maybe_ancestor_idx is a common ancestor of child_idx.
     ///
-    /// This includes:
-    /// * Setting the edge_idx_to_parent value
-    /// * setting min and max ranges
+    /// This is true only if the max distance from the child node to the root is within
+    /// the min/max distance of the ancestor node.
     ///
-    /// Must be done before calling network simplex.
-    //
-    /// In the graphviz 9.0 code, this function is: dfs_range_init()
-    /// It assumes that graph is fully connected.
-    pub(super) fn init_spanning_tree(&mut self) {
-        // let last_node = self.get_node(last_node_idx);
-        // let start_node = if last_node.is_virtual() { last_node_idx } else {0};
+    /// GraphViz code: SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    ///              : SEQ(maybe_ancestor_node_idx.min, child_idx.max, maybe_ancestor_node_idx.max)
+    pub(super) fn is_common_ancestor(&self, maybe_ancestor_node_idx: usize, child_idx: usize) -> bool {
+        let maybe_ancestor_node = self.get_node(maybe_ancestor_node_idx);
+        let ancestor_dist_min = maybe_ancestor_node
+            .tree_dist_min()
+            .expect("tree distance must be set");
+        let ancestor_dist_max = maybe_ancestor_node
+            .tree_dist_max()
+            .expect("tree distance must be set");
 
-        if self.node_count() != 0 {
-            // XXX This is kind of crazy.  The order in which the tree is build
-            //     effects how it is laid out, apparently.  In GraphViz, new virtual nodes
-            //     are added at the beginning of the list.  In dot-rs, they are necessarily
-            //     added at the end because we don't want the indexes to change.
-            //     So we want to pick the last virtual node...
-            let last_node_idx = self.node_count() - 1;
-
-            self.set_tree_parents_and_ranges(true, last_node_idx, None, 1);
-        }
+        self.node_distance_within_limits(child_idx, ancestor_dist_min, ancestor_dist_max)
     }
 
-    /// In the graphviz 9.0 code, there are two functions:
-    /// * dfs_range_init()
-    /// * dfs_range()
-    /// They are identical code, expect for the exit condition.  set_tree_parents_and_ranges()
-    /// does either depending on the "initializing flag"
-    pub(super) fn set_tree_parents_and_ranges(
-        &mut self,
-        initializing: bool,
-        node_idx: usize,
-        parent_edge_idx: Option<usize>,
-        min: usize,
-    ) -> usize {
-        let node = self.get_node(node_idx);
-
-        let par_str = if let Some(parent_edge_idx) = parent_edge_idx {
-            self.edge_to_string(parent_edge_idx)
-        } else {
-            "None".to_string()
-        };
-        println!(
-            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min})\n  parent_edge:{par_str}",
-            node.name
-        );
-
-        if !initializing {
-            if let Some(tree_data) = node.spanning_tree() {
-                if tree_data.edge_idx_to_parent() == parent_edge_idx
-                    && tree_data.tree_dist_min() == Some(min)
-                {
-                    return tree_data.tree_dist_max().unwrap_or(0) + 1;
-                }
-            } else {
-                panic!("Setting tree ranges on a node that is not in the tree!");
-            }
-        }
-
-        let cur_max = node.tree_dist_max();
-        self.get_node_mut(node_idx)
-            .set_tree_data(parent_edge_idx, Some(min), cur_max);
-
-        let mut max = min;
-
-        // println!("Setting range for: {node_idx}: {:?}", self.non_parent_tree_nodes(node_idx));
-
-        for (node_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
-            max = max.max(self.set_tree_parents_and_ranges(
-                initializing,
-                node_idx,
-                Some(edge_idx),
-                max,
-            ));
-        }
-
-        self.get_node_mut(node_idx).set_tree_dist_max(Some(max));
-
-        max + 1
-    }
-
+    /// Return true has a tree_dist_max such that: min <= tree_dist_max <= max
     ///
-    /// GraphViz comment for invalidate_path():
-    ///   Invalidate DFS attributes by walking up the tree from to_node till lca
-    ///   (inclusively). Called when updating tree to improve pruning in dfs_range().
-    ///   Assigns ND_low(n) = -1 for the affected nodes.
-    ///
-    pub(super) fn invalidate_path(&self, lca_node_idx: usize, to_node_idx: usize) {
-        let mut to_node_idx = to_node_idx;
+    /// GraphViz code: SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    ///              : SEQ(min, node_idx, max)
+    ///              
+    /// From the paper: page 12: Section 2.4: Implementation details
+    /// 
+    /// Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder
+    /// traversal of the tree, starting from some ﬁxed root node v root, and labeling each node v with its
+    /// postorder traversal number lim(v), the least number low(v) of any descendant in the search, and the
+    /// edge parent(v) by which the node was reached (see ﬁgure 2-5).
+    /// 
+    /// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
+    /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
+    /// edge and v root is in the head component of the edge (i.e., lim (u)< lim (v)), then a node w is in the tail
+    /// component of e if and only if low(u) ≤ lim(w) ≤ lim(u).  These numbers can also be used to update the
+    /// tree efﬁciently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
+    /// whose cut values must be adjusted are those in the path connecting w and x in the tree.  This path is determined
+    /// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the ﬁrst node
+    /// l such that low (l) ≤ lim(w) , lim(x) ≤ lim (l).  Of course, these postorder parameters must also be adjusted
+    /// when exchanging tree edges, but only for nodes below l.
+    pub(super) fn node_distance_within_limits(&self, node_idx: usize, min: usize, max: usize) -> bool {
+        let tree_dist_max = self
+            .get_node(node_idx)
+            .tree_dist_max()
+            .expect("tree_dist_max must be set");
 
-        println!(
-            "Invalidate path for node {lca_node_idx}: {}",
-            self.node_to_string(lca_node_idx)
-        );
-        println!(
-            "  to note {to_node_idx}: {}",
-            self.node_to_string(to_node_idx)
-        );
-        loop {
-            let to_node = self.get_node(to_node_idx);
-
-            if to_node.tree_dist_min().is_none() {
-                break;
-            }
-
-            to_node.set_tree_dist_min(None);
-
-            if let Some(parent_edge_idx) = to_node.spanning_tree_parent_edge_idx() {
-                let lca_node = self.get_node(lca_node_idx);
-
-                if to_node.tree_dist_max() >= lca_node.tree_dist_max() {
-                    if to_node_idx != lca_node_idx {
-                        panic!("invalidate_path: skipped over LCA");
-                    }
-                    break;
-                }
-
-                let parent_edge = self.get_edge(parent_edge_idx);
-                let parent_src = self.get_node(parent_edge.src_node);
-                let parent_dst = self.get_node(parent_edge.dst_node);
-
-                to_node_idx = if parent_src.tree_dist_max() > parent_dst.tree_dist_max() {
-                    parent_edge.src_node
-                } else {
-                    parent_edge.dst_node
-                };
-            } else {
-                break;
-            }
-        }
+        min <= tree_dist_max && tree_dist_max <= max
     }
 
     /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
@@ -261,6 +174,147 @@ impl Graph {
             "after init_spanning_tree_and_cutvalues() in set_feasible_tree:{}",
             min_heap.len()
         ));
+    }
+
+    /// Calculate the cutvalues of all edges that are part of the current feasible tree.
+    ///
+    /// Documentation from the paper:
+    /// * The init_cutvalues function computes the cut values of the tree edges.
+    ///   * For each tree edge, this is computed by marking the nodes as belonging to the head or tail component,
+    ///   * and then performing the sum of the signed weights of all edges whose head and tail are in different components,
+    ///     * the sign being negative for those edges going from the head to the tail component
+    ///
+    /// Optimization TODOs from the paper:
+    /// * In a naive implementation, initial cut values can be found by taking every tree edge in turn,
+    ///   breaking it, labeling each node according to whether it belongs to the head or tail component,
+    ///   and performing the sum.
+    ///   * This takes O(V E) time.
+    ///   * To reduce this cost, we note that the cut values can be computed using information local to an edge
+    ///     if the search is ordered from the leaves of the feasible tree inward.
+    ///     * It is trivial to compute the cut value of a tree edge with one of its endpoints a leaf in the tree,
+    ///       since either the head or the tail component consists of a single node.
+    ///     * Now, assuming the cut values are known for all the edges incident on a given node except one, the
+    ///       cut value of the remaining edge is the sum of the known cut values plus a term dependent only on
+    ///       the edges incident to the given node.
+    ///
+    /// * Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder traversal
+    ///   of the tree, starting from some ﬁxed root node v root, and labeling each node v with its postorder traversal
+    ///   number lim(v), the least number low(v) of any descendant in the search, and the edge parent(v) by which the
+    ///   node was reached (see ﬁgure 2-5).
+    ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
+    ///     and thus whether a non-tree edge crosses between the two components.
+    pub fn init_spanning_tree_and_cutvalues(&mut self) {
+        if self.node_count() > 0 {
+            self.set_tree_parents_and_ranges(true, 0, None, 1);
+            self.set_cutvals_depth_first(0);
+        }
+    }
+
+    /// In the graphviz 9.0 code, there are two functions:
+    /// * dfs_range_init()
+    /// * dfs_range()
+    /// They are identical code, expect for the exit condition.  set_tree_parents_and_ranges()
+    /// does either depending on the "initializing flag"
+    pub(super) fn set_tree_parents_and_ranges(
+        &mut self,
+        initializing: bool,
+        node_idx: usize,
+        parent_edge_idx: Option<usize>,
+        min: usize,
+    ) -> usize {
+        let node = self.get_node(node_idx);
+
+        let par_str = if let Some(parent_edge_idx) = parent_edge_idx {
+            self.edge_to_string(parent_edge_idx)
+        } else {
+            "None".to_string()
+        };
+        println!(
+            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min})\n  parent_edge:{par_str}",
+            node.name
+        );
+
+        if !initializing {
+            if let Some(tree_data) = node.spanning_tree() {
+                if tree_data.edge_idx_to_parent() == parent_edge_idx
+                    && tree_data.tree_dist_min() == Some(min)
+                {
+                    return tree_data.tree_dist_max().unwrap_or(0) + 1;
+                }
+            } else {
+                panic!("Setting tree ranges on a node that is not in the tree!");
+            }
+        }
+
+        let cur_max = node.tree_dist_max();
+        self.get_node_mut(node_idx)
+            .set_tree_data(parent_edge_idx, Some(min), cur_max);
+
+        let mut max = min;
+
+        for (node_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
+            max = max.max(self.set_tree_parents_and_ranges(
+                initializing,
+                node_idx,
+                Some(edge_idx),
+                max,
+            ));
+        }
+
+        self.get_node_mut(node_idx).set_tree_dist_max(Some(max));
+
+        max + 1
+    }
+
+    ///
+    /// GraphViz comment for invalidate_path():
+    ///   Invalidate DFS attributes by walking up the tree from to_node till lca
+    ///   (inclusively). Called when updating tree to improve pruning in dfs_range().
+    ///   Assigns ND_low(n) = -1 for the affected nodes.
+    ///
+    pub(super) fn invalidate_path(&self, lca_node_idx: usize, to_node_idx: usize) {
+        let mut to_node_idx = to_node_idx;
+
+        println!(
+            "Invalidate path for node {lca_node_idx}: {}",
+            self.node_to_string(lca_node_idx)
+        );
+        println!(
+            "  to note {to_node_idx}: {}",
+            self.node_to_string(to_node_idx)
+        );
+        loop {
+            let to_node = self.get_node(to_node_idx);
+
+            if to_node.tree_dist_min().is_none() {
+                break;
+            }
+
+            to_node.set_tree_dist_min(None);
+
+            if let Some(parent_edge_idx) = to_node.spanning_tree_parent_edge_idx() {
+                let lca_node = self.get_node(lca_node_idx);
+
+                if to_node.tree_dist_max() >= lca_node.tree_dist_max() {
+                    if to_node_idx != lca_node_idx {
+                        panic!("invalidate_path: skipped over LCA");
+                    }
+                    break;
+                }
+
+                let parent_edge = self.get_edge(parent_edge_idx);
+                let parent_src = self.get_node(parent_edge.src_node);
+                let parent_dst = self.get_node(parent_edge.dst_node);
+
+                to_node_idx = if parent_src.tree_dist_max() > parent_dst.tree_dist_max() {
+                    parent_edge.src_node
+                } else {
+                    parent_edge.dst_node
+                };
+            } else {
+                break;
+            }
+        }
     }
 
     /// Given and edge, merge the two subtrees pointed to by each edge's nodes.
@@ -523,7 +577,7 @@ impl Graph {
     }
 
     /// Re-rank the given node by subtracting delta to the rank, and all descendent nodes in the tree.
-    /// 
+    ///
     /// * First reduces the rank of node_idx by delta
     /// * Then recursively reduces the rank of all tree descendents of node_idx
     ///   by delta.
@@ -561,7 +615,7 @@ impl Graph {
     /// parent node of the given node.
     ///
     /// Only returns non-ignored nodes.
-    fn non_parent_tree_nodes(&self, node_idx: usize) -> Vec<(usize, usize)> {
+    pub(super) fn non_parent_tree_nodes(&self, node_idx: usize) -> Vec<(usize, usize)> {
         let mut nodes = self.directional_non_parent_tree_nodes(node_idx, Out);
         let mut in_nodes = self.directional_non_parent_tree_nodes(node_idx, In);
 
@@ -573,44 +627,41 @@ impl Graph {
     /// parent node of the given node from either in_edges or out_edges depending on disposition.
     ///
     /// Only returns non-ignored nodes.
-    ///
-    /// TODO: Rewrite this to call: node_tree_edges(node_idx, disposition)
     fn directional_non_parent_tree_nodes(
         &self,
         node_idx: usize,
         disposition: EdgeDisposition,
     ) -> Vec<(usize, usize)> {
-        let node = self.get_node(node_idx);
-        let edges = match disposition {
-            In => &node.in_edges,
-            Out => &node.out_edges,
-        };
-        use itertools::Itertools;
+        let given_parent_idx = self.get_node(node_idx).spanning_tree_parent_edge_idx();
 
-        edges
+        self.directional_non_given_parent_tree_nodes(node_idx, given_parent_idx, disposition)
+    }
+
+    /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the
+    /// given parent node.
+    ///
+    /// This allows for a depth first search starting at any arbitrary node and without a specific
+    /// parent node set.
+    ///
+    /// Only returns non-ignored nodes.
+    fn directional_non_given_parent_tree_nodes(
+        &self,
+        node_idx: usize,
+        given_parent_idx: Option<usize>,
+        disposition: EdgeDisposition,
+    ) -> Vec<(usize, usize)> {
+        self.node_tree_edges(node_idx, disposition)
             .iter()
             .filter_map(|edge_idx| {
-                let edge = self.get_edge(*edge_idx);
-                let other_node_idx = match disposition {
-                    In => edge.src_node,
-                    Out => edge.dst_node,
-                };
+                if given_parent_idx != Some(*edge_idx) {
+                    let edge = self.get_edge(*edge_idx);
+                    let other_node_idx = match disposition {
+                        In => edge.src_node,
+                        Out => edge.dst_node,
+                    };
 
-                if !edge.ignored
-                    && edge.in_spanning_tree()
-                    && node.spanning_tree_parent_edge_idx() != Some(*edge_idx)
-                {
                     Some((other_node_idx, *edge_idx))
                 } else {
-                    // if edge.ignored {
-                    //     println!("Edge {edge_idx}: ignored ");
-                    // }
-                    // if !edge.in_spanning_tree() {
-                    //     println!("Edge {edge_idx}: not in spanning tree");
-                    // }
-                    // if node.spanning_tree_parent_edge_idx() == Some(*edge_idx) {
-                    //     println!("Edge {edge_idx}: points to parent");
-                    // }
                     None
                 }
             })
@@ -622,7 +673,7 @@ impl Graph {
         &self,
         node_idx: usize,
         disposition: EdgeDisposition,
-    ) -> Vec<&Edge> {
+    ) -> Vec<usize> {
         let node = self.get_node(node_idx);
         let edges = match disposition {
             In => &node.in_edges,
@@ -635,7 +686,7 @@ impl Graph {
                 let edge = self.get_edge(*edge_idx);
 
                 if !edge.ignored && edge.in_spanning_tree() {
-                    Some(edge)
+                    Some(*edge_idx)
                 } else {
                     None
                 }
@@ -654,7 +705,7 @@ mod test {
         let a_idx = graph.name_to_node_idx("a").unwrap();
         let b_idx = graph.name_to_node_idx("b").unwrap();
         let c_idx = graph.name_to_node_idx("c").unwrap();
-        let _d_idx = graph.name_to_node_idx("d").unwrap();
+        let d_idx = graph.name_to_node_idx("d").unwrap();
 
         graph.make_asyclic();
         graph.merge_edges();
@@ -664,14 +715,15 @@ mod test {
         let a_in_nodes = graph.directional_non_parent_tree_nodes(a_idx, In);
         let a_out_nodes = graph.directional_non_parent_tree_nodes(a_idx, Out);
 
+        // "a" is parent, no all its edges return
         assert_eq!(a_out_nodes, [(b_idx, 0)]);
-        assert_eq!(a_in_nodes, []);
+        assert_eq!(a_in_nodes, [(c_idx, 3)]);
 
         let c_in_nodes = graph.directional_non_parent_tree_nodes(c_idx, In);
         let c_out_nodes = graph.directional_non_parent_tree_nodes(c_idx, Out);
 
-        // It does not include (a_idx, 3), because that is a parent node.
-        assert_eq!(c_out_nodes, [(a_idx, 3)]);
+        // "a" is parent, so we don't see c -> a
+        assert_eq!(c_out_nodes, [(d_idx, 2)]);
         assert_eq!(c_in_nodes, []);
     }
 

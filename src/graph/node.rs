@@ -102,6 +102,34 @@ impl NodeType {
     }
 }
 
+/// The fields edge_idx_to_parent, tree_dist_min and tree_dist_max are present to support
+/// the following optimization using a spanning tree associated with nodes and edges of the graph.
+///
+/// Note that this spanning tree shares nodes and edges with the tight, feasible spanning tree, but
+/// the direction of the edges are largely irrelevant.  What is important is edges that lead back
+/// to the root (edge_idx_to_parent) and away from the root.  So it's imporant to know in what context
+/// the tree is being considered.
+/// 
+/// In SpanningTree Data, we have renamed the following fields from the paper to make it more understandable:
+/// * node.tree_dist_max(): lim(n)
+/// * node.tree_dist_min(): low(n)
+///
+/// From the paper: page 12: Section 2.4: Implementation details
+/// 
+/// Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder
+/// traversal of the tree, starting from some ﬁxed root node v root, and labeling each node v with its
+/// postorder traversal number lim(v), the least number low(v) of any descendant in the search, and the
+/// edge parent(v) by which the node was reached (see ﬁgure 2-5).
+/// 
+/// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
+/// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
+/// edge and v root is in the head component of the edge (i.e., lim(u) < lim(v)), then a node w is in the tail
+/// component of e if and only if low(u) ≤ lim(w) ≤ lim(u).  These numbers can also be used to update the
+/// tree efﬁciently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
+/// whose cut values must be adjusted are those in the path connecting w and x in the tree.  This path is determined
+/// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the ﬁrst node
+/// l such that low (l) ≤ lim(w) , lim(x) ≤ lim (l).  Of course, these postorder parameters must also be adjusted
+/// when exchanging tree edges, but only for nodes below l.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct SpanningTreeData {
     edge_idx_to_parent: Option<usize>,
@@ -111,42 +139,7 @@ pub struct SpanningTreeData {
     tree_dist_max: Option<usize>,
     /// Reference to the subtree that this node is a member of.
     sub_tree: Option<SubTree>,
-
-    // /// Reference to the source node set this node was found with
-    // /// Used to convert to a acyclic graph.
-    // asyclic_check: Option<AsyclicCheck>,
 }
-
-/// Used to determine if a graph of unranked nodes is asyclic.
-// #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-// pub(super) struct AsyclicCheck {
-//     root_idx: usize,
-//     depth: u32,
-// }
-
-// impl AsyclicCheck {
-//     /// Index of the root node of this node
-//     pub fn root_idx(&self) -> usize {
-//         self.root_idx
-//     }
-
-//     /// Depth of this node from the root (root.depth == 0)
-//     pub fn depth(&self) -> u32 {
-//         self.depth
-//     }
-
-//     /// True if an edge from this node to dst_node is asyclic:
-//     ///
-//     /// * If dst_node has the same root, we have looped back into our own root
-//     ///   and we have a cycle.
-//     /// * If dst_node has a different root, and that root depts is zero, we have
-//     ///   pointed back to the root of another root, and that is also a cycle.
-//     ///   we have a cycle.
-//     pub fn is_cyclic(&self, dst_check: AsyclicCheck) -> bool {
-//         self.root_idx() == dst_check.root_idx() && dst_check.depth() == 0
-//         // self.root_idx() == dst_check.root_idx() && self.depth() < dst_check.depth() || dst_check.depth() == 0
-//     }
-// }
 
 impl Display for SpanningTreeData {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
@@ -189,10 +182,6 @@ impl SpanningTreeData {
     pub fn edge_idx_to_parent(&self) -> Option<usize> {
         self.edge_idx_to_parent
     }
-
-    // pub(super) fn asyclic_check(&self) -> Option<AsyclicCheck> {
-    //     self.asyclic_check
-    // }
 
     /// The minimal distance to the root of all nodes for which this node is an ancestor.
     pub fn tree_dist_min(&self) -> Option<usize> {
@@ -309,14 +298,6 @@ impl Node {
         }
     }
 
-    // pub(super) fn spanning_tree_asyclic_check(&self) -> Option<AsyclicCheck> {
-    //     if let Some(tree_data) = self.spanning_tree() {
-    //         tree_data.asyclic_check()
-    //     } else {
-    //         None
-    //     }
-    // }
-
     pub(super) fn tree_dist_max(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
             tree_data.tree_dist_max()
@@ -387,25 +368,6 @@ impl Node {
             .as_ref()
             .and_then(|data| data.sub_tree.clone())
     }
-
-    // pub(super) fn asyclic_check(&self) -> Option<AsyclicCheck> {
-    //     self.spanning_tree
-    //         .borrow()
-    //         .as_ref()
-    //         .and_then(|data| data.asyclic_check)
-    // }
-
-    // pub(super) fn set_asyclic_check(&self, root_idx: usize, depth: u32) {
-    //     if !self.in_spanning_tree() {
-    //         self.set_empty_tree_node();
-    //     }
-
-    //     if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
-    //         data.asyclic_check = Some(AsyclicCheck { root_idx, depth });
-    //     } else {
-    //         panic!("trying to set asyclic_check but node not in spanning tree");
-    //     }
-    // }
 
     /// Return true if this node has a sub_tree set.
     pub(super) fn has_sub_tree(&self) -> bool {

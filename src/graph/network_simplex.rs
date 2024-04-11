@@ -16,6 +16,7 @@ use std::collections::{HashSet, VecDeque};
 
 mod heap;
 pub(super) mod spanning_tree;
+pub(super) mod cutvalue;
 pub(crate) mod sub_tree;
 
 /// Determines what variable on each node which is set by the network simplex algorithm.
@@ -25,16 +26,6 @@ pub(crate) enum SimplexNodeTarget {
     VerticalRank,
     /// The X coordinate of each node
     XCoordinate,
-}
-
-/// Enum used for calculating cut values for edges.
-/// To do so, graph nodes need to be placed in either a head or tail component.
-#[derive(Eq, PartialEq)]
-enum CutSet {
-    /// Head component of a cut set
-    Head,
-    /// Tail component of a cut set
-    Tail,
 }
 
 impl Graph {
@@ -88,13 +79,6 @@ impl Graph {
     /// }
     ///
     pub(super) fn network_simplex_ranking(&mut self, target: SimplexNodeTarget) {
-        #[cfg(test)]
-        if self.skip_tree_init && target == SimplexNodeTarget::VerticalRank {
-            println!("Skipping tree initialziation in specal test");
-        } else {
-            self.set_feasible_tree_for_simplex(target == SimplexNodeTarget::VerticalRank);
-        }
-        #[cfg(not(test))]
         self.set_feasible_tree_for_simplex(target == SimplexNodeTarget::VerticalRank);
 
         let mut start_idx = 0;
@@ -104,172 +88,28 @@ impl Graph {
             if let Some((selected_edge_idx, selected_slack)) =
                 self.enter_edge_for_simplex(neg_cut_edge_idx)
             {
-                println!(
-                    "Exchanging edges with slack {selected_slack}\n  remove from tree: {}\n       add to tree: {}",
-                    self.edge_to_string(neg_cut_edge_idx),
-                    self.edge_to_string(selected_edge_idx),
-                );
+                // println!(
+                //     "Exchanging edges with slack {selected_slack}\n  remove from tree: {}\n       add to tree: {}",
+                //     self.edge_to_string(neg_cut_edge_idx),
+                //     self.edge_to_string(selected_edge_idx),
+                // );
                 self.rerank_for_simplex(neg_cut_edge_idx, selected_slack);
                 self.adjust_cutvalues_and_exchange_for_simplex(neg_cut_edge_idx, selected_edge_idx);
 
                 start_idx = neg_cut_edge_idx + 1;
             } else {
-                println!("No negative cut values!");
+                // println!("No negative cut values!");
                 break;
             }
         }
-        self.print_nodes("after simplex loop");
+        // self.print_nodes("after simplex loop");
+
         // self.normalize_simplex_rank(); GraphViz only does this in the "default" case (not TB or LR. We don't have that target)
         self.balance_for_simplex(target);
         self.assign_simplex_rank(target);
         if target == SimplexNodeTarget::XCoordinate {
-            self.print_nodes("network_simplex_ranking after balance_left_right END");
+            // self.print_nodes("network_simplex_ranking after balance_left_right END");
         }
-    }
-
-    /// Adjust cutvalues based on the changing edges, and update cut values of tree edges.
-    fn adjust_cutvalues_and_exchange_for_simplex(
-        &mut self,
-        neg_cut_edge_idx: usize,
-        selected_edge_idx: usize,
-    ) {
-        let cutvalue = self
-            .get_edge(neg_cut_edge_idx)
-            .cut_value
-            .expect("Selected edge must have cut value");
-        let selected_edge = self.get_edge(selected_edge_idx);
-        let sel_src_node_idx = selected_edge.src_node;
-        let sel_dst_node_idx = selected_edge.dst_node;
-
-        let lca_idx =
-            self.adjust_cutvalues_to_lca(sel_src_node_idx, sel_dst_node_idx, cutvalue, true);
-        let lca_idx2 =
-            self.adjust_cutvalues_to_lca(sel_dst_node_idx, sel_src_node_idx, cutvalue, false);
-
-        assert_eq!(lca_idx, lca_idx2, "Least common ancestor must match");
-
-        self.get_edge_mut(neg_cut_edge_idx).cut_value = None;
-        self.get_edge_mut(selected_edge_idx).cut_value = Some(-cutvalue);
-
-        let lca = self.get_node(lca_idx);
-        let lca_parent_edge_idx = lca.spanning_tree_parent_edge_idx();
-        let lca_min = lca
-            .tree_dist_min()
-            .expect("lca does not have a sub_tree_idx_min");
-
-        self.invalidate_path(lca_idx, sel_dst_node_idx);
-        self.invalidate_path(lca_idx, sel_src_node_idx);
-
-        self.exchange_edges_in_spanning_tree(neg_cut_edge_idx, selected_edge_idx);
-
-        println!(
-            "LCA of {} and {} is: {}",
-            self.get_node(sel_src_node_idx).name,
-            self.get_node(sel_dst_node_idx).name,
-            self.get_node(lca_idx).name
-        );
-        self.set_tree_parents_and_ranges(false, lca_idx, lca_parent_edge_idx, lca_min);
-    }
-
-    /// Adjust cutvalues by the given amount from node_idx1 up to the least commmon ancestor of nodes node_idx1 and node_idx2,
-    /// and return the least common ancestor of node_idx1 and node_idx2.
-    ///
-    /// "down" is a signal as to which direction to change the cutvalue.  If down, the cutvalue should be increased if the next
-    /// parent is the src_node.
-    ///
-    /// This is an efficient way of updating only the needed cutvalues during network simplex
-    /// without having to recalculate them all, which can be a large percentage of node layout
-    /// calculations.
-    ///
-    /// * Find the common ancestor by selecting a noder (node1), and loop until we move past
-    ///   the common ancestor with node2.
-    fn adjust_cutvalues_to_lca(
-        &mut self,
-        node1_idx: usize,
-        node2_idx: usize,
-        cutvalue: i32,
-        down: bool,
-    ) -> usize {
-        let mut maybe_lca_idx = node1_idx;
-
-        while !self.is_common_ancestor(maybe_lca_idx, node2_idx) {
-            let not_lca = self.get_node_mut(maybe_lca_idx);
-            let parent_edge_idx = not_lca
-                .spanning_tree_parent_edge_idx()
-                .expect("Must have a common ancestor");
-            let (parent_src_dist_max, parent_dst_dist_max) =
-                self.edge_tree_dist_max(parent_edge_idx);
-            let parent_edge = self.get_edge_mut(parent_edge_idx);
-            let cur_cutvalue = parent_edge
-                .cut_value
-                .expect("cutvalue not set for parent edge");
-            let is_down = if maybe_lca_idx == parent_edge.src_node {
-                down
-            } else {
-                !down
-            };
-
-            parent_edge.cut_value = if is_down {
-                Some(cur_cutvalue + cutvalue)
-            } else {
-                Some(cur_cutvalue - cutvalue)
-            };
-
-            maybe_lca_idx = if parent_src_dist_max > parent_dst_dist_max {
-                parent_edge.src_node
-            } else {
-                parent_edge.dst_node
-            };
-        }
-
-        maybe_lca_idx
-    }
-
-    /// Return the sub_tree_idx_max() for both the src and dst nodes of an edge.
-    ///
-    /// Panics if either node is not in the spanning tree, or does not have a sub_tree_idx_max value set.
-    fn edge_tree_dist_max(&self, parent_edge_idx: usize) -> (usize, usize) {
-        let parent_edge = self.get_edge(parent_edge_idx);
-        let parent_src_dist_max = self
-            .get_node(parent_edge.src_node)
-            .tree_dist_max()
-            .expect("tree_dist_max not set");
-        let parent_dst_dist_max = self
-            .get_node(parent_edge.dst_node)
-            .tree_dist_max()
-            .expect("tree_dist_max not set");
-
-        (parent_src_dist_max, parent_dst_dist_max)
-    }
-
-    /// Return true if maybe_ancestor_idx is a common ancestor of child_idx.
-    ///
-    /// This is true only if the max distance from the child node to the root is within
-    /// the min/max distance of the ancestor node.
-    ///
-    /// GraphViz code: !SEQ(ND_low(v), ND_lim(w), ND_lim(v))
-    fn is_common_ancestor(&self, maybe_ancestor_node_idx: usize, child_idx: usize) -> bool {
-        let maybe_ancestor_node = self.get_node(maybe_ancestor_node_idx);
-        let ancestor_dist_min = maybe_ancestor_node
-            .tree_dist_min()
-            .expect("tree distance must be set");
-        let ancestor_dist_max = maybe_ancestor_node
-            .tree_dist_max()
-            .expect("tree distance must be set");
-
-        self.node_distance_within_limits(child_idx, ancestor_dist_min, ancestor_dist_max)
-    }
-
-    /// Return true has a tree_dist_max such that: min <= tree_dist_max <= max
-    ///
-    /// GraphViz code: !SEQ(ND_low(v), ND_lim(w), ND_lim(v))
-    fn node_distance_within_limits(&self, node_idx: usize, min: usize, max: usize) -> bool {
-        let tree_dist_max = self
-            .get_node(node_idx)
-            .tree_dist_max()
-            .expect("tree_dist_max must be set");
-
-        min <= tree_dist_max && tree_dist_max <= max
     }
 
     /// Rerank nodes based on which edge was removed from the tree during a loop of network simplex.
@@ -319,228 +159,6 @@ impl Graph {
             node.assign_simplex_rank(target);
         }
     }
-
-    /// Calculate the cutvalues of all edges that are part of the current feasible tree.
-    ///
-    /// Documentation from the paper:
-    /// * The init_cutvalues function computes the cut values of the tree edges.
-    ///   * For each tree edge, this is computed by marking the nodes as belonging to the head or tail component,
-    ///   * and then performing the sum of the signed weights of all edges whose head and tail are in different components,
-    ///     * the sign being negative for those edges going from the head to the tail component
-    ///
-    /// Optimization TODOs from the paper:
-    /// * In a naive implementation, initial cut values can be found by taking every tree edge in turn,
-    ///   breaking it, labeling each node according to whether it belongs to the head or tail component,
-    ///   and performing the sum.
-    ///   * This takes O(V E) time.
-    ///   * To reduce this cost, we note that the cut values can be computed using information local to an edge
-    ///     if the search is ordered from the leaves of the feasible tree inward.
-    ///     * It is trivial to compute the cut value of a tree edge with one of its endpoints a leaf in the tree,
-    ///       since either the head or the tail component consists of a single node.
-    ///     * Now, assuming the cut values are known for all the edges incident on a given node except one, the
-    ///       cut value of the remaining edge is the sum of the known cut values plus a term dependent only on
-    ///       the edges incident to the given node.
-    ///
-    /// * Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder traversal
-    ///   of the tree, starting from some ﬁxed root node v root, and labeling each node v with its postorder traversal
-    ///   number lim(v), the least number low(v) of any descendant in the search, and the edge parent(v) by which the
-    ///   node was reached (see ﬁgure 2-5).
-    ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
-    ///     and thus whether a non-tree edge crosses between the two components.
-    pub(super) fn init_spanning_tree_and_cutvalues(&mut self) {
-        // init_spanning_tree() is here for now because it mirrors the GraphViz code calling dfs_range_init()
-        // of which init_spanning_tree() is the equivalent.
-        //
-        // Assuming I continue to move over to GraphViz style code, this will make sense here.
-        // Otherwise, it should be probably pulled into the calling function.
-        self.init_spanning_tree();
-
-        for edge_idx in 0..self.edges.len() {
-            let edge = self.get_edge(edge_idx);
-            if edge.in_spanning_tree() {
-                let (head_nodes, tail_nodes) = self.get_components(edge_idx);
-                let cut_value = self.transition_weight_sum(&head_nodes, &tail_nodes);
-
-                self.get_edge_mut(edge_idx).cut_value = Some(cut_value);
-                // println!(
-                //     "Set cut value for {}: {cut_value}\n  heads: {}\n  tails: {}",
-                //     self.display_edge(edge_idx),
-                //     self.display_component(&head_nodes),
-                //     self.display_component(&tail_nodes),
-                // )
-            }
-        }
-    }
-
-    /// Get the head an tail components needed to calculate edge cut values.
-    ///
-    /// Documentation from the paper: page 8
-    /// Given a feasible spanning tree, we can associate an integer cut value with each tree edge as follows.
-    /// * If the tree edge is deleted, the tree breaks into two connected components:
-    ///   * the tail component containing the tail node of the edge,
-    ///   * and the head component containing the head node.
-    /// * The cut value is deﬁned as the sum of the weights of all edges from the tail component to the head component,
-    ///   including the tree edge, minus the sum of the weights of all edges from the head component to the tail component.
-    fn get_components(&self, edge_idx: usize) -> (HashSet<usize>, HashSet<usize>) {
-        let head_component = self.collect_component_set(edge_idx, CutSet::Head, &HashSet::new());
-        let tail_component = self.collect_component_set(edge_idx, CutSet::Tail, &head_component);
-
-        (head_component, tail_component)
-    }
-
-    /// Collect a head or tail cutset component.
-    ///
-    /// * Given an initial node, consider all edges which are in the feasible tree
-    ///   * ignore the cut edge
-    ///   * if the edge is not yet in this cut set or the opposite cut set, add it.
-    fn collect_component_set(
-        &self,
-        cut_edge_idx: usize,
-        set: CutSet,
-        opposite: &HashSet<usize>,
-    ) -> HashSet<usize> {
-        let mut component_set = HashSet::new();
-        let cut_edge = self.get_edge(cut_edge_idx);
-
-        let node_idx = if set == CutSet::Head {
-            cut_edge.dst_node
-        } else {
-            cut_edge.src_node
-        };
-
-        let mut candidate_queue = vec![node_idx];
-        while !candidate_queue.is_empty() {
-            while let Some(node_idx) = candidate_queue.pop() {
-                let node = self.get_node(node_idx);
-
-                component_set.insert(node_idx);
-
-                for edge_idx in node.get_all_edges().filter(|edge_idx| {
-                    let edge_idx = **edge_idx;
-
-                    edge_idx != cut_edge_idx && self.get_edge(edge_idx).in_spanning_tree()
-                }) {
-                    let candidate_node_idx = self
-                        .get_connected_node(node_idx, *edge_idx)
-                        .expect("edge not connected");
-
-                    if !component_set.contains(&candidate_node_idx)
-                        && !opposite.contains(&candidate_node_idx)
-                    {
-                        candidate_queue.push(candidate_node_idx);
-                    }
-                }
-            }
-        }
-        component_set
-    }
-
-    /// Given two sets of nodes, return the sum of all edges that move from the head set to the tail set.
-    fn transition_weight_sum(
-        &self,
-        head_nodes: &HashSet<usize>,
-        tail_nodes: &HashSet<usize>,
-    ) -> i32 {
-        let mut sum = 0;
-        for edge in self.edges.iter() {
-            if head_nodes.contains(&edge.src_node) && tail_nodes.contains(&edge.dst_node) {
-                sum -= edge.weight as i32;
-            } else if tail_nodes.contains(&edge.src_node) && head_nodes.contains(&edge.dst_node) {
-                sum += edge.weight as i32;
-            }
-        }
-        sum
-    }
-
-    // // True if the head (src_node) of the given edge is not in the feasible tree.
-    // fn edge_head_is_incident(&self, edge_idx: usize) -> bool {
-    //     let edge = self.get_edge(edge_idx);
-    //     let src_node = self.get_node(edge.src_node);
-    //     let dst_node = self.get_node(edge.dst_node);
-
-    //     !src_node.in_spanning_tree() && dst_node.in_spanning_tree()
-    // }
-
-    // /// edge_index is expected to span two nodes, one of which is in the tree, one of which is not.
-    // /// Return the index to the node which is not yet in the tree.
-    // fn get_incident_node(&self, edge_idx: usize) -> Option<usize> {
-    //     let edge = self.get_edge(edge_idx);
-    //     let src_node = self.get_node(edge.src_node);
-    //     let dst_node = self.get_node(edge.dst_node);
-
-    //     if !src_node.in_spanning_tree() && dst_node.in_spanning_tree() {
-    //         Some(edge.src_node)
-    //     } else if src_node.in_spanning_tree() && !dst_node.in_spanning_tree() {
-    //         Some(edge.dst_node)
-    //     } else {
-    //         None
-    //     }
-    // }
-
-    // /// Return an edge with the smallest slack of any edge which is incident to the tree.
-    // ///
-    // /// Incident to the tree means one point of the edge points to a node that is in the tree,
-    // /// and the other point points to a node that it not within the tree.
-    // ///
-    // /// TODO: Make more efficient by keeping a list of incident nodes
-    // ///
-    // /// Optimization TODO from the paper:
-    // /// * The network simplex is also very sensitive to the choice of the negative edge to replace.
-    // /// * We observed that searching cyclically through all the tree edges, instead of searching from the
-    // ///   beginning of the list of tree edges every time, can save many iterations.
-    // fn get_min_incident_edge(&self) -> Option<usize> {
-    //     let mut candidate = None;
-    //     let mut candidate_slack = i32::MAX;
-
-    //     for (node_idx, node) in self.nodes.iter().enumerate() {
-    //         if node.in_spanning_tree() {
-    //             for edge_idx in node.get_all_edges() {
-    //                 let connected_node_idx = self
-    //                     .get_connected_node(node_idx, *edge_idx)
-    //                     .expect("Edge not connected");
-
-    //                 if !self.get_node(connected_node_idx).in_spanning_tree() {
-    //                     let slack = self
-    //                         .simplex_slack(*edge_idx)
-    //                         .expect("Can't calculate slack");
-
-    //                     if candidate.is_none() || slack < candidate_slack {
-    //                         candidate = Some(*edge_idx);
-    //                         candidate_slack = slack;
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     candidate
-    // }
-
-    // /// Get an edge that spans a node which is in the feasible tree with another node that is not.
-    // #[allow(unused)]
-    // fn get_next_feasible_edge(&self) -> Option<usize> {
-    //     for node in self.nodes.iter() {
-    //         if node.in_spanning_tree() {
-    //             for edge_idx in &node.out_edges {
-    //                 let dst_node = self.get_edge(*edge_idx).dst_node;
-
-    //                 if !self.get_node(dst_node).in_spanning_tree() {
-    //                     return Some(*edge_idx);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     None
-    // }
-
-    // /// An edge is "feasible" if both it's nodes have been ranked, and rank_diff > MIN_EDGE_LEN.
-    // #[allow(unused)]
-    // fn edge_is_feasible(&self, edge_idx: usize) -> bool {
-    //     if let Some(diff) = self.simplex_edge_length(edge_idx) {
-    //         diff > MIN_EDGE_LENGTH as i32
-    //     } else {
-    //         false
-    //     }
-    // }
 
     /// Returns the slack of and edge for the network simplex algorithm.
     ///
@@ -592,9 +210,6 @@ impl Graph {
     ///   the minimal elements to rank 0.  These nodes are removed from the poset and the
     ///   new set of minimal elements are assigned rank 1, etc.
     ///
-    //// TODO: Don't we have to remove redundant edges and ensure the graph is not circular
-    ///  before we even start this?
-    ///
     ///   * In my implementation:
     ///     * Initialize:
     ///       * All nodes ranks are set to: None
@@ -616,7 +231,8 @@ impl Graph {
         let mut nodes_to_rank = VecDeque::new();
         let mut scanned_edges = HashSet::new();
 
-        self.print_nodes("before init_simplex_rank()");
+        // self.print_nodes("before init_simplex_rank()");
+
         // Lets not assume the tree fields are clear to begin with
         for edge in self.edges.iter_mut() {
             edge.set_in_spanning_tree(false)
@@ -635,7 +251,7 @@ impl Graph {
 
         while let Some(node_idx) = nodes_to_rank.pop_front() {
             let node = self.get_node(node_idx);
-            println!("  init_simplex_rank(): Processing: {}", self.node_to_string(node_idx));
+            // println!("  init_simplex_rank(): Processing: {}", self.node_to_string(node_idx));
 
             if node.simplex_rank().is_none() {
                 let mut new_rank = 0;
@@ -656,7 +272,7 @@ impl Graph {
                     let edge = self.get_edge(edge_idx);
                     let dst_node = self.get_node(edge.dst_node);
                     if dst_node.no_unscanned_in_edges(&scanned_edges) {
-                        println!("  init_simples_rank():    queueing: {}", self.get_node(edge.dst_node).name);
+                        // println!("  init_simples_rank():    queueing: {}", self.get_node(edge.dst_node).name);
                         nodes_to_rank.push_back(edge.dst_node)
                     }
                 }
@@ -664,7 +280,7 @@ impl Graph {
             }
         }
 
-        self.print_nodes("after init_simplex_rank()");
+        // self.print_nodes("after init_simplex_rank()");
     }
 
     /// If any edge has a negative cut value, return the first one found starting with start_idx.
@@ -730,14 +346,14 @@ impl Graph {
             }
         };
 
-        println!(
-            "Going to select: {disposition}: search_node {min}-{max}: {}",
-            self.node_to_string(search_node_idx)
-        );
+        // println!(
+        //     "Going to select: {disposition}: search_node {min}-{max}: {}",
+        //     self.node_to_string(search_node_idx)
+        // );
 
         self.select_edge_for_simplex(disposition, search_node_idx, min, max, None)
             .map(|selected_edge| {
-                println!("Final selection: {}", self.edge_to_string(selected_edge));
+                // println!("Final selection: {}", self.edge_to_string(selected_edge));
                 (
                     selected_edge,
                     self.simplex_slack(selected_edge)
@@ -768,10 +384,10 @@ impl Graph {
             .tree_dist_max()
             .expect("Search node must have subtree");
 
-        println!(
-            "   select_edge_for_simplex: search_node: {}",
-            self.node_to_string(search_node_idx)
-        );
+        // println!(
+        //     "   select_edge_for_simplex: search_node: {}",
+        //     self.node_to_string(search_node_idx)
+        // );
         for edge_idx in search_node.get_edges(disposition).iter().cloned() {
             let edge = self.get_edge(edge_idx);
             let node_idx = match disposition {
@@ -782,10 +398,10 @@ impl Graph {
                 .get_node(node_idx)
                 .tree_dist_max()
                 .expect("Candidate node must have a subtree");
-            println!(
-                "   select_edge_for_simplex: checking edge {disposition}: {}",
-                self.edge_to_string(edge_idx)
-            );
+            // println!(
+            //     "   select_edge_for_simplex: checking edge {disposition}: {}",
+            //     self.edge_to_string(edge_idx)
+            // );
 
             if !edge.in_spanning_tree() {
                 let slack = self.simplex_slack(edge_idx).expect("Edge must have slack");
@@ -796,31 +412,31 @@ impl Graph {
                     && (candidate_slack.is_none() || Some(slack) < candidate_slack)
                 {
                     candidate_idx = Some(edge_idx);
-                    println!("   selected: {edge_idx}");
+                    // println!("   selected: {edge_idx}");
                 } else {
-                    println!(
-                        "   node not withing distance limits {min}-{max}: {}",
-                        self.node_to_string(node_idx)
-                    )
+                    // println!(
+                    //     "   node not withing distance limits {min}-{max}: {}",
+                    //     self.node_to_string(node_idx)
+                    // )
                 }
             } else if node_tree_dist_max < search_node_tree_dist_max {
                 candidate_idx =
                     self.select_edge_for_simplex(disposition, node_idx, min, max, candidate_idx);
             } else {
-                println!("   select_edge_for_simplex: rejected edge {edge_idx}");
+                // println!("   select_edge_for_simplex: rejected edge {edge_idx}");
             }
         }
-        println!("   select_edge_for_simplex: next phase");
+        // println!("   select_edge_for_simplex: next phase");
         for edge_idx in search_node
             .get_edges(disposition.opposite())
             .iter()
             .cloned()
         {
-            println!(
-                "   select_edge_for_simplex: checking edge {}: {}",
-                disposition.opposite(),
-                self.edge_to_string(edge_idx)
-            );
+            // println!(
+            //     "   select_edge_for_simplex: checking edge {}: {}",
+            //     disposition.opposite(),
+            //     self.edge_to_string(edge_idx)
+            // );
             let edge = self.get_edge(edge_idx);
             let node_idx = match disposition.opposite() {
                 In => edge.src_node,
@@ -835,7 +451,7 @@ impl Graph {
                 candidate_idx =
                     self.select_edge_for_simplex(disposition, node_idx, min, max, candidate_idx);
             } else {
-                println!("   select_edge_for_simplex: rejected edge {edge_idx}: {node_tree_dist_max} < {search_node_tree_dist_max}");
+                // println!("   select_edge_for_simplex: rejected edge {edge_idx}: {node_tree_dist_max} < {search_node_tree_dist_max}");
             }
         }
 
@@ -851,33 +467,7 @@ impl Graph {
     ) {
         self.get_edge(neg_cut_edge_idx).set_in_spanning_tree(false);
         self.get_edge(non_tree_edge_idx).set_in_spanning_tree(true);
-
-        // LOOK AT EDGE C.
-        // XXX IT SEEMS LIKE WHILE IT SHOULD BE SET INTO THE TREE, THIS NEEDS TO BE DONE LATER, AFTER THE RERANK LOGIC...
-        //     BECAUSE SETTING THIS BEFORE THE RERANK IS DONE CAUSES AN INFINITE LOOP
     }
-
-    // /// Set the least rank of the tree to zero.
-    // /// * finding the current least rank
-    // /// * subtracking the least rank from all ranks
-    // ///
-    // /// Documentation from paper:
-    // /// The solution is normalized setting the least rank to zero.
-    // ///
-    // /// In GraphVis Code: scan_and_normalize()
-    // fn normalize_simplex_rank(&mut self) {
-    //     if let Some(min_node) = self.real_nodes_iter().map(|(_idx, node)| node).min() {
-    //         if let Some(least_rank) = min_node.simplex_rank() {
-    //             for node in self.nodes.iter_mut() {
-    //                 if let Some(rank) = node.simplex_rank() {
-    //                     if let Some(new_rank) = rank.checked_sub(least_rank) {
-    //                         node.set_simplex_rank(Some(new_rank));
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 
     /// Balance nodes either top to bottom or left to right
     fn balance_for_simplex(&mut self, target: SimplexNodeTarget) {
@@ -967,20 +557,19 @@ impl Graph {
     ///   two solutions have the same cost, Thus, optimality of G′ implies optimality for G and solving G′ gives us a solution for G.
     ///
     fn balance_left_right(&mut self) {
-        self.print_nodes("balance_left_right start");
+        // self.print_nodes("balance_left_right start");
 
         for (tree_edge_idx, tree_edge) in self.tree_edge_iter() {
             if tree_edge.cut_value == Some(0) {
-                print!("Looking at edge with cut of 0:");
-                self.print_edge(tree_edge_idx);
+                // print!("Looking at edge with cut of 0:"); self.print_edge(tree_edge_idx);
 
-                if let Some((non_tree_edge_idx, non_tree_edge_slack)) = self.enter_edge_for_simplex(tree_edge_idx)
+                if let Some((_non_tree_edge_idx, non_tree_edge_slack)) = self.enter_edge_for_simplex(tree_edge_idx)
                 {
                     if non_tree_edge_slack > 1 {
-                        println!("  balance_left_right(): replace {tree_edge_idx} with {non_tree_edge_idx}, slack: {non_tree_edge_slack}\n    replace: {}\n      with: {}",
-                                self.edge_to_string(tree_edge_idx),
-                                self.edge_to_string(non_tree_edge_idx),
-                            );
+                        // println!("  balance_left_right(): replace {tree_edge_idx} with {non_tree_edge_idx}, slack: {non_tree_edge_slack}\n    replace: {}\n      with: {}",
+                        //         self.edge_to_string(tree_edge_idx),
+                        //         self.edge_to_string(non_tree_edge_idx),
+                        //     );
 
                         let src_node = self.get_node(tree_edge.src_node);
                         let dst_node = self.get_node(tree_edge.dst_node);
@@ -993,25 +582,25 @@ impl Graph {
                             } else {
                                 (tree_edge.dst_node, -non_tree_edge_slack / 2)
                             };
-                            println!("  rerank by node {rerank_node_idx} by: {delta}");
+                            // println!("  rerank by node {rerank_node_idx} by: {delta}");
                             self.rerank_by_tree(rerank_node_idx, delta);
                         } else {
                             panic!("Not all nodes in spanning tree!");
                         }
                     } else {
-                        println!(
-                            "  balance_left_right(): skipping candidate replacement edge with slack <= 1: slack={non_tree_edge_slack}: {}",
-                            self.edge_to_string(non_tree_edge_idx)
-                        );
+                        // println!(
+                        //     "  balance_left_right(): skipping candidate replacement edge with slack <= 1: slack={non_tree_edge_slack}: {}",
+                        //     self.edge_to_string(_non_tree_edge_idx)
+                        // );
                     }
                 } else {
                     println!("  No edge to enter!");
                 }
             } else {
-                println!(
-                    "balance_left_right(): skipping candidate removal edge with cutval != Some(0): {}",
-                    self.edge_to_string(tree_edge_idx)
-                );
+                // println!(
+                //     "balance_left_right(): skipping candidate removal edge with cutval != Some(0): {}",
+                //     self.edge_to_string(tree_edge_idx)
+                // );
             }
         }
     }
@@ -1052,14 +641,6 @@ mod tests {
                 .count()
         }
 
-        fn assert_expected_cutvals(&self, expected_cutvals: Vec<(&str, &str, i32)>) {
-            for (src_name, dst_name, cut_val) in expected_cutvals {
-                let (edge, _) = self.get_named_edge(src_name, dst_name);
-
-                assert_eq!(edge.cut_value, Some(cut_val), "unexpected cut_value");
-            }
-        }
-
         #[allow(unused)]
         fn display_component(&self, comp: &HashSet<usize>) -> String {
             let mut node_names = vec![];
@@ -1071,64 +652,6 @@ mod tests {
             format!("{node_names:?}",)
         }
     }
-
-    // #[test]
-    // // An incident edge is one that has one point in a tree node, and the other
-    // // in a non-tree node (thus "incident" to the tree).
-    // fn test_get_min_incident_edge() {
-    //     let mut graph = Graph::new();
-    //     let a_idx = graph.add_node("A");
-    //     let b_idx = graph.add_node("B");
-    //     let c_idx = graph.add_node("C");
-
-    //     let e1 = graph.add_edge(a_idx, b_idx);
-    //     let e2 = graph.add_edge(a_idx, c_idx);
-
-    //     graph.init_simplex_rank();
-
-    //     println!("{graph}");
-
-    //     graph.get_node_mut(a_idx).set_tree_root_node();
-    //     let min_edge_idx = graph.get_min_incident_edge();
-    //     assert_eq!(min_edge_idx, Some(e1));
-
-    //     graph.get_node_mut(b_idx).set_tree_root_node();
-    //     let min_edge_idx = graph.get_min_incident_edge();
-    //     assert_eq!(min_edge_idx, Some(e2));
-
-    //     graph.get_node_mut(c_idx).set_tree_root_node();
-    //     let min_edge_idx = graph.get_min_incident_edge();
-    //     assert_eq!(min_edge_idx, None);
-    // }
-
-    // #[test]
-    // fn test_edge_head_is_incident() {
-    //     let mut graph = Graph::new();
-    //     let a_idx = graph.add_node("A");
-    //     let b_idx = graph.add_node("B");
-    //     let c_idx = graph.add_node("C");
-
-    //     let e1 = graph.add_edge(a_idx, b_idx);
-    //     let e2 = graph.add_edge(a_idx, c_idx);
-    //     let e3 = graph.add_edge(b_idx, c_idx);
-    //     let e4 = graph.add_edge(b_idx, a_idx);
-
-    //     graph.init_simplex_rank();
-
-    //     println!("{graph}");
-
-    //     graph.get_node_mut(a_idx).set_tree_root_node();
-    //     // Graph:(A) <-> B
-    //     //         |    |
-    //     //         |    v
-    //     //          \-> C
-    //     //
-    //     // head is incident only for: B->A
-    //     assert!(!graph.edge_head_is_incident(e1), "A -> B");
-    //     assert!(!graph.edge_head_is_incident(e2), "A -> C");
-    //     assert!(!graph.edge_head_is_incident(e3), "B -> C");
-    //     assert!(graph.edge_head_is_incident(e4), "B -> A");
-    // }
 
     /// * l(e) = length(e) = rank(e.dst_node)-rank(e.src_node) = rank_diff(e)
     ///   * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
@@ -1185,30 +708,6 @@ mod tests {
         assert_eq!(graph.simplex_slack(a_c), Some(1));
         assert_eq!(graph.simplex_slack(b_c), Some(0));
         // assert_eq!(graph.edge_length(c_a), Some(-2));
-    }
-
-    #[test]
-    fn test_init_cut_values_2_3_a() {
-        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a();
-
-        graph.init_spanning_tree_and_cutvalues();
-        graph.assert_expected_cutvals(expected_cutvals);
-    }
-
-    #[test]
-    fn setup_init_cut_values_2_3_b() {
-        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_b();
-
-        graph.init_spanning_tree_and_cutvalues();
-        graph.assert_expected_cutvals(expected_cutvals);
-    }
-
-    #[test]
-    fn setup_init_cut_values_2_3_extended() {
-        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a_extended();
-
-        graph.init_spanning_tree_and_cutvalues();
-        graph.assert_expected_cutvals(expected_cutvals);
     }
 
     #[test]
