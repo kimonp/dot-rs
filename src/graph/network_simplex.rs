@@ -79,13 +79,6 @@ impl Graph {
     /// }
     ///
     pub(super) fn network_simplex_ranking(&mut self, target: SimplexNodeTarget) {
-        #[cfg(test)]
-        if self.skip_tree_init && target == SimplexNodeTarget::VerticalRank {
-            println!("Skipping tree initialziation in specal test");
-        } else {
-            self.set_feasible_tree_for_simplex(target == SimplexNodeTarget::VerticalRank);
-        }
-        #[cfg(not(test))]
         self.set_feasible_tree_for_simplex(target == SimplexNodeTarget::VerticalRank);
 
         let mut start_idx = 0;

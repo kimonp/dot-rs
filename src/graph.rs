@@ -54,8 +54,6 @@ pub struct Graph {
     horizontal_node_separation: u32,
     /// First node_idx in the graph that is virutal.  All subsequent nodes must be virtual too.
     first_virtual_idx: Option<usize>,
-    #[cfg(test)]
-    skip_tree_init: bool,
 }
 
 impl Default for Graph {
@@ -72,8 +70,6 @@ impl Graph {
             rank_orderings: None,
             horizontal_node_separation: NODE_MIN_SEP_X as u32,
             first_virtual_idx: None,
-            #[cfg(test)]
-            skip_tree_init: false,
         }
     }
 
@@ -367,38 +363,6 @@ impl Graph {
         }
         queue
     }
-
-    // /// Beginning with start, return the first index that is not yet marked as part of the tree.
-    // fn get_next_non_tree_node_idx(&self, start: usize) -> Option<usize> {
-    //     for (index, node) in self.nodes.iter().skip(start).enumerate() {
-    //         let node_idx = start + index;
-    //         if !node.in_spanning_tree() {
-    //             return Some(node_idx);
-    //         }
-    //     }
-    //     None
-    // }
-
-    // /// Return a queue of nodes that don't have incoming edges (source nodes).
-    // fn get_source_nodes_and_fix_cyclic(&mut self) -> VecDeque<usize> {
-    //     let node_count = self.node_count();
-    //     let mut queue;
-
-    //     loop {
-    //         queue = self.get_source_nodes();
-
-    //         // Ensure we have at least one source node
-    //         if queue.is_empty() && node_count != 0 {
-    //             let node = self.get_node(0);
-    //             let in_edge_idx = node.in_edges[0];
-
-    //             self.reverse_edge(in_edge_idx);
-    //         } else {
-    //             break;
-    //         }
-    //     }
-    //     queue
-    // }
 
     fn reverse_edge(&mut self, edge_idx_to_reverse: usize) {
         let (src_node_idx, dst_node_idx) = {
@@ -735,30 +699,6 @@ impl Graph {
         min_rank_nodes
     }
 
-    // /// Return a hash map of rank -> vec<node_idx> as well as the minimum rank
-    // fn get_rank_map(&self) -> (Option<u32>, HashMap<u32, Vec<usize>>) {
-    //     let mut ranks: HashMap<u32, Vec<usize>> = HashMap::new();
-    //     let mut min_rank = None;
-
-    //     for (node_idx, node) in self.nodes.iter().enumerate() {
-    //         if let Some(rank) = node.simplex_rank {
-    //             if let Some(level) = ranks.get_mut(&rank) {
-    //                 level.push(node_idx);
-    //             } else {
-    //                 ranks.insert(rank, vec![node_idx]);
-    //             }
-
-    //             min_rank = if let Some(min_rank) = min_rank {
-    //                 Some(u32::min(min_rank, rank))
-    //             } else {
-    //                 Some(rank)
-    //             };
-    //         }
-    //     }
-
-    //     (min_rank, ranks)
-    // }
-
     /// Generic Network simplex:
     ///
     /// fn network_simplex_example() {
@@ -1035,43 +975,6 @@ impl Graph {
     fn make_splines(&mut self) {
         todo!();
     }
-
-    // /// Return a value for the graph used to optimize the graph for the selection of x coordiantes for nodes.
-    // ///
-    // /// Documentation from paper: page 17
-    // fn graph_coordinate_optimization_value(&self) -> u32 {
-    //     self.edges
-    //         .iter()
-    //         .map(|edge| self.edge_coordinate_optimization_value(edge))
-    //         .sum()
-    // }
-
-    // /// Return a value for an edge used to optimize the graph for the selection of x coordiantes for nodes.
-    // ///
-    // /// Documentation from paper: page 17
-    // /// * For edge = (v,w): Ω(e)*ω(e)*|Xw − Xv|
-    // /// * Subject to: Xb − Xa ≥ ρ(a,b)
-    // ///   * ρ is a function on pairs of adjacent nodes in the same rank giving the minimum separation
-    // ///     between their center points
-    // fn edge_coordinate_optimization_value(&self, edge: &Edge) -> u32 {
-    //     let src_node = self.get_node(edge.src_node);
-    //     let dst_node = self.get_node(edge.dst_node);
-    //     let omega = Edge::edge_omega_value(src_node.is_virtual(), dst_node.is_virtual());
-    //     let weight = edge.weight;
-    //     let w_x = src_node.coordinates.unwrap().x();
-    //     let v_x = dst_node.coordinates.unwrap().y();
-    //     let x_diff = w_x.abs_diff(v_x);
-
-    //     self.min_node_distance().max(omega * weight * x_diff)
-    // }
-
-    // /// TODO: min_node_distance should be determined by graph context, and perhaps the specific nodes
-    // ///       involved
-    // fn min_node_distance(&self) -> u32 {
-    //     const MIN_NODE_DISTANCE: u32 = 100; // pixels...
-
-    //     MIN_NODE_DISTANCE
-    // }
 
     /// Given a node index, return an iterator to a tuple with each edge_idx, and the node_idx of
     /// the node on the other side of the edge.
@@ -1531,37 +1434,7 @@ pub mod tests {
         }
     }
 
-    // #[test]
-    // fn test_get_source_nodes_single() {
-    //     let mut graph = Graph::new();
-    //     let node_map = graph.add_nodes('a'..='d');
-    //     let edges = vec![("a", "b"), ("c", "d"), ("d", "c")];
-    //     graph.add_edges(&edges, &node_map);
-
-    //     let source_nodes = graph.get_source_nodes_and_fix_cyclic();
-    //     let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
-
-    //     assert_eq!(source_nodes, vec![0]);
-    // }
-
-    // #[test]
-    // fn test_get_source_nodes_double() {
-    //     let mut graph = Graph::new();
-    //     let node_map = graph.add_nodes('a'..='c');
-    //     let edges = vec![("a", "b"), ("c", "b")];
-    //     graph.add_edges(&edges, &node_map);
-
-    //     let source_nodes = graph.get_source_nodes_and_fix_cyclic();
-    //     let source_nodes = source_nodes.iter().cloned().collect::<Vec<usize>>();
-
-    //     assert_eq!(source_nodes, vec![0, 2]);
-    // }
-
-    /// Ignored because we need to handle this with subgraphs: breaking up unconnected asyclic
-    /// graphs into separate graphs.
-    ///
     /// Test that two simple cyclic graphs are both made asyclic.
-    #[ignore]
     #[test]
     fn test_make_asyclic() {
         let mut graph = Graph::new();
