@@ -1174,7 +1174,7 @@ pub mod tests {
         /// used with add_edges().
         ///
         /// * Nodes must be named after a single character.
-        /// * The range is inclusive only of the left side.  So 'a'..'d' incluses: a, b, c but NOT d.
+        /// * The range is inclusive only of the left side.  So 'a'..'d' includes: a, b, c but NOT d.
         fn add_nodes(&mut self, range: RangeInclusive<char>) -> HashMap<String, usize> {
             let mut index_map = HashMap::new();
 

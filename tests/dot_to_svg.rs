@@ -23,6 +23,7 @@ pub fn write_svg_to_file(name: &str, svg: &str) {
     case::complex_cyclic("complex_cyclic"),
     case::flux_capacitor("flux_capacitor"),
     case::t1_2_1("t1_2_1"),
+    case::t2_1_2("t2_1_2"),
     case::a_to_4_nodes("a_to_4_nodes"),
     case::simple_scramble("simple_scramble"),
     case::reverse_scramble("reverse_scramble"),

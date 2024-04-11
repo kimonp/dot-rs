@@ -2,7 +2,7 @@
 
 use crate::graph::Graph;
 
-pub const DOT_EXAMPLES: [(&str, &str); 17] = [
+pub const DOT_EXAMPLES: [(&str, &str); 18] = [
     ("a_to_b_and_c", "digraph {a -> b; a -> c;}"),
     ("b_and_c_to_a", "digraph {b -> a; c -> a;}"),
     ("a_to_c_and_b_to_a", "digraph {a -> c; b -> a;}"),
@@ -14,6 +14,7 @@ pub const DOT_EXAMPLES: [(&str, &str); 17] = [
     ),
     ("flux_capacitor", "digraph {a -> c; b -> c; c -> d}"),
     ("t1_2_1", "digraph { a -> b; a -> c; b -> d; c -> d; }"),
+    ("t2_1_2", "digraph { a -> b; c -> b; b -> d; b -> e; }"),
     ("a_to_4_nodes", "digraph {a -> b; a -> c; a -> d; a -> e;}"),
     (
         "simple_scramble",
