@@ -134,14 +134,11 @@ impl Graph {
             cutvalue_component
         }
     }
-
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::network_simplex::SimplexNodeTarget::XCoordinate;
     
     impl Graph {
         fn assert_expected_cutvals(&self, expected_cutvals: Vec<(&str, &str, i32)>) {
@@ -183,132 +180,6 @@ mod tests {
 
         graph.rank_nodes_vertically();
         println!("{graph}");
-    }
-
-    /// This test sets a feasible_tree to match what GraphViz chooses to see if
-    /// the choice of feasible tree is responsible for how it is graphed (and it appears to be)
-    ///
-    /// Ignored because for this to work, the feasible tree must not be reset during the XCoordinate
-    /// run of network simplex.
-    #[ignore]
-    #[test]
-    fn test_advanced_cutvalues() {
-        let mut graph = Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }");
-        graph.rank_nodes_vertically();
-        graph.set_horizontal_ordering();
-        graph.set_y_coordinates();
-
-        graph.skip_tree_init = true;
-
-        let mut aux_graph = graph.create_positioning_aux_graph();
-        aux_graph.make_asyclic();
-        let v7_idx = 7;
-        let v6_idx = 6;
-        let v5_idx = 5;
-        let v4_idx = 4;
-        let a_idx = 0;
-        let b_idx = 1;
-        let c_idx = 2;
-        let d_idx = 3;
-
-        aux_graph
-            .get_node_mut(d_idx)
-            .set_tree_data(Some(v7_idx), None, None);
-        aux_graph
-            .get_node_mut(v6_idx)
-            .set_tree_data(Some(d_idx), None, None);
-        aux_graph
-            .get_node_mut(b_idx)
-            .set_tree_data(Some(v6_idx), None, None);
-        aux_graph
-            .get_node_mut(c_idx)
-            .set_tree_data(Some(b_idx), None, None);
-        aux_graph
-            .get_node_mut(v4_idx)
-            .set_tree_data(Some(b_idx), None, None);
-        aux_graph
-            .get_node_mut(a_idx)
-            .set_tree_data(Some(v4_idx), None, None);
-        aux_graph
-            .get_node_mut(v5_idx)
-            .set_tree_data(Some(a_idx), None, None);
-
-        for (src_name, dst_name) in [
-            ("v7", "d"),
-            ("v6", "d"),
-            ("v6", "b"),
-            ("b", "c"),
-            ("v4", "b"),
-            ("v4", "a"),
-            ("v5", "a"),
-        ] {
-            let (_, edge_idx) = aux_graph.get_named_edge(src_name, dst_name);
-            aux_graph.get_edge_mut(edge_idx).set_in_spanning_tree(true);
-        }
-        println!("--------START HERE------");
-        println!("{aux_graph}");
-
-        aux_graph.init_spanning_tree_and_cutvalues();
-        aux_graph.network_simplex_ranking(XCoordinate);
-
-        println!("AUX: {aux_graph}");
-        graph.set_x_coordinates_from_aux(&aux_graph);
-        println!("GRAPH{graph}");
-
-        let svg = crate::svg::SVG::new(graph, false);
-        svg.write_to_file("foo");
-    }
-
-    /// This test sets a feasible_tree to match what GraphViz chooses to see if
-    /// the choice of feasible tree is responsible for how it is graphed (and it appears to be)
-    ///
-    /// Ignored because for this to work, the feasible tree must not be reset during the XCoordinate
-    /// run of network simplex.
-    #[ignore]
-    #[test]
-    fn test_cutvalues_b_and_c_to_a() {
-        let mut graph = Graph::from("digraph { b -> a; c -> a; }");
-        graph.rank_nodes_vertically();
-        graph.set_horizontal_ordering();
-        graph.set_y_coordinates();
-
-        let mut aux_graph = graph.create_positioning_aux_graph();
-        aux_graph.make_asyclic();
-
-        graph.skip_tree_init = true;
-        let v4_idx = 4;
-        let v3_idx = 3;
-        let b_idx = 0;
-        let a_idx = 1;
-        let c_idx = 2;
-
-        for (child_idx, parent_idx) in [
-            (a_idx, v4_idx),
-            (v3_idx, a_idx),
-            (v3_idx, b_idx),
-            (b_idx, c_idx),
-        ] {
-            aux_graph
-                .get_node_mut(child_idx)
-                .set_tree_data(Some(parent_idx), None, None);
-        }
-
-        for (src_name, dst_name) in [("v4", "a"), ("v3", "a"), ("v3", "b"), ("b", "c")] {
-            let (_, edge_idx) = aux_graph.get_named_edge(src_name, dst_name);
-            aux_graph.get_edge_mut(edge_idx).set_in_spanning_tree(true);
-        }
-        aux_graph.init_spanning_tree_and_cutvalues();
-        println!("--------START HERE------");
-        println!("{aux_graph}");
-
-        aux_graph.network_simplex_ranking(XCoordinate);
-
-        println!("AUX: {aux_graph}");
-        graph.set_x_coordinates_from_aux(&aux_graph);
-        println!("GRAPH: {graph}");
-
-        let svg = crate::svg::SVG::new(graph, false);
-        svg.write_to_file("foo");
     }
 
     #[test]
