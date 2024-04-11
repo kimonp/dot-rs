@@ -154,35 +154,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cutvalues() {
-        let mut graph = Graph::new();
-        let a_idx = graph.add_node("A");
-        let b_idx = graph.add_node("B");
-        let c_idx = graph.add_node("C");
-        let d_idx = graph.add_node("D");
-        let e_idx = graph.add_node("E");
-        let f_idx = graph.add_node("F");
-        let g_idx = graph.add_node("G");
-        let h_idx = graph.add_node("H");
-
-        graph.add_edge(a_idx, b_idx);
-        graph.add_edge(a_idx, e_idx);
-        graph.add_edge(a_idx, f_idx);
-
-        graph.add_edge(b_idx, c_idx);
-
-        graph.add_edge(e_idx, g_idx);
-        graph.add_edge(f_idx, g_idx);
-        graph.add_edge(c_idx, d_idx);
-
-        graph.add_edge(g_idx, h_idx);
-        graph.add_edge(d_idx, h_idx);
-
-        graph.rank_nodes_vertically();
-        println!("{graph}");
-    }
-
-    #[test]
     fn test_init_cut_values_2_3_a() {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a();
 
