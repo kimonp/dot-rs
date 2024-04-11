@@ -1,4 +1,4 @@
-name: Enforce Clippy lints, including warnings
+name: Enforce Clippy Lints including warnings, and Tests
 on: push
 
 # Fail CI on all warnings, including Clippy lints.
@@ -6,7 +6,7 @@ env:
   RUSTFLAGS: "-Dwarnings"
 
 jobs:
-  clippy_check:
+  clippy_check_and_test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
