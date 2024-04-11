@@ -546,10 +546,7 @@ impl Graph {
     /// * After this is complete, set the cutvalue of this edge.
     ///
     /// GraphViz: dfs_cutval()
-    pub(super) fn set_cutvals_depth_first(
-        &mut self,
-        node_idx: usize,
-    ) {
+    pub(super) fn set_cutvals_depth_first(&mut self, node_idx: usize) {
         for (other_idx, _edge_idx) in self.non_parent_tree_nodes(node_idx) {
             self.set_cutvals_depth_first(other_idx)
         }
@@ -568,7 +565,7 @@ impl Graph {
         let edge = self.get_edge(edge_idx);
         let src_node = self.get_node(edge.src_node);
         let parent_edge_idx = src_node.spanning_tree_parent_edge_idx();
-        let (points_to_parent, searched_node_idx) = if parent_edge_idx == Some(edge_idx) {
+        let (edge_points_to_searched, searched_node_idx) = if parent_edge_idx == Some(edge_idx) {
             (true, edge.src_node)
         } else {
             (false, edge.dst_node)
@@ -577,7 +574,7 @@ impl Graph {
         let search_edges = self.get_node(searched_node_idx).get_all_edges();
         let sum = search_edges
             .map(|edge_idx| {
-                self.calc_cutvalue_component(*edge_idx, searched_node_idx, points_to_parent)
+                self.calc_cutvalue_component(*edge_idx, searched_node_idx, edge_points_to_searched)
             })
             .sum();
 
@@ -585,14 +582,19 @@ impl Graph {
     }
 
     /// Compute the component of a cutvalue for another edge.
-    /// 
+    /// Pass in:
+    /// * edge_idx: The edge who will be contributing a cutvalue component
+    /// * searched_node_idx: The node connected to edge_idx which has already been searched
+    /// * edge_points_to_searched: True if this edge points to a node that has already been
+    ///   searched (and thus is not the node is not tree parent of this edge)
+    ///
     /// * Components from all edges of a node can be summed together to calculate a
     ///   cutvalue without looking through all the other nodes and edges.
     /// * This only works in the context of a depth first search, where the cutvalues
     ///   of nodes farther away from the root have already been calculated.
     /// * This works because the cutvalues of tree leaves can be locally calcualted
     ///   and the result of the cutvalues can be built from there.
-    /// 
+    ///
     /// From paper: page 11, section 2.4:
     ///
     /// To reduce this cost (of caculating cutvalues), we note that the cut values can be
@@ -628,44 +630,45 @@ impl Graph {
         &self,
         edge_idx: usize,
         searched_node_idx: usize,
-        points_to_parent: bool,
+        edge_points_to_searched: bool,
     ) -> i32 {
         let edge = self.get_edge(edge_idx);
         let src_node_searched = edge.src_node == searched_node_idx;
+        let dst_node_searched = edge.dst_node == searched_node_idx;
+        let child_node_searched = if edge_points_to_searched {
+            dst_node_searched
+        } else {
+            src_node_searched
+        };
+
         let unsearched_node_idx = if src_node_searched {
             edge.dst_node
         } else {
             edge.src_node
         };
 
-        let edge_weight = edge.weight as i32;
-        let (reverse_direction, mut cutvalue_component) =
-            if !self.is_common_ancestor(searched_node_idx, unsearched_node_idx) {
-                (true, edge_weight)
-            } else {
-                let cur_cutvalue = if edge.in_spanning_tree() {
-                    edge.cut_value.unwrap_or_default()
-                } else {
-                    0
-                };
+        let search_node_is_ancestor =
+            self.is_common_ancestor(searched_node_idx, unsearched_node_idx);
+        let negate_component = (search_node_is_ancestor && !child_node_searched) || (!search_node_is_ancestor && child_node_searched);
 
-                (false, cur_cutvalue - edge_weight)
+        let edge_weight = edge.weight as i32;
+        let cutvalue_component = if search_node_is_ancestor {
+            let cur_cutvalue = if edge.in_spanning_tree() {
+                edge.cut_value.unwrap_or_default()
+            } else {
+                0
             };
 
-        let mut negate_component = if points_to_parent {
-            edge.dst_node != searched_node_idx
+            cur_cutvalue - edge_weight
         } else {
-            edge.src_node != searched_node_idx
+            edge_weight
         };
-        if reverse_direction {
-            negate_component = !negate_component;
-        }
 
         if negate_component {
-            cutvalue_component = -cutvalue_component;
+            -cutvalue_component
+        } else {
+            cutvalue_component
         }
-
-        cutvalue_component
     }
 
     /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the
