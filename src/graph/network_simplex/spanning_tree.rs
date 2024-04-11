@@ -39,6 +39,128 @@ use crate::graph::edge::{
 };
 
 impl Graph {
+    /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
+    ///
+    /// Documentation from the paper: pages 8-9
+    /// * The while loop code below ﬁnds an edge to a non-tree node that is adjacent to the tree, and adjusts the ranks of
+    ///   the tree nodes to make this edge tight.
+    ///   * As the edge was picked to have minimal slack, the resulting ranking is still feasible.
+    ///   * Thus, on every iteration, the maximal tight tree gains at least one node, and the algorithm
+    ///     eventually terminates with a feasible spanning tree.
+    /// * This technique is essentially the one described by Sugiyama et al [STT]:
+    ///   * Sugiyama, K., S. Tagawa and M. Toda, ‘‘Methods for Visual Understanding of Hierarchical System Structures,’’
+    ///   * IEEE Transactions on Systems, Man, and Cybernetics SMC-11(2), February, 1981, pp. 109-125.
+    ///
+    /// ChatGPT:
+    /// * In graph theory, an "edge incident on a tree" refers to an edge that connects a vertex of the tree to a vertex outside the tree.
+    /// * A tree is a specific type of graph that is connected and acyclic, meaning it doesn't contain any cycles.
+    ///   * The edges in a tree connect the vertices (nodes) in such a way that there is exactly one path between any two vertices.
+    ///
+    /// Additional papar details: page 7
+    /// * A feasible ranking is one satisfying the length constraints l(e) ≥ δ(e) for all e.
+    ///   * Thus, a ranking where the all edge rankings are > min_length().  Thus no rank < 1
+    ///   * l(e) = length(e) = rank(e1)-rank(e2) = rank_diff(e)
+    ///     * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
+    ///     * λ(w) − λ(v) = rank(w) - rank(v)
+    ///   * δ(e) = min_length(e) = 1 unless requested by user
+    /// * Given any ranking, not necessarily feasible, the "slack" of an edge is the difference of its length and its
+    ///   minimum length.
+    ///   * QUESTION: Is "its minimum length" == MIN_EDGE_LENGTH or just the minmum it can be in a tree?
+    ///   * A(0) -> B(1) -> C(2)
+    ///      \--------------/
+    ///   * vs:
+    ///   * A(0) -> B(1) -> C(1)
+    ///      \--------------/
+    /// * Thus, a ranking is feasible if the slack of every edge is non-negative.
+    /// * An edge is "tight" if its slack is zero.
+    ///
+    pub(super) fn set_feasible_tree_for_simplex(&mut self, init_rank: bool) {
+        if init_rank {
+            self.init_simplex_rank();
+        }
+
+        // Nodecount is at least as big as necessary: there will very likely be
+        // fewer subtrees than nodes, but not more.
+        let mut min_heap = MinHeap::new(self.node_count());
+
+        // Whether you are in the spanning tree or not, create as subtree
+        // for all nodes.
+        self.print_nodes("before find_tight_subtree() in set_feasible_tree()");
+
+        // We use node_idx_virtual_first() to mirror the order that GraphViz uses.
+        for node_idx in self.node_indexes_in_graphviz_order() {
+            // Don't place this exclusion in a filter, as it can change from the preivous call.
+            if !self.get_node(node_idx).has_sub_tree() {
+                let sub_tree = self.find_tight_subtree(node_idx);
+                min_heap.insert_unordered_item(sub_tree);
+            }
+        }
+
+        min_heap.order_heap();
+
+        self.print_nodes(&format!(
+            "after find_tight_subtree(): heap_size:{} in set_feasible_tree",
+            min_heap.len()
+        ));
+
+        while min_heap.len() > 1 {
+            let sub_tree = min_heap.pop().expect("can't be empty");
+            println!(
+                "   finding edge for: {:?} with heap of {}",
+                sub_tree,
+                min_heap.len()
+            );
+            let edge_idx = self
+                .find_tightest_incident_edge(sub_tree)
+                .expect("cant find inter tree edge");
+
+            println!("   Merging with edge: {edge_idx}");
+            let modified_sub_tree_idx = self.merge_sub_trees(edge_idx);
+            println!("   Reording: {modified_sub_tree_idx}");
+            min_heap.reorder_item(modified_sub_tree_idx);
+            println!("   reorder done");
+        }
+        self.init_spanning_tree_and_cutvalues();
+        self.print_nodes(&format!(
+            "after init_spanning_tree_and_cutvalues() in set_feasible_tree:{}",
+            min_heap.len()
+        ));
+    }
+
+    /// Calculate the cutvalues of all edges that are part of the current feasible tree.
+    ///
+    /// Documentation from the paper:
+    /// * The init_cutvalues function computes the cut values of the tree edges.
+    ///   * For each tree edge, this is computed by marking the nodes as belonging to the head or tail component,
+    ///   * and then performing the sum of the signed weights of all edges whose head and tail are in different components,
+    ///     * the sign being negative for those edges going from the head to the tail component
+    ///
+    /// Optimization TODOs from the paper:
+    /// * In a naive implementation, initial cut values can be found by taking every tree edge in turn,
+    ///   breaking it, labeling each node according to whether it belongs to the head or tail component,
+    ///   and performing the sum.
+    ///   * This takes O(V E) time.
+    ///   * To reduce this cost, we note that the cut values can be computed using information local to an edge
+    ///     if the search is ordered from the leaves of the feasible tree inward.
+    ///     * It is trivial to compute the cut value of a tree edge with one of its endpoints a leaf in the tree,
+    ///       since either the head or the tail component consists of a single node.
+    ///     * Now, assuming the cut values are known for all the edges incident on a given node except one, the
+    ///       cut value of the remaining edge is the sum of the known cut values plus a term dependent only on
+    ///       the edges incident to the given node.
+    ///
+    /// * Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder traversal
+    ///   of the tree, starting from some ﬁxed root node v root, and labeling each node v with its postorder traversal
+    ///   number lim(v), the least number low(v) of any descendant in the search, and the edge parent(v) by which the
+    ///   node was reached (see ﬁgure 2-5).
+    ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
+    ///     and thus whether a non-tree edge crosses between the two components.
+    pub fn init_spanning_tree_and_cutvalues(&mut self) {
+        if self.node_count() > 0 {
+            self.set_tree_parents_and_ranges(true, 0, None, 1);
+            self.set_cutvals_depth_first(0);
+        }
+    }
+
     /// In the graphviz 9.0 code, there are two functions:
     /// * dfs_range_init()
     /// * dfs_range()
@@ -144,94 +266,6 @@ impl Graph {
                 break;
             }
         }
-    }
-
-    /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
-    ///
-    /// Documentation from the paper: pages 8-9
-    /// * The while loop code below ﬁnds an edge to a non-tree node that is adjacent to the tree, and adjusts the ranks of
-    ///   the tree nodes to make this edge tight.
-    ///   * As the edge was picked to have minimal slack, the resulting ranking is still feasible.
-    ///   * Thus, on every iteration, the maximal tight tree gains at least one node, and the algorithm
-    ///     eventually terminates with a feasible spanning tree.
-    /// * This technique is essentially the one described by Sugiyama et al [STT]:
-    ///   * Sugiyama, K., S. Tagawa and M. Toda, ‘‘Methods for Visual Understanding of Hierarchical System Structures,’’
-    ///   * IEEE Transactions on Systems, Man, and Cybernetics SMC-11(2), February, 1981, pp. 109-125.
-    ///
-    /// ChatGPT:
-    /// * In graph theory, an "edge incident on a tree" refers to an edge that connects a vertex of the tree to a vertex outside the tree.
-    /// * A tree is a specific type of graph that is connected and acyclic, meaning it doesn't contain any cycles.
-    ///   * The edges in a tree connect the vertices (nodes) in such a way that there is exactly one path between any two vertices.
-    ///
-    /// Additional papar details: page 7
-    /// * A feasible ranking is one satisfying the length constraints l(e) ≥ δ(e) for all e.
-    ///   * Thus, a ranking where the all edge rankings are > min_length().  Thus no rank < 1
-    ///   * l(e) = length(e) = rank(e1)-rank(e2) = rank_diff(e)
-    ///     * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
-    ///     * λ(w) − λ(v) = rank(w) - rank(v)
-    ///   * δ(e) = min_length(e) = 1 unless requested by user
-    /// * Given any ranking, not necessarily feasible, the "slack" of an edge is the difference of its length and its
-    ///   minimum length.
-    ///   * QUESTION: Is "its minimum length" == MIN_EDGE_LENGTH or just the minmum it can be in a tree?
-    ///   * A(0) -> B(1) -> C(2)
-    ///      \--------------/
-    ///   * vs:
-    ///   * A(0) -> B(1) -> C(1)
-    ///      \--------------/
-    /// * Thus, a ranking is feasible if the slack of every edge is non-negative.
-    /// * An edge is "tight" if its slack is zero.
-    ///
-    pub(super) fn set_feasible_tree_for_simplex(&mut self, init_rank: bool) {
-        if init_rank {
-            self.init_simplex_rank();
-        }
-
-        // Nodecount is at least as big as necessary: there will very likely be
-        // fewer subtrees than nodes, but not more.
-        let mut min_heap = MinHeap::new(self.node_count());
-
-        // Whether you are in the spanning tree or not, create as subtree
-        // for all nodes.
-        self.print_nodes("before find_tight_subtree() in set_feasible_tree()");
-
-        // We use node_idx_virtual_first() to mirror the order that GraphViz uses.
-        for node_idx in self.node_indexes_in_graphviz_order() {
-            // Don't place this exclusion in a filter, as it can change from the preivous call.
-            if !self.get_node(node_idx).has_sub_tree() {
-                let sub_tree = self.find_tight_subtree(node_idx);
-                min_heap.insert_unordered_item(sub_tree);
-            }
-        }
-
-        min_heap.order_heap();
-
-        self.print_nodes(&format!(
-            "after find_tight_subtree(): heap_size:{} in set_feasible_tree",
-            min_heap.len()
-        ));
-
-        while min_heap.len() > 1 {
-            let sub_tree = min_heap.pop().expect("can't be empty");
-            println!(
-                "   finding edge for: {:?} with heap of {}",
-                sub_tree,
-                min_heap.len()
-            );
-            let edge_idx = self
-                .find_tightest_incident_edge(sub_tree)
-                .expect("cant find inter tree edge");
-
-            println!("   Merging with edge: {edge_idx}");
-            let modified_sub_tree_idx = self.merge_sub_trees(edge_idx);
-            println!("   Reording: {modified_sub_tree_idx}");
-            min_heap.reorder_item(modified_sub_tree_idx);
-            println!("   reorder done");
-        }
-        self.init_spanning_tree_and_cutvalues();
-        self.print_nodes(&format!(
-            "after init_spanning_tree_and_cutvalues() in set_feasible_tree:{}",
-            min_heap.len()
-        ));
     }
 
     /// Given and edge, merge the two subtrees pointed to by each edge's nodes.
@@ -532,143 +566,12 @@ impl Graph {
     /// parent node of the given node.
     ///
     /// Only returns non-ignored nodes.
-    fn non_parent_tree_nodes(&self, node_idx: usize) -> Vec<(usize, usize)> {
+    pub(super) fn non_parent_tree_nodes(&self, node_idx: usize) -> Vec<(usize, usize)> {
         let mut nodes = self.directional_non_parent_tree_nodes(node_idx, Out);
         let mut in_nodes = self.directional_non_parent_tree_nodes(node_idx, In);
 
         nodes.append(&mut in_nodes);
         nodes
-    }
-
-    /// Set the cutvalues of all edges in the tree via a depth first search.
-    ///
-    /// * Start a depth first search on all nodes of this node not pointed to the parent.
-    /// * After this is complete, set the cutvalue of this edge.
-    ///
-    /// GraphViz: dfs_cutval()
-    pub(super) fn set_cutvals_depth_first(&mut self, node_idx: usize) {
-        for (other_idx, _edge_idx) in self.non_parent_tree_nodes(node_idx) {
-            self.set_cutvals_depth_first(other_idx)
-        }
-        if let Some(parent_edge_idx) = self.get_node(node_idx).spanning_tree_parent_edge_idx() {
-            self.set_cutval(parent_edge_idx)
-        }
-    }
-
-    /// Set the cut value of edge_idx by summing cutvalue components from each edge.
-    ///
-    /// * Assumes that cut values of edges on one side edge_idx have already been set
-    ///   which will be true if called using a depth first search.
-    ///
-    /// GraphViz: x_cutval()
-    fn set_cutval(&mut self, edge_idx: usize) {
-        let edge = self.get_edge(edge_idx);
-        let src_node = self.get_node(edge.src_node);
-        let parent_edge_idx = src_node.spanning_tree_parent_edge_idx();
-        let (edge_points_to_searched, searched_node_idx) = if parent_edge_idx == Some(edge_idx) {
-            (true, edge.src_node)
-        } else {
-            (false, edge.dst_node)
-        };
-
-        let search_edges = self.get_node(searched_node_idx).get_all_edges();
-        let sum = search_edges
-            .map(|edge_idx| {
-                self.calc_cutvalue_component(*edge_idx, searched_node_idx, edge_points_to_searched)
-            })
-            .sum();
-
-        self.get_edge_mut(edge_idx).cut_value = Some(sum);
-    }
-
-    /// Compute the component of a cutvalue for another edge.
-    /// Pass in:
-    /// * edge_idx: The edge who will be contributing a cutvalue component
-    /// * searched_node_idx: The node connected to edge_idx which has already been searched
-    /// * edge_points_to_searched: True if this edge points to a node that has already been
-    ///   searched (and thus is not the node is not tree parent of this edge)
-    ///
-    /// * Components from all edges of a node can be summed together to calculate a
-    ///   cutvalue without looking through all the other nodes and edges.
-    /// * This only works in the context of a depth first search, where the cutvalues
-    ///   of nodes farther away from the root have already been calculated.
-    /// * This works because the cutvalues of tree leaves can be locally calcualted
-    ///   and the result of the cutvalues can be built from there.
-    ///
-    /// From paper: page 11, section 2.4:
-    ///
-    /// To reduce this cost (of caculating cutvalues), we note that the cut values can be
-    /// computed using information local to an edge if the search is ordered from the leaves
-    /// of the feasible tree inward.  It is trivial to compute the cut value of a tree edge
-    /// with one of its endpoints a leaf in the tree, since either the head or the tail
-    /// component consists of a single node.  Now, assuming the cut values are known for all
-    /// the edges incident on a given node except one, the cut value of the remaining edge is
-    /// the sum of the known cut values plus a term dependent only on the edges incident to
-    /// the given node.
-    ///
-    /// We illustrate this computation in ﬁgure 2-4 in the case where two tree edges, with
-    /// known cut values, join a third, with the shown orientations. The other cases are handled
-    /// similarly.  We assume the cut values of (u, w) and (v, w) are known.  The edges labeled
-    /// with capital letters represent the set of all non-tree edges with the given direction
-    /// and whose heads and tails belong to the components shown. The cut values of (u, w) and
-    /// (v ,w) are given by
-    ///
-    /// c(u, w) = ω(u, w) + A + C + F − B − E − D
-    /// and
-    /// c(v, w) = ω(v, w) + L + I + D − K − J − C
-    ///
-    /// respectively.  The cut value of (w, x) is then
-    ///
-    /// c(w, x) = ω(w, x) + G − H + A − B + L − K
-    ///         = ω(w, x) + G − H + (c(u, w) − ω(u, w) − C − F + E + D) + (c (v, w) − ω(v, w) − I − D + J + C)
-    ///         = ω(w, x) + G − H + c(u, w) − ω(u, w) + c(v ,w) − ω(v, w) − F + E − I + J
-    ///
-    /// an expression involving only local edge information and the known cut values.  By thus
-    /// computing cut values incrementally, we can ensure that every edge is examined only twice.
-    /// This greatly reduces the time spent computing initial cut values.
-    fn calc_cutvalue_component(
-        &self,
-        edge_idx: usize,
-        searched_node_idx: usize,
-        edge_points_to_searched: bool,
-    ) -> i32 {
-        let edge = self.get_edge(edge_idx);
-        let src_node_searched = edge.src_node == searched_node_idx;
-        let dst_node_searched = edge.dst_node == searched_node_idx;
-        let child_node_searched = if edge_points_to_searched {
-            dst_node_searched
-        } else {
-            src_node_searched
-        };
-
-        let unsearched_node_idx = if src_node_searched {
-            edge.dst_node
-        } else {
-            edge.src_node
-        };
-
-        let search_node_is_ancestor =
-            self.is_common_ancestor(searched_node_idx, unsearched_node_idx);
-        let negate_component = (search_node_is_ancestor && !child_node_searched) || (!search_node_is_ancestor && child_node_searched);
-
-        let edge_weight = edge.weight as i32;
-        let cutvalue_component = if search_node_is_ancestor {
-            let cur_cutvalue = if edge.in_spanning_tree() {
-                edge.cut_value.unwrap_or_default()
-            } else {
-                0
-            };
-
-            cur_cutvalue - edge_weight
-        } else {
-            edge_weight
-        };
-
-        if negate_component {
-            -cutvalue_component
-        } else {
-            cutvalue_component
-        }
     }
 
     /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the

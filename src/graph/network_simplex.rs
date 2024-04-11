@@ -16,6 +16,7 @@ use std::collections::{HashSet, VecDeque};
 
 mod heap;
 pub(super) mod spanning_tree;
+pub(super) mod cutvalue;
 pub(crate) mod sub_tree;
 
 /// Determines what variable on each node which is set by the network simplex algorithm.
@@ -253,8 +254,8 @@ impl Graph {
 
     /// Return true has a tree_dist_max such that: min <= tree_dist_max <= max
     ///
-    /// GraphViz code: !SEQ(ND_low(v), ND_lim(w), ND_lim(v))
-    ///              : !SEQ(min, node_idx, max)
+    /// GraphViz code: SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    ///              : SEQ(min, node_idx, max)
     fn node_distance_within_limits(&self, node_idx: usize, min: usize, max: usize) -> bool {
         let tree_dist_max = self
             .get_node(node_idx)
@@ -309,40 +310,6 @@ impl Graph {
     pub(super) fn assign_simplex_rank(&mut self, target: SimplexNodeTarget) {
         for node in self.nodes.iter_mut() {
             node.assign_simplex_rank(target);
-        }
-    }
-
-    /// Calculate the cutvalues of all edges that are part of the current feasible tree.
-    ///
-    /// Documentation from the paper:
-    /// * The init_cutvalues function computes the cut values of the tree edges.
-    ///   * For each tree edge, this is computed by marking the nodes as belonging to the head or tail component,
-    ///   * and then performing the sum of the signed weights of all edges whose head and tail are in different components,
-    ///     * the sign being negative for those edges going from the head to the tail component
-    ///
-    /// Optimization TODOs from the paper:
-    /// * In a naive implementation, initial cut values can be found by taking every tree edge in turn,
-    ///   breaking it, labeling each node according to whether it belongs to the head or tail component,
-    ///   and performing the sum.
-    ///   * This takes O(V E) time.
-    ///   * To reduce this cost, we note that the cut values can be computed using information local to an edge
-    ///     if the search is ordered from the leaves of the feasible tree inward.
-    ///     * It is trivial to compute the cut value of a tree edge with one of its endpoints a leaf in the tree,
-    ///       since either the head or the tail component consists of a single node.
-    ///     * Now, assuming the cut values are known for all the edges incident on a given node except one, the
-    ///       cut value of the remaining edge is the sum of the known cut values plus a term dependent only on
-    ///       the edges incident to the given node.
-    ///
-    /// * Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder traversal
-    ///   of the tree, starting from some ﬁxed root node v root, and labeling each node v with its postorder traversal
-    ///   number lim(v), the least number low(v) of any descendant in the search, and the edge parent(v) by which the
-    ///   node was reached (see ﬁgure 2-5).
-    ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
-    ///     and thus whether a non-tree edge crosses between the two components.
-    pub(super) fn init_spanning_tree_and_cutvalues(&mut self) {
-        if self.node_count() > 0 {
-            self.set_tree_parents_and_ranges(true, 0, None, 1);
-            self.set_cutvals_depth_first(0);
         }
     }
 
@@ -827,17 +794,6 @@ mod tests {
                 .count()
         }
 
-        fn assert_expected_cutvals(&self, expected_cutvals: Vec<(&str, &str, i32)>) {
-            for (src_name, dst_name, expected_cut_val) in expected_cutvals {
-                let (edge, _) = self.get_named_edge(src_name, dst_name);
-
-                assert_eq!(Some(expected_cut_val), edge.cut_value, "unexpected cut_value for edge {src_name}->{dst_name}");
-                if Some(expected_cut_val) != edge.cut_value {
-                    println!("unexpected cut_value for edge {src_name}->{dst_name}: {} vs {:?}", expected_cut_val, edge.cut_value);
-                }
-            }
-        }
-
         #[allow(unused)]
         fn display_component(&self, comp: &HashSet<usize>) -> String {
             let mut node_names = vec![];
@@ -905,30 +861,6 @@ mod tests {
         assert_eq!(graph.simplex_slack(a_c), Some(1));
         assert_eq!(graph.simplex_slack(b_c), Some(0));
         // assert_eq!(graph.edge_length(c_a), Some(-2));
-    }
-
-    #[test]
-    fn test_init_cut_values_2_3_a() {
-        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a();
-
-        graph.init_spanning_tree_and_cutvalues();
-        graph.assert_expected_cutvals(expected_cutvals);
-    }
-
-    #[test]
-    fn test_init_cut_values_2_3_b() {
-        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_b();
-
-        graph.init_spanning_tree_and_cutvalues();
-        graph.assert_expected_cutvals(expected_cutvals);
-    }
-
-    #[test]
-    fn test_init_cut_values_2_3_extended() {
-        let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a_extended();
-
-        graph.init_spanning_tree_and_cutvalues();
-        graph.assert_expected_cutvals(expected_cutvals);
     }
 
     #[test]
