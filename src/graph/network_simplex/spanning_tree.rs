@@ -40,32 +40,6 @@ use crate::graph::edge::{
 
 #[allow(unused)]
 impl Graph {
-    // /// Initializes the spanning tree data.
-    // ///
-    // /// This includes:
-    // /// * Setting the edge_idx_to_parent value
-    // /// * setting min and max ranges
-    // ///
-    // /// Must be done before calling network simplex.
-    // //
-    // /// In the graphviz 9.0 code, this function is: dfs_range_init()
-    // /// It assumes that graph is fully connected.
-    // pub(super) fn init_spanning_tree(&mut self) {
-    //     // let last_node = self.get_node(last_node_idx);
-    //     // let start_node = if last_node.is_virtual() { last_node_idx } else {0};
-
-    //     if self.node_count() != 0 {
-    //         // XXX This is kind of crazy.  The order in which the tree is build
-    //         //     effects khow it is laid out, apparently.  In GraphViz, new virtual nodes
-    //         //     are added at the beginning of the list.  In dot-rs, they are necessarily
-    //         //     added at the end because we don't want the indexes to change.
-    //         //     So we want to pick the last virtual node...
-    //         let last_node_idx = self.node_count() - 1;
-
-    //         self.set_tree_parents_and_ranges(true, last_node_idx, None, 1);
-    //     }
-    // }
-
     /// In the graphviz 9.0 code, there are two functions:
     /// * dfs_range_init()
     /// * dfs_range()
@@ -107,8 +81,6 @@ impl Graph {
             .set_tree_data(parent_edge_idx, Some(min), cur_max);
 
         let mut max = min;
-
-        // println!("Setting range for: {node_idx}: {:?}", self.non_parent_tree_nodes(node_idx));
 
         for (node_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
             max = max.max(self.set_tree_parents_and_ranges(
@@ -597,20 +569,20 @@ impl Graph {
     pub(super) fn set_cutvals_depth_first(
         &mut self,
         node_idx: usize,
-        parent_edge_idx: Option<usize>,
+        _parent_edge_idx: Option<usize>,
     ) {
-        for (other_idx, edge_idx) in self.non_given_parent_tree_nodes(node_idx, parent_edge_idx) {
+        for (other_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
             self.set_cutvals_depth_first(other_idx, Some(edge_idx))
         }
-        if let Some(parent_edge_idx) = parent_edge_idx {
+        if let Some(parent_edge_idx) = self.get_node(node_idx).spanning_tree_parent_edge_idx() {
             self.set_cutval(parent_edge_idx)
         }
     }
 
-    /// Set the cut value of edge_idx.
+    /// Set the cut value of edge_idx by summing cutvalue components from each edge.
     ///
-    /// * Assumes that cut values of edges on one side edge_idx have already been set.
-    /// * Values are
+    /// * Assumes that cut values of edges on one side edge_idx have already been set
+    ///   which will be true if called using a depth first search.
     ///
     /// GraphViz: x_cutval()
     fn set_cutval(&mut self, edge_idx: usize) {
@@ -631,27 +603,17 @@ impl Graph {
             .sum();
 
         self.get_edge_mut(edge_idx).cut_value = Some(sum);
-
-        // println!("    Set cutval for edge: {}", self.edge_to_string(edge_idx));
     }
 
-    /// Typically returns: cut_value(edge_idx)-weight(edge_idx)
-    ///
-    /// * returns the weight(edge_idx) if:
-    ///     low_index(node_v) > lim_index(other) > lim_index(node_v)
-    ///   So, same as:
-    ///     min_index(node_v) > max_index(other) > max_index(node_v)
-    ///   where:
-    ///      * low_index(node) == ND_low(n) - min DFS index for nodes in sub-tree (>=
-    ///      1)
-    ///      * lim_index(node) == ND_lim(n) max DFS index for nodes in sub-tree
-    /// * ELSE returns the cut_value(e)-weight(e) if tree_edge(e)
-    /// * ELSE returns the -weight(e)
-    ///
-    /// And based on a few factors, may negate the number it returns
-    /// GraphViz: x_val()
-    ///
-    ///
+    /// Compute the component of a cutvalue for another edge.
+    /// 
+    /// * Components from all edges of a node can be summed together to calculate a
+    ///   cutvalue without looking through all the other nodes and edges.
+    /// * This only works in the context of a depth first search, where the cutvalues
+    ///   of nodes farther away from the root have already been calculated.
+    /// * This works because the cutvalues of tree leaves can be locally calcualted
+    ///   and the result of the cutvalues can be built from there.
+    /// 
     /// From paper: page 11, section 2.4:
     ///
     /// To reduce this cost (of caculating cutvalues), we note that the cut values can be
