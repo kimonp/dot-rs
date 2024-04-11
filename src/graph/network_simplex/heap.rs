@@ -112,6 +112,7 @@ impl<T: Ord + HeapIndex + Eq> MinHeap<T> {
     /// Return a reference to the top item in the heap.
     ///
     /// If the heap has been ordered, it will be the smallest item.
+    #[allow(dead_code)]
     pub fn peek(&self) -> Option<&T> {
         if self.len() != 0 {
             Some(&self.data[0])

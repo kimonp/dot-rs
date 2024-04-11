@@ -1247,6 +1247,7 @@ impl Graph {
             .filter(|(_, edge)| !edge.ignored && edge.in_spanning_tree())
     }
 
+    #[allow(dead_code)]
     fn not_tree_edge_iter(&self) -> impl Iterator<Item = (usize, &Edge)> {
         self.edges
             .iter()
@@ -1256,6 +1257,7 @@ impl Graph {
 
     /// An iterator that returns only nodes that are "real" (not virtual nodes added
     /// for layout)
+    #[allow(dead_code)]
     fn real_nodes_iter(&self) -> impl Iterator<Item = (usize, &Node)> {
         self.nodes
             .iter()
