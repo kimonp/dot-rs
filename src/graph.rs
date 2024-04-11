@@ -1061,6 +1061,7 @@ impl Graph {
             .filter(|(_, node)| node.node_type == NodeType::Real)
     }
 
+    #[allow(dead_code)]
     fn print_edge(&self, edge_idx: usize) {
         println!("{}", self.edge_to_string(edge_idx));
     }
