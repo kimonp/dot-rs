@@ -38,7 +38,6 @@ use crate::graph::edge::{
     EdgeDisposition::{self, In, Out},
 };
 
-#[allow(unused)]
 impl Graph {
     /// In the graphviz 9.0 code, there are two functions:
     /// * dfs_range_init()
@@ -541,25 +540,6 @@ impl Graph {
         nodes
     }
 
-    /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the
-    /// given parent node of the given node.
-    ///
-    /// Only returns non-ignored nodes.
-    /// Useful if you want to do a depth first search starting with an arbitrary node.
-    fn non_given_parent_tree_nodes(
-        &self,
-        node_idx: usize,
-        given_parent_idx: Option<usize>,
-    ) -> Vec<(usize, usize)> {
-        let mut nodes =
-            self.directional_non_given_parent_tree_nodes(node_idx, given_parent_idx, Out);
-        let mut in_nodes =
-            self.directional_non_given_parent_tree_nodes(node_idx, given_parent_idx, In);
-
-        nodes.append(&mut in_nodes);
-        nodes
-    }
-
     /// Set the cutvalues of all edges in the tree via a depth first search.
     ///
     /// * Start a depth first search on all nodes of this node not pointed to the parent.
@@ -569,10 +549,9 @@ impl Graph {
     pub(super) fn set_cutvals_depth_first(
         &mut self,
         node_idx: usize,
-        _parent_edge_idx: Option<usize>,
     ) {
-        for (other_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
-            self.set_cutvals_depth_first(other_idx, Some(edge_idx))
+        for (other_idx, _edge_idx) in self.non_parent_tree_nodes(node_idx) {
+            self.set_cutvals_depth_first(other_idx)
         }
         if let Some(parent_edge_idx) = self.get_node(node_idx).spanning_tree_parent_edge_idx() {
             self.set_cutval(parent_edge_idx)
@@ -682,14 +661,9 @@ impl Graph {
             negate_component = !negate_component;
         }
 
-        let prv = cutvalue_component;
         if negate_component {
             cutvalue_component = -cutvalue_component;
         }
-        // println!(
-        //     "edge component for edge {edge_idx}: s={searched_node_idx} pp={points_to_parent} (rev={reverse_direction} neg={negate_component})= prv={prv} rv={cutvalue_component}: {}",
-        //     self.edge_to_string(edge_idx)
-        // );
 
         cutvalue_component
     }
