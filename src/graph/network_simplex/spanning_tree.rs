@@ -40,31 +40,31 @@ use crate::graph::edge::{
 
 #[allow(unused)]
 impl Graph {
-    /// Initializes the spanning tree data.
-    ///
-    /// This includes:
-    /// * Setting the edge_idx_to_parent value
-    /// * setting min and max ranges
-    ///
-    /// Must be done before calling network simplex.
-    //
-    /// In the graphviz 9.0 code, this function is: dfs_range_init()
-    /// It assumes that graph is fully connected.
-    pub(super) fn init_spanning_tree(&mut self) {
-        // let last_node = self.get_node(last_node_idx);
-        // let start_node = if last_node.is_virtual() { last_node_idx } else {0};
+    // /// Initializes the spanning tree data.
+    // ///
+    // /// This includes:
+    // /// * Setting the edge_idx_to_parent value
+    // /// * setting min and max ranges
+    // ///
+    // /// Must be done before calling network simplex.
+    // //
+    // /// In the graphviz 9.0 code, this function is: dfs_range_init()
+    // /// It assumes that graph is fully connected.
+    // pub(super) fn init_spanning_tree(&mut self) {
+    //     // let last_node = self.get_node(last_node_idx);
+    //     // let start_node = if last_node.is_virtual() { last_node_idx } else {0};
 
-        if self.node_count() != 0 {
-            // XXX This is kind of crazy.  The order in which the tree is build
-            //     effects how it is laid out, apparently.  In GraphViz, new virtual nodes
-            //     are added at the beginning of the list.  In dot-rs, they are necessarily
-            //     added at the end because we don't want the indexes to change.
-            //     So we want to pick the last virtual node...
-            let last_node_idx = self.node_count() - 1;
+    //     if self.node_count() != 0 {
+    //         // XXX This is kind of crazy.  The order in which the tree is build
+    //         //     effects khow it is laid out, apparently.  In GraphViz, new virtual nodes
+    //         //     are added at the beginning of the list.  In dot-rs, they are necessarily
+    //         //     added at the end because we don't want the indexes to change.
+    //         //     So we want to pick the last virtual node...
+    //         let last_node_idx = self.node_count() - 1;
 
-            self.set_tree_parents_and_ranges(true, last_node_idx, None, 1);
-        }
-    }
+    //         self.set_tree_parents_and_ranges(true, last_node_idx, None, 1);
+    //     }
+    // }
 
     /// In the graphviz 9.0 code, there are two functions:
     /// * dfs_range_init()
@@ -523,7 +523,7 @@ impl Graph {
     }
 
     /// Re-rank the given node by subtracting delta to the rank, and all descendent nodes in the tree.
-    /// 
+    ///
     /// * First reduces the rank of node_idx by delta
     /// * Then recursively reduces the rank of all tree descendents of node_idx
     ///   by delta.
@@ -570,47 +570,207 @@ impl Graph {
     }
 
     /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the
+    /// given parent node of the given node.
+    ///
+    /// Only returns non-ignored nodes.
+    /// Useful if you want to do a depth first search starting with an arbitrary node.
+    fn non_given_parent_tree_nodes(
+        &self,
+        node_idx: usize,
+        given_parent_idx: Option<usize>,
+    ) -> Vec<(usize, usize)> {
+        let mut nodes =
+            self.directional_non_given_parent_tree_nodes(node_idx, given_parent_idx, Out);
+        let mut in_nodes =
+            self.directional_non_given_parent_tree_nodes(node_idx, given_parent_idx, In);
+
+        nodes.append(&mut in_nodes);
+        nodes
+    }
+
+    /// Set the cutvalues of all edges in the tree via a depth first search.
+    ///
+    /// * Start a depth first search on all nodes of this node not pointed to the parent.
+    /// * After this is complete, set the cutvalue of this edge.
+    ///
+    /// GraphViz: dfs_cutval()
+    pub(super) fn set_cutvals_depth_first(
+        &mut self,
+        node_idx: usize,
+        parent_edge_idx: Option<usize>,
+    ) {
+        for (other_idx, edge_idx) in self.non_given_parent_tree_nodes(node_idx, parent_edge_idx) {
+            self.set_cutvals_depth_first(other_idx, Some(edge_idx))
+        }
+        if let Some(parent_edge_idx) = parent_edge_idx {
+            self.set_cutval(parent_edge_idx)
+        }
+    }
+
+    /// Set the cut value of edge_idx.
+    ///
+    /// * Assumes that cut values of edges on one side edge_idx have already been set.
+    /// * Values are
+    ///
+    /// GraphViz: x_cutval()
+    fn set_cutval(&mut self, edge_idx: usize) {
+        let edge = self.get_edge(edge_idx);
+        let src_node = self.get_node(edge.src_node);
+        let parent_edge_idx = src_node.spanning_tree_parent_edge_idx();
+        let (points_to_parent, searched_node_idx) = if parent_edge_idx == Some(edge_idx) {
+            (true, edge.src_node)
+        } else {
+            (false, edge.dst_node)
+        };
+
+        let search_edges = self.get_node(searched_node_idx).get_all_edges();
+        let sum = search_edges
+            .map(|edge_idx| {
+                self.calc_cutvalue_component(*edge_idx, searched_node_idx, points_to_parent)
+            })
+            .sum();
+
+        self.get_edge_mut(edge_idx).cut_value = Some(sum);
+
+        // println!("    Set cutval for edge: {}", self.edge_to_string(edge_idx));
+    }
+
+    /// Typically returns: cut_value(edge_idx)-weight(edge_idx)
+    ///
+    /// * returns the weight(edge_idx) if:
+    ///     low_index(node_v) > lim_index(other) > lim_index(node_v)
+    ///   So, same as:
+    ///     min_index(node_v) > max_index(other) > max_index(node_v)
+    ///   where:
+    ///      * low_index(node) == ND_low(n) - min DFS index for nodes in sub-tree (>=
+    ///      1)
+    ///      * lim_index(node) == ND_lim(n) max DFS index for nodes in sub-tree
+    /// * ELSE returns the cut_value(e)-weight(e) if tree_edge(e)
+    /// * ELSE returns the -weight(e)
+    ///
+    /// And based on a few factors, may negate the number it returns
+    /// GraphViz: x_val()
+    ///
+    ///
+    /// From paper: page 11, section 2.4:
+    ///
+    /// To reduce this cost (of caculating cutvalues), we note that the cut values can be
+    /// computed using information local to an edge if the search is ordered from the leaves
+    /// of the feasible tree inward.  It is trivial to compute the cut value of a tree edge
+    /// with one of its endpoints a leaf in the tree, since either the head or the tail
+    /// component consists of a single node.  Now, assuming the cut values are known for all
+    /// the edges incident on a given node except one, the cut value of the remaining edge is
+    /// the sum of the known cut values plus a term dependent only on the edges incident to
+    /// the given node.
+    ///
+    /// We illustrate this computation in ﬁgure 2-4 in the case where two tree edges, with
+    /// known cut values, join a third, with the shown orientations. The other cases are handled
+    /// similarly.  We assume the cut values of (u, w) and (v, w) are known.  The edges labeled
+    /// with capital letters represent the set of all non-tree edges with the given direction
+    /// and whose heads and tails belong to the components shown. The cut values of (u, w) and
+    /// (v ,w) are given by
+    ///
+    /// c(u, w) = ω(u, w) + A + C + F − B − E − D
+    /// and
+    /// c(v, w) = ω(v, w) + L + I + D − K − J − C
+    ///
+    /// respectively.  The cut value of (w, x) is then
+    ///
+    /// c(w, x) = ω(w, x) + G − H + A − B + L − K
+    ///         = ω(w, x) + G − H + (c(u, w) − ω(u, w) − C − F + E + D) + (c (v, w) − ω(v, w) − I − D + J + C)
+    ///         = ω(w, x) + G − H + c(u, w) − ω(u, w) + c(v ,w) − ω(v, w) − F + E − I + J
+    ///
+    /// an expression involving only local edge information and the known cut values.  By thus
+    /// computing cut values incrementally, we can ensure that every edge is examined only twice.
+    /// This greatly reduces the time spent computing initial cut values.
+    fn calc_cutvalue_component(
+        &self,
+        edge_idx: usize,
+        searched_node_idx: usize,
+        points_to_parent: bool,
+    ) -> i32 {
+        let edge = self.get_edge(edge_idx);
+        let src_node_searched = edge.src_node == searched_node_idx;
+        let unsearched_node_idx = if src_node_searched {
+            edge.dst_node
+        } else {
+            edge.src_node
+        };
+
+        let edge_weight = edge.weight as i32;
+        let (reverse_direction, mut cutvalue_component) =
+            if !self.is_common_ancestor(searched_node_idx, unsearched_node_idx) {
+                (true, edge_weight)
+            } else {
+                let cur_cutvalue = if edge.in_spanning_tree() {
+                    edge.cut_value.unwrap_or_default()
+                } else {
+                    0
+                };
+
+                (false, cur_cutvalue - edge_weight)
+            };
+
+        let mut negate_component = if points_to_parent {
+            edge.dst_node != searched_node_idx
+        } else {
+            edge.src_node != searched_node_idx
+        };
+        if reverse_direction {
+            negate_component = !negate_component;
+        }
+
+        let prv = cutvalue_component;
+        if negate_component {
+            cutvalue_component = -cutvalue_component;
+        }
+        // println!(
+        //     "edge component for edge {edge_idx}: s={searched_node_idx} pp={points_to_parent} (rev={reverse_direction} neg={negate_component})= prv={prv} rv={cutvalue_component}: {}",
+        //     self.edge_to_string(edge_idx)
+        // );
+
+        cutvalue_component
+    }
+
+    /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the
     /// parent node of the given node from either in_edges or out_edges depending on disposition.
     ///
     /// Only returns non-ignored nodes.
-    ///
-    /// TODO: Rewrite this to call: node_tree_edges(node_idx, disposition)
     fn directional_non_parent_tree_nodes(
         &self,
         node_idx: usize,
         disposition: EdgeDisposition,
     ) -> Vec<(usize, usize)> {
-        let node = self.get_node(node_idx);
-        let edges = match disposition {
-            In => &node.in_edges,
-            Out => &node.out_edges,
-        };
-        use itertools::Itertools;
+        let given_parent_idx = self.get_node(node_idx).spanning_tree_parent_edge_idx();
 
-        edges
+        self.directional_non_given_parent_tree_nodes(node_idx, given_parent_idx, disposition)
+    }
+
+    /// Return a vector of (node_idx, edge_idx) which are tree members and do not point to the
+    /// given parent node.
+    ///
+    /// This allows for a depth first search starting at any arbitrary node and without a specific
+    /// parent node set.
+    ///
+    /// Only returns non-ignored nodes.
+    fn directional_non_given_parent_tree_nodes(
+        &self,
+        node_idx: usize,
+        given_parent_idx: Option<usize>,
+        disposition: EdgeDisposition,
+    ) -> Vec<(usize, usize)> {
+        self.node_tree_edges(node_idx, disposition)
             .iter()
             .filter_map(|edge_idx| {
-                let edge = self.get_edge(*edge_idx);
-                let other_node_idx = match disposition {
-                    In => edge.src_node,
-                    Out => edge.dst_node,
-                };
+                if given_parent_idx != Some(*edge_idx) {
+                    let edge = self.get_edge(*edge_idx);
+                    let other_node_idx = match disposition {
+                        In => edge.src_node,
+                        Out => edge.dst_node,
+                    };
 
-                if !edge.ignored
-                    && edge.in_spanning_tree()
-                    && node.spanning_tree_parent_edge_idx() != Some(*edge_idx)
-                {
                     Some((other_node_idx, *edge_idx))
                 } else {
-                    // if edge.ignored {
-                    //     println!("Edge {edge_idx}: ignored ");
-                    // }
-                    // if !edge.in_spanning_tree() {
-                    //     println!("Edge {edge_idx}: not in spanning tree");
-                    // }
-                    // if node.spanning_tree_parent_edge_idx() == Some(*edge_idx) {
-                    //     println!("Edge {edge_idx}: points to parent");
-                    // }
                     None
                 }
             })
@@ -622,7 +782,7 @@ impl Graph {
         &self,
         node_idx: usize,
         disposition: EdgeDisposition,
-    ) -> Vec<&Edge> {
+    ) -> Vec<usize> {
         let node = self.get_node(node_idx);
         let edges = match disposition {
             In => &node.in_edges,
@@ -635,7 +795,7 @@ impl Graph {
                 let edge = self.get_edge(*edge_idx);
 
                 if !edge.ignored && edge.in_spanning_tree() {
-                    Some(edge)
+                    Some(*edge_idx)
                 } else {
                     None
                 }
@@ -654,7 +814,7 @@ mod test {
         let a_idx = graph.name_to_node_idx("a").unwrap();
         let b_idx = graph.name_to_node_idx("b").unwrap();
         let c_idx = graph.name_to_node_idx("c").unwrap();
-        let _d_idx = graph.name_to_node_idx("d").unwrap();
+        let d_idx = graph.name_to_node_idx("d").unwrap();
 
         graph.make_asyclic();
         graph.merge_edges();
@@ -664,14 +824,15 @@ mod test {
         let a_in_nodes = graph.directional_non_parent_tree_nodes(a_idx, In);
         let a_out_nodes = graph.directional_non_parent_tree_nodes(a_idx, Out);
 
+        // "a" is parent, no all its edges return
         assert_eq!(a_out_nodes, [(b_idx, 0)]);
-        assert_eq!(a_in_nodes, []);
+        assert_eq!(a_in_nodes, [(c_idx, 3)]);
 
         let c_in_nodes = graph.directional_non_parent_tree_nodes(c_idx, In);
         let c_out_nodes = graph.directional_non_parent_tree_nodes(c_idx, Out);
 
-        // It does not include (a_idx, 3), because that is a parent node.
-        assert_eq!(c_out_nodes, [(a_idx, 3)]);
+        // "a" is parent, so we don't see c -> a
+        assert_eq!(c_out_nodes, [(d_idx, 2)]);
         assert_eq!(c_in_nodes, []);
     }
 

@@ -27,16 +27,6 @@ pub(crate) enum SimplexNodeTarget {
     XCoordinate,
 }
 
-/// Enum used for calculating cut values for edges.
-/// To do so, graph nodes need to be placed in either a head or tail component.
-#[derive(Eq, PartialEq)]
-enum CutSet {
-    /// Head component of a cut set
-    Head,
-    /// Tail component of a cut set
-    Tail,
-}
-
 impl Graph {
     /// Rank nodes in the graph using the network simplex algorithm.
     ///
@@ -247,7 +237,8 @@ impl Graph {
     /// This is true only if the max distance from the child node to the root is within
     /// the min/max distance of the ancestor node.
     ///
-    /// GraphViz code: !SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    /// GraphViz code: SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    ///              : SEQ(maybe_ancestor_node_idx.min, child_idx.max, maybe_ancestor_node_idx.max)
     fn is_common_ancestor(&self, maybe_ancestor_node_idx: usize, child_idx: usize) -> bool {
         let maybe_ancestor_node = self.get_node(maybe_ancestor_node_idx);
         let ancestor_dist_min = maybe_ancestor_node
@@ -263,6 +254,7 @@ impl Graph {
     /// Return true has a tree_dist_max such that: min <= tree_dist_max <= max
     ///
     /// GraphViz code: !SEQ(ND_low(v), ND_lim(w), ND_lim(v))
+    ///              : !SEQ(min, node_idx, max)
     fn node_distance_within_limits(&self, node_idx: usize, min: usize, max: usize) -> bool {
         let tree_dist_max = self
             .get_node(node_idx)
@@ -348,108 +340,10 @@ impl Graph {
     ///   * This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
     ///     and thus whether a non-tree edge crosses between the two components.
     pub(super) fn init_spanning_tree_and_cutvalues(&mut self) {
-        // init_spanning_tree() is here for now because it mirrors the GraphViz code calling dfs_range_init()
-        // of which init_spanning_tree() is the equivalent.
-        //
-        // Assuming I continue to move over to GraphViz style code, this will make sense here.
-        // Otherwise, it should be probably pulled into the calling function.
-        self.init_spanning_tree();
-
-        for edge_idx in 0..self.edges.len() {
-            let edge = self.get_edge(edge_idx);
-            if edge.in_spanning_tree() {
-                let (head_nodes, tail_nodes) = self.get_components(edge_idx);
-                let cut_value = self.transition_weight_sum(&head_nodes, &tail_nodes);
-
-                self.get_edge_mut(edge_idx).cut_value = Some(cut_value);
-                // println!(
-                //     "Set cut value for {}: {cut_value}\n  heads: {}\n  tails: {}",
-                //     self.display_edge(edge_idx),
-                //     self.display_component(&head_nodes),
-                //     self.display_component(&tail_nodes),
-                // )
-            }
+        if self.node_count() > 0 {
+            self.set_tree_parents_and_ranges(true, 0, None, 1);
+            self.set_cutvals_depth_first(0, None);
         }
-    }
-
-    /// Get the head an tail components needed to calculate edge cut values.
-    ///
-    /// Documentation from the paper: page 8
-    /// Given a feasible spanning tree, we can associate an integer cut value with each tree edge as follows.
-    /// * If the tree edge is deleted, the tree breaks into two connected components:
-    ///   * the tail component containing the tail node of the edge,
-    ///   * and the head component containing the head node.
-    /// * The cut value is deﬁned as the sum of the weights of all edges from the tail component to the head component,
-    ///   including the tree edge, minus the sum of the weights of all edges from the head component to the tail component.
-    fn get_components(&self, edge_idx: usize) -> (HashSet<usize>, HashSet<usize>) {
-        let head_component = self.collect_component_set(edge_idx, CutSet::Head, &HashSet::new());
-        let tail_component = self.collect_component_set(edge_idx, CutSet::Tail, &head_component);
-
-        (head_component, tail_component)
-    }
-
-    /// Collect a head or tail cutset component.
-    ///
-    /// * Given an initial node, consider all edges which are in the feasible tree
-    ///   * ignore the cut edge
-    ///   * if the edge is not yet in this cut set or the opposite cut set, add it.
-    fn collect_component_set(
-        &self,
-        cut_edge_idx: usize,
-        set: CutSet,
-        opposite: &HashSet<usize>,
-    ) -> HashSet<usize> {
-        let mut component_set = HashSet::new();
-        let cut_edge = self.get_edge(cut_edge_idx);
-
-        let node_idx = if set == CutSet::Head {
-            cut_edge.dst_node
-        } else {
-            cut_edge.src_node
-        };
-
-        let mut candidate_queue = vec![node_idx];
-        while !candidate_queue.is_empty() {
-            while let Some(node_idx) = candidate_queue.pop() {
-                let node = self.get_node(node_idx);
-
-                component_set.insert(node_idx);
-
-                for edge_idx in node.get_all_edges().filter(|edge_idx| {
-                    let edge_idx = **edge_idx;
-
-                    edge_idx != cut_edge_idx && self.get_edge(edge_idx).in_spanning_tree()
-                }) {
-                    let candidate_node_idx = self
-                        .get_connected_node(node_idx, *edge_idx)
-                        .expect("edge not connected");
-
-                    if !component_set.contains(&candidate_node_idx)
-                        && !opposite.contains(&candidate_node_idx)
-                    {
-                        candidate_queue.push(candidate_node_idx);
-                    }
-                }
-            }
-        }
-        component_set
-    }
-
-    /// Given two sets of nodes, return the sum of all edges that move from the head set to the tail set.
-    fn transition_weight_sum(
-        &self,
-        head_nodes: &HashSet<usize>,
-        tail_nodes: &HashSet<usize>,
-    ) -> i32 {
-        let mut sum = 0;
-        for edge in self.edges.iter() {
-            if head_nodes.contains(&edge.src_node) && tail_nodes.contains(&edge.dst_node) {
-                sum -= edge.weight as i32;
-            } else if tail_nodes.contains(&edge.src_node) && head_nodes.contains(&edge.dst_node) {
-                sum += edge.weight as i32;
-            }
-        }
-        sum
     }
 
     // // True if the head (src_node) of the given edge is not in the feasible tree.
@@ -1053,10 +947,13 @@ mod tests {
         }
 
         fn assert_expected_cutvals(&self, expected_cutvals: Vec<(&str, &str, i32)>) {
-            for (src_name, dst_name, cut_val) in expected_cutvals {
+            for (src_name, dst_name, expected_cut_val) in expected_cutvals {
                 let (edge, _) = self.get_named_edge(src_name, dst_name);
 
-                assert_eq!(edge.cut_value, Some(cut_val), "unexpected cut_value");
+                assert_eq!(Some(expected_cut_val), edge.cut_value, "unexpected cut_value for edge {src_name}->{dst_name}");
+                if Some(expected_cut_val) != edge.cut_value {
+                    println!("unexpected cut_value for edge {src_name}->{dst_name}: {} vs {:?}", expected_cut_val, edge.cut_value);
+                }
             }
         }
 
@@ -1196,7 +1093,7 @@ mod tests {
     }
 
     #[test]
-    fn setup_init_cut_values_2_3_b() {
+    fn test_init_cut_values_2_3_b() {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_b();
 
         graph.init_spanning_tree_and_cutvalues();
@@ -1204,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn setup_init_cut_values_2_3_extended() {
+    fn test_init_cut_values_2_3_extended() {
         let (mut graph, expected_cutvals) = Graph::configure_example_2_3_a_extended();
 
         graph.init_spanning_tree_and_cutvalues();
