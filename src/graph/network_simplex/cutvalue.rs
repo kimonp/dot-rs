@@ -26,17 +26,17 @@ impl Graph {
     /// From the paper: page 12: Section 2.4: Implementation details
     /// 
     /// Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder
-    /// traversal of the tree, starting from some ﬁxed root node v root, and labeling each node v with its
+    /// traversal of the tree, starting from some fixed root node v root, and labeling each node v with its
     /// postorder traversal number lim(v), the least number low(v) of any descendant in the search, and the
-    /// edge parent(v) by which the node was reached (see ﬁgure 2-5).
+    /// edge parent(v) by which the node was reached (see figure 2-5).
     /// 
     /// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
     /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
     /// edge and v root is in the head component of the edge (i.e., lim(u) < lim(v)), then a node w is in the tail
     /// component of e if and only if low(u) ≤ lim(w) ≤ lim(u).  These numbers can also be used to update the
-    /// tree efﬁciently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
+    /// tree efficiently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
     /// whose cut values must be adjusted are those in the path connecting w and x in the tree.  This path is determined
-    /// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the ﬁrst node
+    /// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the first node
     /// l such that low (l) ≤ lim(w) , lim(x) ≤ lim (l).  Of course, these postorder parameters must also be adjusted
     /// when exchanging tree edges, but only for nodes below l.
     pub(super) fn adjust_cutvalues_and_exchange_for_simplex(

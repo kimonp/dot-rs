@@ -21,6 +21,8 @@ pub fn write_svg_to_file(name: &str, svg: &str) {
     case::two_cyclic("two_cyclic"),
     case::three_cyclic("three_cyclic"),
     case::complex_cyclic("complex_cyclic"),
+    case::crossing_issues("crossing_issues"),
+    case::complex_crossing("complex_crossing"),
     case::flux_capacitor("flux_capacitor"),
     case::t1_2_1("t1_2_1"),
     case::t2_1_2("t2_1_2"),

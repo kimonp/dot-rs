@@ -454,16 +454,18 @@ impl Graph {
 
         if best.crossing_count() != 0 {
             for i in 0..MAX_ITERATIONS {
-                // println!("Ordering pass {i}: cross count: {}", order.crossing_count());
+                println!("Ordering pass {i}: cross count: {}", order.crossing_count());
+                let forward = i % 2 == 0; 
+                let exchange_if_equal = i % 3 < 2;
 
-                order.weighted_median(i);
-                // println!(
-                //     "  After weighed_median: {}\n{order}",
-                //     order.crossing_count()
-                // );
+                order.weighted_median(forward, exchange_if_equal);
+                println!("  After weighed_median: {}", order.crossing_count());
 
-                order.transpose();
-                // println!("  After transpose: {}\n{order}", order.crossing_count());
+                order.transpose(exchange_if_equal);
+                println!(
+                    "  After transpose ({exchange_if_equal}): {}",
+                    order.crossing_count()
+                );
 
                 let new_crossing_count = order.crossing_count();
                 if new_crossing_count < best.crossing_count() {
@@ -1409,7 +1411,6 @@ pub mod tests {
             assert_eq!(node_c.out_edges, vec![]);
         }
     }
-
 
     #[test]
     fn test_merge_edges() {

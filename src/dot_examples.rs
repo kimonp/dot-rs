@@ -2,7 +2,7 @@
 
 use crate::graph::Graph;
 
-pub const DOT_EXAMPLES: [(&str, &str); 18] = [
+pub const DOT_EXAMPLES: [(&str, &str); 20] = [
     ("a_to_b_and_c", "digraph {a -> b; a -> c;}"),
     ("b_and_c_to_a", "digraph {b -> a; c -> a;}"),
     ("a_to_c_and_b_to_a", "digraph {a -> c; b -> a;}"),
@@ -11,6 +11,23 @@ pub const DOT_EXAMPLES: [(&str, &str); 18] = [
     (
         "complex_cyclic",
         "digraph { a -> c; b -> d; c -> e; e -> d; d -> c; }",
+    ),
+    ("crossing_issues", "digraph {0 -> a1; 0 -> b1; 0 -> c1; a1 -> b2; b1 -> a2; c1 -> a2; c1 -> c2; a1 -> c2; b1 -> b2;}"), 
+    (
+        "complex_crossing",
+        "digraph {
+            1->8;
+            2->8; 2->20;
+            8->16;
+            16->19;
+            8->11; 8->10;
+            11->16; 11->15;
+            10->15; 10->14; 10->13;
+            16->20; 16->18;
+            14->18;
+            1->13;
+            13->17;
+        }",
     ),
     ("flux_capacitor", "digraph {a -> c; b -> c; c -> d}"),
     ("t1_2_1", "digraph { a -> b; a -> c; b -> d; c -> d; }"),

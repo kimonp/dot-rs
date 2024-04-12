@@ -3,5 +3,9 @@
         "./Cargo.toml",
         "./graphvis_test_app/Cargo.toml",
         "./Cargo.toml"
+    ],
+    "cSpell.words": [
+        "rstest",
+        "wmedian"
     ]
 }

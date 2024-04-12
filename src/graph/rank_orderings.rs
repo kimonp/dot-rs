@@ -96,6 +96,13 @@ pub enum AdjacentRank {
     Below,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum TransposeResult {
+    Better,
+    Worse,
+    Same,
+}
+
 impl RankOrderings {
     pub fn new() -> RankOrderings {
         RankOrderings {
@@ -173,13 +180,13 @@ impl RankOrderings {
     /// * wmedian re-orders the nodes within each rank based on the weighted median heuristic.
     /// * Depending on the parity of the current iteration number, the ranks are traversed from
     ///   top to bottom or from bottom to top.
-    /// * To simplify the presentation, ﬁgure the code below only shows one direction in detail
+    /// * To simplify the presentation, figure the code below only shows one direction in detail
     ///
     /// * In the forward traversal of the ranks, the main loop starts at rank 1 and ends at the maximum rank.
     /// * At each rank a vertex is assigned a median based on the adjacent vertices on the previous rank.
     /// * Then, the vertices in the rank are sorted by their medians.
     /// * An important consideration is what to do with vertices that have no adjacent vertices on the previous rank.
-    ///   * In our implementation such vertices are left ﬁxed in their current positions with non-ﬁxed vertices
+    ///   * In our implementation such vertices are left fixed in their current positions with non-fixed vertices
     ///     sorted into the remaining positions
     ///
     /// wmedian(order, iter) {
@@ -192,14 +199,14 @@ impl RankOrderings {
     ///         }
     ///     } else ...
     /// }
-    pub fn weighted_median(&self, index: usize) {
-        if index % 2 == 0 {
+    pub fn weighted_median(&self, forward: bool, exchange_if_equal: bool) {
+        if forward {
             for (_rank, rank_order) in self.iter() {
-                self.adjust_rank(rank_order, Below);
+                self.adjust_rank(rank_order, Below, exchange_if_equal);
             }
         } else {
             for (_rank, rank_order) in self.iter().rev() {
-                self.adjust_rank(rank_order, Above);
+                self.adjust_rank(rank_order, Above, exchange_if_equal);
             }
         }
     }
@@ -215,7 +222,7 @@ impl RankOrderings {
     ///                 median[v] = median_value(v, r-1)
     ///             }
     ///             sort(order[r], median);
-    fn adjust_rank(&self, rank_order: &RankOrder, which_rank: AdjacentRank) {
+    fn adjust_rank(&self, rank_order: &RankOrder, which_rank: AdjacentRank, exchange_if_equal: bool) {
         // Collect all the node_positions that should be re-ordered, and those that stay where they are
         let mut ordering = vec![];
         let mut static_pos = vec![];
@@ -248,6 +255,28 @@ impl RankOrderings {
                 ordering.insert(orig_pos, node_pos);
             }
         }
+        
+        if exchange_if_equal {
+            let mut cur_pos_start = 0;
+            while cur_pos_start < ordering.len() {
+                let cur_median = ordering[cur_pos_start].borrow().median;
+
+                let mut cur_pos_end = cur_pos_start;
+                loop {
+                    if cur_pos_end+1 == ordering.len() || ordering[cur_pos_end+1].borrow().median != cur_median {
+                        break;
+                    }
+                    cur_pos_end += 1;
+                }
+
+                if cur_pos_end != cur_pos_start {
+                    ordering.swap(cur_pos_start, cur_pos_end);
+                    cur_pos_start = cur_pos_end;
+                } else {
+                    cur_pos_start += 1;
+                }
+            }
+        }
 
         // Set the values of all the newly calculated positions
         for (new_pos, node_pos) in ordering.iter().enumerate() {
@@ -263,8 +292,8 @@ impl RankOrderings {
     /// * If adjacent nodes == 3: ...EXPLAIN: TODO...
     ///
     /// Documentation from paper: page 15
-    /// * The median value of a vertex is deﬁned as the median position of the adjacent
-    ///   vertices if that is uniquely deﬁned.
+    /// * The median value of a vertex is defined as the median position of the adjacent
+    ///   vertices if that is uniquely defined.
     ///   * Otherwise, it is interpolated between the two median positions using a measure
     ///     of tightness.
     ///   * Generally, the weighted median is biased toward the side where vertices are
@@ -404,7 +433,7 @@ impl RankOrderings {
     ///         end
     ///     end
     /// end
-    pub fn transpose(&self) {
+    pub fn transpose(&self, exchange_if_equal: bool) {
         let mut improved = true;
 
         while improved {
@@ -413,7 +442,7 @@ impl RankOrderings {
             for (_rank, rank_set) in self.ranks.iter() {
                 let mut rank_position = self.rank_order_to_vec(rank_set);
                 let position_count = rank_position.len();
-                // println!("--- transpose for rank {_rank} ({position_count} positions)");
+                println!("--- transpose for rank {_rank} ({position_count} positions)");
 
                 if position_count > 1 {
                     let rank_set = rank_set.borrow();
@@ -421,13 +450,14 @@ impl RankOrderings {
                     for position in 0..position_count - 1 {
                         let v = rank_position[position];
                         let w = rank_position[position + 1];
+                        let result = self.exchange_if_crosses_decrease(&rank_set, v, w, exchange_if_equal);
 
-                        if self.exchange_if_crosses_decrease(&rank_set, v, w) {
-                            // println!("{_rank}: exchanged {position} with {}", position + 1);
+                        if result != TransposeResult::Worse {
+                            println!("{_rank}: exchanged {position} with {}", position + 1);
                             rank_position.swap(position, position + 1);
-                            improved = true
+                            improved = result == TransposeResult::Better
                         } else {
-                            // println!("{_rank}: no exchange for {position}");
+                            println!("{_rank}: no exchange for {position}");
                         }
                     }
                 }
@@ -443,17 +473,20 @@ impl RankOrderings {
         rank: &BTreeSet<usize>,
         node_idx_a: usize,
         node_idx_b: usize,
-    ) -> bool {
+        exchange_if_equal: bool,
+    ) -> TransposeResult {
         let cur_value = self.crossing_count_to_next_rank(rank);
         self.exchange_positions(node_idx_a, node_idx_b);
         let new_value = self.crossing_count_to_next_rank(rank);
 
         if new_value < cur_value {
-            true
+            TransposeResult::Better
+        } else if cur_value > 0 && exchange_if_equal && new_value == cur_value {
+            TransposeResult::Same
         } else {
             self.exchange_positions(node_idx_b, node_idx_a);
 
-            false
+            TransposeResult::Worse
         }
     }
 
@@ -556,7 +589,7 @@ mod test {
         let ordering = double_rank_orderings(max);
 
         assert_eq!(ordering.crossing_count(), 10);
-        ordering.transpose();
+        ordering.transpose(false);
         assert_eq!(ordering.crossing_count(), 0);
     }
 
@@ -574,9 +607,9 @@ mod test {
 
         assert_eq!(ordering.crossing_count(), 3);
         let rank = ordering.ranks.get(&0).unwrap().borrow();
-        ordering.exchange_if_crosses_decrease(&rank, 0, max - 1);
+        ordering.exchange_if_crosses_decrease(&rank, 0, max - 1, false);
         assert_eq!(ordering.crossing_count(), 0);
-        ordering.exchange_if_crosses_decrease(&rank, 0, max - 1);
+        ordering.exchange_if_crosses_decrease(&rank, 0, max - 1, false);
         assert_eq!(ordering.crossing_count(), 0);
     }
 

@@ -100,6 +100,9 @@ fn lines_are_crossed(new: &Line, active: &Line) -> bool {
 
 #[cfg(test)]
 mod test {
+    use crate::dot_examples::dot_example_str;
+    use crate::graph::Graph;
+
     use super::*;
     use rstest::rstest;
     use LineType::Down;
@@ -124,5 +127,23 @@ mod test {
 
         let cross_count = count_crosses(lines);
         assert_eq!(cross_count, expected);
+    }
+
+    #[rstest(example_name, expected_crossings,
+        case::complex_crossing("complex_crossing", 0),
+        case::large_example("large_example", 2),
+    )]
+    fn test_example_crossings(example_name: &str, expected_crossings: u32) {
+        let dot = dot_example_str(example_name);
+        let mut graph = Graph::from(dot);
+
+        graph.rank_nodes_vertically();
+        graph.set_horizontal_ordering();
+
+        assert_eq!(
+            graph.rank_orderings.unwrap().crossing_count(),
+            expected_crossings,
+            "GraphViz crossing count is: {expected_crossings}"
+        );
     }
 }
