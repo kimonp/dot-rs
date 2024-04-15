@@ -14,9 +14,9 @@ use super::{
 };
 use std::collections::{HashSet, VecDeque};
 
+pub(super) mod cutvalue;
 mod heap;
 pub(super) mod spanning_tree;
-pub(super) mod cutvalue;
 pub(crate) mod sub_tree;
 
 /// Determines what variable on each node which is set by the network simplex algorithm.
@@ -83,11 +83,16 @@ impl Graph {
 
         let mut start_idx = 0;
         while let Some(neg_cut_edge_idx) = self.leave_edge_for_simplex(start_idx) {
-            println!("About to enter: {neg_cut_edge_idx}");
+            println!(
+                "About to leave edge: {}",
+                self.edge_to_string(neg_cut_edge_idx)
+            );
 
             if let Some((selected_edge_idx, selected_slack)) =
                 self.enter_edge_for_simplex(neg_cut_edge_idx)
             {
+                // println!("EDGE ENTERED");
+                // self.print_spanning_tree_in_dot();
                 // println!(
                 //     "Exchanging edges with slack {selected_slack}\n  remove from tree: {}\n       add to tree: {}",
                 //     self.edge_to_string(neg_cut_edge_idx),
@@ -319,14 +324,16 @@ impl Graph {
     /// * Determines if we will be searching In or Out from the src_node or the dst_node respectively
     ///   based on the whichever has the smallest subtree max.
     /// * Passes the search_node and min/max to the recursive select_edge_for_simplex(), which will return
-    ///   an: Option<candinate_node>
+    ///   an: Option<candidate_node>
     /// * If the candidate_node is set, look up it's slack and return both.
     ///
     /// Documentation from paper:
-    /// * enter_edge ﬁnds a non-tree edge to replace e.
+    /// * enter_edge finds a non-tree edge to replace e.
     ///   * This is done by breaking the edge e, which divides the tree into a head and tail component.
     ///   * All edges going from the head component to the tail are considered, with an edge of minimum slack being chosen.
     ///   * This is necessary to maintain feasibility.
+    ///   
+    /// GraphViz: enter_edge()
     fn enter_edge_for_simplex(&self, tree_edge_idx: usize) -> Option<(usize, i32)> {
         let edge = self.get_edge(tree_edge_idx);
         let (disposition, search_node_idx, min, max) = {
@@ -347,7 +354,7 @@ impl Graph {
         };
 
         // println!(
-        //     "Going to select: {disposition}: search_node {min}-{max}: {}",
+        //     "Going to select to enter (add to tree): {disposition}: from search_node ({min}-{max}): {}",
         //     self.node_to_string(search_node_idx)
         // );
 
@@ -362,7 +369,7 @@ impl Graph {
             })
     }
 
-    /// Recursively find the first edge that satifies the edge selection critiera for network simplex.
+    /// Recursively find the first edge that satisfies the edge selection criteria for network simplex.
     ///
     /// Selection criteria:
     /// * Edge must not currently be in the spanning tree.
@@ -370,26 +377,31 @@ impl Graph {
     ///   * The src_node (tail) of the edge must have a sub_tree_max >= min and <= max
     /// * If disposition is Out:
     ///   * The dst_node (tail) of the edge must have a sub_tree_max >= min and <= max
+    ///   
+    /// GraphViz: dfs_enter_out_edge() and dfs_enter_in_edge()
     fn select_edge_for_simplex(
         &self,
         disposition: EdgeDisposition,
         search_node_idx: usize,
         min: usize,
         max: usize,
-        candidate_idx: Option<usize>,
+        candidate_edge_idx: Option<usize>,
     ) -> Option<usize> {
-        let mut candidate_idx = candidate_idx;
+        let mut candidate_edge_idx = candidate_edge_idx;
         let search_node = self.get_node(search_node_idx);
         let search_node_tree_dist_max = search_node
             .tree_dist_max()
-            .expect("Search node must have subtree");
+            .expect("Search node must have dist_max set");
 
         // println!(
-        //     "   select_edge_for_simplex: search_node: {}",
+        //     "   select_edge_for_simplex: SEARCH_NODE: {}",
         //     self.node_to_string(search_node_idx)
         // );
         for edge_idx in search_node.get_edges(disposition).iter().cloned() {
             let edge = self.get_edge(edge_idx);
+            if edge.ignored {
+                continue;
+            }
             let node_idx = match disposition {
                 In => edge.src_node,
                 Out => edge.dst_node,
@@ -399,20 +411,26 @@ impl Graph {
                 .tree_dist_max()
                 .expect("Candidate node must have a subtree");
             // println!(
-            //     "   select_edge_for_simplex: checking edge {disposition}: {}",
+            //     "   select_edge_for_simplex: checking '{disposition}' edge: {}",
             //     self.edge_to_string(edge_idx)
             // );
 
             if !edge.in_spanning_tree() {
                 let slack = self.simplex_slack(edge_idx).expect("Edge must have slack");
-                let candidate_slack = candidate_idx
+                let candidate_slack = candidate_edge_idx
                     .map(|edge_idx| self.simplex_slack(edge_idx).expect("edge must have slack"));
 
-                if !self.node_distance_within_limits(node_idx, min, max)
+                if !self.node_in_tail_component(node_idx, min, max)
                     && (candidate_slack.is_none() || Some(slack) < candidate_slack)
                 {
-                    candidate_idx = Some(edge_idx);
-                    // println!("   selected: {edge_idx}");
+                    candidate_edge_idx = Some(edge_idx);
+                    // println!(
+                    //     "   selected: {edge_idx} because: !({min} <= {} <= {max}) and: Some({slack}) < {:?}: {}",
+                    //     self.get_node(node_idx)
+                    //         .tree_dist_max()
+                    //         .expect("tree_dist_max must be set"),
+                    //     candidate_slack, self.edge_to_string(edge_idx)
+                    // );
                 } else {
                     // println!(
                     //     "   node not withing distance limits {min}-{max}: {}",
@@ -420,15 +438,24 @@ impl Graph {
                     // )
                 }
             } else if node_tree_dist_max < search_node_tree_dist_max {
-                candidate_idx =
-                    self.select_edge_for_simplex(disposition, node_idx, min, max, candidate_idx);
+                candidate_edge_idx = self.select_edge_for_simplex(
+                    disposition,
+                    node_idx,
+                    min,
+                    max,
+                    candidate_edge_idx,
+                );
             } else {
-                // println!("   select_edge_for_simplex: rejected edge {edge_idx}");
+                // println!(
+                //     "   select_edge_for_simplex: rejected edge: {}",
+                //     self.edge_to_string(edge_idx)
+                // );
             }
         }
+
         // println!("   select_edge_for_simplex: next phase");
-        for edge_idx in search_node
-            .get_edges(disposition.opposite())
+        for edge_idx in self
+            .node_tree_edges(search_node_idx, disposition.opposite())
             .iter()
             .cloned()
         {
@@ -438,6 +465,9 @@ impl Graph {
             //     self.edge_to_string(edge_idx)
             // );
             let edge = self.get_edge(edge_idx);
+            if edge.ignored {
+                continue;
+            }
             let node_idx = match disposition.opposite() {
                 In => edge.src_node,
                 Out => edge.dst_node,
@@ -445,17 +475,22 @@ impl Graph {
             let node_tree_dist_max = self
                 .get_node(node_idx)
                 .tree_dist_max()
-                .expect("Candidate node must have a subtree");
+                .expect("Candidate node must have a dist_max");
 
             if node_tree_dist_max < search_node_tree_dist_max {
-                candidate_idx =
-                    self.select_edge_for_simplex(disposition, node_idx, min, max, candidate_idx);
+                candidate_edge_idx = self.select_edge_for_simplex(
+                    disposition,
+                    node_idx,
+                    min,
+                    max,
+                    candidate_edge_idx,
+                );
             } else {
                 // println!("   select_edge_for_simplex: rejected edge {edge_idx}: {node_tree_dist_max} < {search_node_tree_dist_max}");
             }
         }
 
-        candidate_idx
+        candidate_edge_idx
     }
 
     /// Documentation from paper:
@@ -467,6 +502,12 @@ impl Graph {
     ) {
         self.get_edge(neg_cut_edge_idx).set_in_spanning_tree(false);
         self.get_edge(non_tree_edge_idx).set_in_spanning_tree(true);
+
+        println!(
+            "Exchanging edges:\n  OUT: {}\n   IN: {}",
+            self.edge_to_string(neg_cut_edge_idx),
+            self.edge_to_string(non_tree_edge_idx)
+        );
     }
 
     /// Balance nodes either top to bottom or left to right
@@ -505,7 +546,7 @@ impl Graph {
     }
 
     /// Balance nodes left-right so that nodes in different ranks are balanced against each other.
-    /// 
+    ///
     /// So:  A
     ///      | \
     ///      B  C
@@ -513,7 +554,7 @@ impl Graph {
     /// Becomes:   A
     ///           /  \
     ///          B    C
-    /// 
+    ///
     /// * In this case, A is "balanced" or centered against B and C
     /// * balance_left_right() is only called using the "transformed" aux_graph that was modified with
     ///   network simplex for setting horizontal positions (target == XCoordinate).
@@ -526,10 +567,10 @@ impl Graph {
     ///         * Rerank the selected node and all tree descendent nodes by:
     ///           * if you selected the tail: -non_tree_edge_slack / 2
     ///           * if you selected the head: non_tree_edge_slack / 2
-    /// 
+    ///
     /// * Note that this only steps through all tree edges once.
     /// * However, the reranking of nodes can affect subsequent rerankings
-    /// 
+    ///
     /// How it works:
     /// * As of now, I don't fully understand how it works.
     /// * First, you are using a transformed graph:
@@ -542,11 +583,11 @@ impl Graph {
     ///           since the direction of the arrow to be cut is include in the calculation.
     ///           So for:  N1 <-e1- V -e2-> N2, cutvalue(e1) == cutvalue(e2) +/- 2
     ///   * Additionally, adjacent nodes in the same rank are connected by an edge
-    ///     which is there to keep the nodes from moving relative to each other 
+    ///     which is there to keep the nodes from moving relative to each other
     ///     (the original paper says it is to "force the nodes to be sufficiently
     ///     separate from one another but does not affect the cost of layout").
-    /// * By selecting a cutvalue of zero, you are only considering edges that 
-    /// 
+    /// * By selecting a cutvalue of zero, you are only considering edges that
+    ///
     /// From the paper: (page 20 section 4.2: Optimal node placement)
     /// * We can now consider the level assignment problem on G′, which can be solved using the network simplex method.
     ///   Any solution of the positioning problem on G corresponds to a solution of the level assignment problem on G′ with the same cost.
@@ -563,7 +604,8 @@ impl Graph {
             if tree_edge.cut_value == Some(0) {
                 // print!("Looking at edge with cut of 0:"); self.print_edge(tree_edge_idx);
 
-                if let Some((_non_tree_edge_idx, non_tree_edge_slack)) = self.enter_edge_for_simplex(tree_edge_idx)
+                if let Some((_non_tree_edge_idx, non_tree_edge_slack)) =
+                    self.enter_edge_for_simplex(tree_edge_idx)
                 {
                     if non_tree_edge_slack > 1 {
                         // println!("  balance_left_right(): replace {tree_edge_idx} with {non_tree_edge_idx}, slack: {non_tree_edge_slack}\n    replace: {}\n      with: {}",
