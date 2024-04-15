@@ -95,7 +95,7 @@ fn layout_rs_to_svg(dot: &str) -> String {
 #[component]
 fn App(cx: Scope) -> Element {
     let rows = DOT_EXAMPLES.iter()
-        .filter(|(title, _dot)| *title != "large_example")
+        // .filter(|(title, _dot)| *title != "large_example")
         .map(|(title, dot)| rsx! { DotSet { title: title.to_string(), dot: dot.to_string() } });
 
     cx.render(rsx! {rows})
