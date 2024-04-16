@@ -530,6 +530,11 @@ impl Node {
         self.get_edges(EdgeDisposition::In).is_empty()
     }
 
+    /// True if there are no outgoing edges from a node.
+    pub(super) fn no_out_edges(&self) -> bool {
+        self.get_edges(EdgeDisposition::Out).is_empty()
+    }
+
     // /// True if there are no outgoing edges to a node.
     // pub(super) fn no_out_edges(&self) -> bool {
     //     self.get_edges(EdgeDisposition::Out).is_empty()

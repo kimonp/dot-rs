@@ -16,9 +16,9 @@ type RankOrder = RefCell<BTreeSet<usize>>;
 
 #[derive(Debug, Clone)]
 pub struct RankOrderings {
-    /// Ordered list of ranks in the graph, with a set of all node positons at that rank.
+    /// Ordered list of ranks in the graph, with a set of all node positions at that rank.
     ranks: BTreeMap<i32, RankOrder>,
-    /// Map of node_idx to node positions.  Node postions are shared refs into positions in "ranks".
+    /// Map of node_idx to node positions.  Node positions are shared refs into positions in "ranks".
     nodes: RefCell<HashMap<usize, RefCell<NodePosition>>>,
 }
 
@@ -47,9 +47,9 @@ impl Display for RankOrderings {
     }
 }
 
-/// NodePosition is the structure with the RankOderings struct that keeps
+/// NodePosition is the structure with the RankOrderings struct that keeps
 /// all the critical information about a node's position with ranks so that
-/// calculations can be done effeciently.
+/// calculations can be done efficiently.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct NodePosition {
     /// node_idx into the parent graph
@@ -247,6 +247,7 @@ impl RankOrderings {
         // Place them in order so that they can be inserted into their original places, one by one
         static_pos.sort_by(|a, b| a.borrow().position.cmp(&b.borrow().position));
 
+
         for node_pos in static_pos {
             let orig_pos = node_pos.borrow().position;
             if ordering.len() < orig_pos {
@@ -257,27 +258,9 @@ impl RankOrderings {
         }
         
         if exchange_if_equal {
-            let mut cur_pos_start = 0;
-            while cur_pos_start < ordering.len() {
-                let cur_median = ordering[cur_pos_start].borrow().median;
-
-                let mut cur_pos_end = cur_pos_start;
-                loop {
-                    if cur_pos_end+1 == ordering.len() || ordering[cur_pos_end+1].borrow().median != cur_median {
-                        break;
-                    }
-                    cur_pos_end += 1;
-                }
-
-                if cur_pos_end != cur_pos_start {
-                    ordering.swap(cur_pos_start, cur_pos_end);
-                    cur_pos_start = cur_pos_end;
-                } else {
-                    cur_pos_start += 1;
-                }
-            }
+            exchange_equal_positions(&mut ordering);
         }
-
+            
         // Set the values of all the newly calculated positions
         for (new_pos, node_pos) in ordering.iter().enumerate() {
             (*node_pos).borrow_mut().position = new_pos;
@@ -410,7 +393,7 @@ impl RankOrderings {
     /// * This is the main loop that iterates as long as the number of edge crossings can be reduced
     ///   by transpositions.
     ///   * TODO: As in the loop in the ordering function, an adaptive strategy could be applied
-    ///     here to terminate the loop once the improvement is a sufﬁciently small fraction of
+    ///     here to terminate the loop once the improvement is a sufficiently small fraction of
     ///     the number of crossings.
     /// * Each adjacent pair of vertices is examined.
     ///   * Their order is switched if this reduces the number of crossings.
@@ -527,6 +510,33 @@ impl RankOrderings {
     }
 }
 
+/// Swap the first and last element of consecutive equal positions in ordering.
+/// 
+/// Do this by searching through the sorted vector only once.
+fn exchange_equal_positions(ordering: &mut Vec<&RefCell<NodePosition>>) {
+    let mut cur_pos_start = 0;
+    while cur_pos_start < ordering.len() {
+        let cur_median = ordering[cur_pos_start].borrow().median;
+
+        // Find the last element that has the same median value as the current one
+        let mut cur_pos_end = cur_pos_start;
+        loop {
+            if cur_pos_end+1 == ordering.len() || ordering[cur_pos_end+1].borrow().median != cur_median {
+                break;
+            }
+            cur_pos_end += 1;
+        }
+
+        if cur_pos_end != cur_pos_start {
+            ordering.swap(cur_pos_start, cur_pos_end);
+            cur_pos_start = cur_pos_end;
+        } else {
+            cur_pos_start += 1;
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -536,7 +546,7 @@ mod test {
     fn test_adjacent_position() {
         let mut graph = Graph::example_graph_from_paper_2_3();
         graph.rank_nodes_vertically();
-        let order = graph.init_horizontal_order();
+        let order = graph.init_horizontal_order(true);
 
         let node_f = graph.name_to_node_idx("f").unwrap();
         let node_g = graph.name_to_node_idx("g").unwrap();
@@ -679,7 +689,7 @@ mod test {
         graph.init_simplex_rank();
         graph.assign_simplex_rank(VerticalRank);
         graph.rank_nodes_vertically();
-        let order = graph.init_horizontal_order();
+        let order = graph.init_horizontal_order(true);
 
         assert_eq!(order.crossing_count(), 0);
         println!("ORDER: {order}");

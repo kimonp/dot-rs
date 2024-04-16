@@ -358,7 +358,20 @@ impl Graph {
             .enumerate()
             .filter(|(_i, n)| n.no_in_edges())
         {
-            // self.get_node(node_idx).set_asyclic_check(node_idx, 0);
+            queue.push_back(node_idx);
+        }
+        queue
+    }
+
+    fn get_sink_nodes(&self) -> VecDeque<usize> {
+        let mut queue = VecDeque::new();
+
+        for (node_idx, _node) in self
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_i, n)| n.no_out_edges())
+        {
             queue.push_back(node_idx);
         }
         queue
@@ -422,12 +435,29 @@ impl Graph {
         self.nodes.len()
     }
 
+    /// Run thr horizontal ordering algorithm in two different configurations and choose the best
+    /// * The best being the one with the fewest line crosses between ranks.
+    ///
+    /// From the Paper: page 17 section 3: Vertex Ordering Within Ranks
+    ///
+    /// One final point is that it is generally worth the extra cost to run the vertex ordering algorithm twice:
+    /// once for an initial order determined by starting with vertices of minimal rank and searching out-edges,
+    /// and the second time by starting with vertices of maximal rank and searching in-edges.  This allows one
+    /// to pick the better of two different solutions.
+    ///
+    fn set_horizontal_ordering(&mut self) -> &RankOrderings {
+        self.set_horizontal_ordering_with_direction(true);
+        self.set_horizontal_ordering_with_direction(false);
+
+        self.rank_orderings.as_ref().unwrap()
+    }
+
     /// Set the rank_orderings field of graph and set the horizontal position of each node.
     ///
     /// TODO: Note that the horizontal position of each node is not used.  It is taken from the
     ///       rank_orderings again later.  This should be cleaned up once debugging is complete.
     ///
-    /// GraphViz: essentially the fuction: dot_mincross(), though this does more.
+    /// GraphViz: essentially the function: dot_mincross(), though this does more.
     ///
     /// Documentation from paper: page 14
     ///
@@ -447,15 +477,15 @@ impl Graph {
     ///     }
     ///     return best
     /// }
-    fn set_horizontal_ordering(&mut self) -> &RankOrderings {
+    fn set_horizontal_ordering_with_direction(&mut self, min: bool) -> &RankOrderings {
         const MAX_ITERATIONS: usize = 24;
-        let order = self.init_horizontal_order();
+        let order = self.init_horizontal_order(min);
         let mut best = order.clone();
 
         if best.crossing_count() != 0 {
             for i in 0..MAX_ITERATIONS {
                 println!("Ordering pass {i}: cross count: {}", order.crossing_count());
-                let forward = i % 2 == 0; 
+                let forward = i % 2 == 0;
                 let exchange_if_equal = i % 3 < 2;
 
                 order.weighted_median(forward, exchange_if_equal);
@@ -484,12 +514,30 @@ impl Graph {
             best.crossing_count()
         );
 
-        self.set_node_positions(&best);
+        if self.should_update_ordering(&best) {
+            self.set_node_positions(&best);
+
+            self.rank_orderings = Some(best);
+        }
         self.print_nodes("After set_horizontal_ordering (dot_mincross())");
 
-        self.rank_orderings = Some(best);
-
         self.rank_orderings.as_ref().unwrap()
+    }
+
+    /// Return true if the given new_ordering has fewer crosses than the current.
+    fn should_update_ordering(&self, new_ordering: &RankOrderings) -> bool {
+        if let Some(cur_count) = self.cur_crossing_count() {
+            cur_count > new_ordering.crossing_count()
+        } else {
+            true
+        }
+    }
+
+    /// If a rank_orderings has been set, return it's crossing count, otherwise None.
+    fn cur_crossing_count(&self) -> Option<u32> {
+        self.rank_orderings
+            .as_ref()
+            .map(|ordering| ordering.crossing_count())
     }
 
     /// Set the relative positions of each node from the given orderings.
@@ -505,8 +553,8 @@ impl Graph {
     }
 
     /// Set the initial ordering of the nodes, and return a RankOrderings object to optimize node orderings.
-    fn init_horizontal_order(&mut self) -> RankOrderings {
-        let order = self.get_initial_horizontal_orderings();
+    fn init_horizontal_order(&mut self, min: bool) -> RankOrderings {
+        let order = self.get_initial_horizontal_orderings(min);
 
         self.fill_vertical_rank_gaps(&order);
         self.set_adjacent_nodes_in_vertical_ranks(&order);
@@ -597,46 +645,50 @@ impl Graph {
     ///     as the node_idx.
     ///
     /// * Start with the nodes in the minimal rank (presumably rank 0)
-    ///  * Do a breadth first seach by following edges that point to nodes that
+    ///  * Do a breadth first search by following edges that point to nodes that
     ///    have not yet been assigned an ordering
-    ///    * Pull a node of of the queue.  If it has not yet been assigned:
+    ///    * Pull a node off of the queue.  If it has not yet been assigned:
     ///      * Add it to the rank_order BTreeMap under it's given rank
     ///      * Mark it assigned
-    ///      * push the all the unassinged nodes the node's edges point to on the back of the queue
+    ///      * push the all the unassigned nodes the node's edges point to on the back of the queue
     /// * Continue until the queue in empty and return the rank order.
     ///
     /// NOTE: I initially implemented this as a depth first search.  But a depth first search
     ///       sometimes reverses the initial ranking implied by the user's input string.
-    ///       Thus coult cause incorrent horizontal coordinates in the assign coordinate phase.
+    ///       Thus could cause incorrect horizontal coordinates in the assign coordinate phase.
     ///       I am unclear what causes this side effect, but switching to a breadth first search
     ///       resolved it.  Hopefully I can figure out why!
     ///
     /// Documentation from paper: page 14
     /// init_order initially orders the nodes in each rank.
-    /// * This may be done by a depth-ﬁrst or breadth-ﬁrst search starting with vertices of minimum rank.
+    /// * This may be done by a depth-first or breadth-first search starting with vertices of minimum rank.
     ///   * Vertices are assigned positions in their ranks in left-to-right order as the search progresses.
     ///     * This strategy ensures that the initial ordering of a tree has no crossings.
     ///     * This is important because such crossings are obvious, easily- avoided "mistakes."
-    fn get_initial_horizontal_orderings(&mut self) -> RankOrderings {
+    fn get_initial_horizontal_orderings(&mut self, min: bool) -> RankOrderings {
         let mut rank_order = RankOrderings::new();
-        let mut dfs_queue = self.get_min_vertical_rank_nodes();
+        let mut dfs_queue = self.get_vertical_rank_nodes(min);
         let mut assigned = HashSet::new();
 
-        // println!("Starting Queue: {dfs_queue:?}");
+        // println!("Starting Queue (min={min}): {dfs_queue:?}");
 
         while let Some(node_idx) = dfs_queue.pop_front() {
             let node = self.get_node(node_idx);
-            let unassigned_dst_nodes = node
-                .out_edges
-                .iter()
+            let node_iter = if min {
+                node.out_edges.iter()
+            } else {
+                node.in_edges.iter()
+            };
+            let unassigned_nodes = node_iter
                 .cloned()
                 .filter_map(|edge_idx| {
                     let edge = self.get_edge(edge_idx);
+                    let other_node = if min { edge.dst_node } else { edge.src_node };
 
                     if edge.ignored {
                         None
-                    } else if assigned.get(&edge.dst_node).is_none() {
-                        Some(edge.dst_node)
+                    } else if assigned.get(&other_node).is_none() {
+                        Some(other_node)
                     } else {
                         None
                     }
@@ -653,14 +705,14 @@ impl Graph {
                 // println!("  Assigned node: {node_idx}");
             }
 
-            for node_idx in unassigned_dst_nodes {
+            for node_idx in unassigned_nodes {
                 dfs_queue.push_back(node_idx);
             }
         }
         rank_order
     }
 
-    /// The graph is reponsible for setting adjacent nodes in the rank_order once all nodes have been added to it.
+    /// The graph is responsible for setting adjacent nodes in the rank_order once all nodes have been added to it.
     fn set_adjacent_nodes_in_vertical_ranks(&self, rank_order: &RankOrderings) {
         for (node_idx, _node_position) in rank_order.nodes().borrow().iter() {
             let (above_adj, below_adj) = self.get_vertical_adjacent_nodes(*node_idx);
@@ -669,36 +721,43 @@ impl Graph {
         }
     }
 
-    /// Return a VecDequeue of nodes which have minimum rank.
+    /// Return a VecDequeue of nodes which have minimum or maximum rank.
     ///
     /// * Assumes that the graph has been ranked
     /// * Since this will be used to populate ranks, we must
-    ///   include all source nodes (nodes with no in edges) otherwise
-    ///   they will not be ranked.  The initial ranking might
+    ///   include all source/sink nodes (nodes with no in/out edges) otherwise
+    ///   they will not be ranked.  The initial vertical ranking might
     ///   not rank all source nodes as rank zero, so we need to check
     ///   that they are all included.
-    fn get_min_vertical_rank_nodes(&self) -> VecDeque<usize> {
-        let mut min_rank_nodes = VecDeque::new();
-        let min_rank = self
-            .nodes
-            .iter()
-            .min()
-            .and_then(|min_node| min_node.vertical_rank);
-        let mut source_nodes: HashSet<usize> =
-            HashSet::from_iter(self.get_source_nodes().iter().cloned());
+    ///   * We use source nodes if we are starting with min rank, otherwise
+    ///     we use sink nodes.
+    fn get_vertical_rank_nodes(&self, min: bool) -> VecDeque<usize> {
+        let mut edge_rank_nodes = VecDeque::new();
+        let node_iter = self.nodes.iter();
+        let edge_rank = if min {
+            node_iter.min().and_then(|min_node| min_node.vertical_rank)
+        } else {
+            node_iter.max().and_then(|max_node| max_node.vertical_rank)
+        };
+        let mut starting_nodes: HashSet<usize> = if min {
+            HashSet::from_iter(self.get_source_nodes().iter().cloned())
+        } else {
+            HashSet::from_iter(self.get_sink_nodes().iter().cloned())
+        };
 
         for (node_idx, node) in self.nodes.iter().enumerate() {
-            if node.vertical_rank == min_rank {
-                min_rank_nodes.push_back(node_idx);
-                source_nodes.remove(&node_idx);
+            if node.vertical_rank == edge_rank {
+                edge_rank_nodes.push_back(node_idx);
+                starting_nodes.remove(&node_idx);
             }
         }
+
         // Include any source nodes that have not yet been included.
-        for node_idx in source_nodes {
-            min_rank_nodes.push_back(node_idx);
+        for node_idx in starting_nodes {
+            edge_rank_nodes.push_back(node_idx);
         }
 
-        min_rank_nodes
+        edge_rank_nodes
     }
 
     /// Generic Network simplex:
@@ -857,7 +916,7 @@ impl Graph {
 
     /// Add the new node and edges between the new node, as per figure 4-2 in paper
     ///
-    /// Note that we are adding 2 edges and one node for every edge, but not the orignal edge itself.
+    /// Note that we are adding 2 edges and one node for every edge, but not the original edge itself.
     fn add_virtual_nodes_for_horizontal_positioning(&self, aux_graph: &mut Graph) {
         for edge in self.edges.iter() {
             let src_node_idx = edge.src_node;
@@ -866,7 +925,7 @@ impl Graph {
             let src_node = aux_graph.get_node(src_node_idx).clone();
             let dst_node = aux_graph.get_node(dst_node_idx).clone();
 
-            // As well, must use simplex_rank() instead of vertical_rank, beacause it may have been
+            // As well, must use simplex_rank() instead of vertical_rank, because it may have been
             // changed.
             let src_rank = src_node.simplex_rank().unwrap();
             let dst_rank = dst_node.simplex_rank().unwrap();
@@ -1472,7 +1531,7 @@ pub mod tests {
 
         graph.rank_nodes_vertically();
 
-        let min_rank = graph.get_min_vertical_rank_nodes();
+        let min_rank = graph.get_vertical_rank_nodes(true);
         let min_rank = min_rank.iter().cloned().collect::<Vec<usize>>();
 
         assert_eq!(min_rank, vec![node_c_idx], "min node should be 'c'");
@@ -1485,7 +1544,7 @@ pub mod tests {
         graph.rank_nodes_vertically();
 
         println!("{graph}");
-        let order = graph.get_initial_horizontal_orderings();
+        let order = graph.get_initial_horizontal_orderings(true);
 
         println!("{order:?}");
     }
@@ -1505,7 +1564,7 @@ pub mod tests {
 
         let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a();
         graph.init_spanning_tree_and_cutvalues();
-        let order = graph.get_initial_horizontal_orderings();
+        let order = graph.get_initial_horizontal_orderings(true);
 
         println!("{graph}");
         graph.fill_vertical_rank_gaps(&order);
