@@ -1,12 +1,12 @@
 //! Methods for the network simplex algorithm that assist with generating
 //! cutvalues for edges.
-//! 
+//!
 //! Cutvalues are a key concept in graphviz layout, effecting both vertical
 //! and horizontal positioning.  Cutvalues are the value that the network simplex seeks
 //! to maximize in it's network flow calculation.
-//! 
+//!
 //! From page 9 of the paper: Section 2.3 Network simplex
-//! 
+//!
 //! Given a feasible spanning tree, we can associate an integer cut value with each tree edge as
 //! follows. If the tree edge is deleted ("cut"), the tree breaks into two connected components,
 //! the tail component containing the tail node of the edge, and the head component containing
@@ -24,12 +24,12 @@ impl Graph {
     /// * node.tree_dist_min(): low(n)
     ///
     /// From the paper: page 12: Section 2.4: Implementation details
-    /// 
+    ///
     /// Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder
     /// traversal of the tree, starting from some fixed root node v root, and labeling each node v with its
     /// postorder traversal number lim(v), the least number low(v) of any descendant in the search, and the
     /// edge parent(v) by which the node was reached (see figure 2-5).
-    /// 
+    ///
     /// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
     /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
     /// edge and v root is in the head component of the edge (i.e., lim(u) < lim(v)), then a node w is in the tail
@@ -59,17 +59,18 @@ impl Graph {
 
         assert_eq!(lca_idx, lca_idx2, "Least common ancestor must match");
 
-        self.get_edge_mut(neg_cut_edge_idx).cut_value = None;
-        self.get_edge_mut(selected_edge_idx).cut_value = Some(-cutvalue);
-
         let lca = self.get_node(lca_idx);
-        let lca_parent_edge_idx = lca.spanning_tree_parent_edge_idx();
         let lca_min = lca
             .tree_dist_min()
             .expect("lca does not have a sub_tree_idx_min");
 
-        self.invalidate_path(lca_idx, sel_dst_node_idx);
-        self.invalidate_path(lca_idx, sel_src_node_idx);
+        self.invalidate_path_to_lca(lca_idx, sel_dst_node_idx);
+        self.invalidate_path_to_lca(lca_idx, sel_src_node_idx);
+
+        self.get_edge_mut(selected_edge_idx).cut_value = Some(-cutvalue);
+        self.get_edge_mut(neg_cut_edge_idx).cut_value = None;
+
+        // self.print_spanning_tree_in_dot();
 
         self.exchange_edges_in_spanning_tree(neg_cut_edge_idx, selected_edge_idx);
 
@@ -79,10 +80,12 @@ impl Graph {
         //     self.get_node(sel_dst_node_idx).name,
         //     self.get_node(lca_idx).name
         // );
+        let lca = self.get_node(lca_idx);
+        let lca_parent_edge_idx = lca.spanning_tree_parent_edge_idx();
         self.set_tree_parents_and_ranges(false, lca_idx, lca_parent_edge_idx, lca_min);
     }
 
-    /// Adjust cutvalues by the given amount from node_idx1 up to the least commmon ancestor of nodes node_idx1 and node_idx2,
+    /// Adjust cutvalues by the given amount from node_idx1 up to the least common ancestor of nodes node_idx1 and node_idx2,
     /// and return the least common ancestor of node_idx1 and node_idx2.
     ///
     /// "down" is a signal as to which direction to change the cutvalue.  If down, the cutvalue should be increased if the next
@@ -92,7 +95,7 @@ impl Graph {
     /// without having to recalculate them all, which can be a large percentage of node layout
     /// calculations.
     ///
-    /// * Find the common ancestor by selecting a noder (node1), and loop until we move past
+    /// * Find the common ancestor by selecting a node (node1), and loop until we move past
     ///   the common ancestor with node2.
     fn adjust_cutvalues_to_lca(
         &mut self,
@@ -209,7 +212,7 @@ impl Graph {
     ///   and the result of the cutvalues can be built from there.
     ///
     /// GraphViz: x_val()
-    /// 
+    ///
     /// From paper: page 11, section 2.4:
     ///
     /// To reduce this cost (of caculating cutvalues), we note that the cut values can be
@@ -264,7 +267,8 @@ impl Graph {
 
         let search_node_is_ancestor =
             self.is_common_ancestor(searched_node_idx, unsearched_node_idx);
-        let negate_component = (search_node_is_ancestor && !child_node_searched) || (!search_node_is_ancestor && child_node_searched);
+        let negate_component = (search_node_is_ancestor && !child_node_searched)
+            || (!search_node_is_ancestor && child_node_searched);
 
         let edge_weight = edge.weight as i32;
         let cutvalue_component = if search_node_is_ancestor {
@@ -290,15 +294,22 @@ impl Graph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     impl Graph {
         fn assert_expected_cutvals(&self, expected_cutvals: Vec<(&str, &str, i32)>) {
             for (src_name, dst_name, expected_cut_val) in expected_cutvals {
                 let (edge, _) = self.get_named_edge(src_name, dst_name);
 
-                assert_eq!(Some(expected_cut_val), edge.cut_value, "unexpected cut_value for edge {src_name}->{dst_name}");
+                assert_eq!(
+                    Some(expected_cut_val),
+                    edge.cut_value,
+                    "unexpected cut_value for edge {src_name}->{dst_name}"
+                );
                 if Some(expected_cut_val) != edge.cut_value {
-                    println!("unexpected cut_value for edge {src_name}->{dst_name}: {} vs {:?}", expected_cut_val, edge.cut_value);
+                    println!(
+                        "unexpected cut_value for edge {src_name}->{dst_name}: {} vs {:?}",
+                        expected_cut_val, edge.cut_value
+                    );
                 }
             }
         }

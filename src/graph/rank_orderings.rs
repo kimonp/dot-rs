@@ -442,7 +442,7 @@ impl RankOrderings {
             for (_rank, rank_set) in self.ranks.iter() {
                 let mut rank_position = self.rank_order_to_vec(rank_set);
                 let position_count = rank_position.len();
-                println!("--- transpose for rank {_rank} ({position_count} positions)");
+                // println!("--- transpose for rank {_rank} ({position_count} positions)");
 
                 if position_count > 1 {
                     let rank_set = rank_set.borrow();
@@ -453,11 +453,11 @@ impl RankOrderings {
                         let result = self.exchange_if_crosses_decrease(&rank_set, v, w, exchange_if_equal);
 
                         if result != TransposeResult::Worse {
-                            println!("{_rank}: exchanged {position} with {}", position + 1);
+                            // println!("{_rank}: exchanged {position} with {}", position + 1);
                             rank_position.swap(position, position + 1);
                             improved = result == TransposeResult::Better
                         } else {
-                            println!("{_rank}: no exchange for {position}");
+                            // println!("{_rank}: no exchange for {position}");
                         }
                     }
                 }

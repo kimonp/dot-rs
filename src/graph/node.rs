@@ -353,7 +353,6 @@ impl Node {
             tree_dist_min: min,
             tree_dist_max: max,
             sub_tree: self.sub_tree(),
-            // asyclic_check: self.asyclic_check(),
         });
     }
 

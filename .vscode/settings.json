@@ -5,7 +5,12 @@
         "./Cargo.toml"
     ],
     "cSpell.words": [
+        "cutvalue",
+        "postorder",
         "rstest",
+        "Sugiyama",
+        "Tagawa",
+        "Toda",
         "wmedian"
     ]
 }
