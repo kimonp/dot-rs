@@ -1,14 +1,17 @@
 [package]
-name = "graphvis_test_app"
+name = "dot-rs-testing-app"
 version = "0.1.0"
+authors = ["Kimon Papahadjopoulos <kimonp@gmail.com>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-dioxus = "0.4.3"
-dioxus-desktop = "0.4.3"
+dioxus = { version = "0.5", features = ["desktop"] }
 dot-rs = { path = "../../dot-rs" }
 layout-rs = { path = "../../layout/layout" }
 # petgraph = "0.6.4"
 # petgraph-evcxr = "*"
+
+# Debug
+log = "0.4.19"
+dioxus-logger = "0.4.1"
