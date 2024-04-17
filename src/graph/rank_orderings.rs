@@ -370,6 +370,27 @@ impl RankOrderings {
         crossing_count
     }
 
+    /// Return a rank that has the worst number of crosses > 0.
+    pub fn get_rank_with_worst_crossing_count(&self) -> Option<i32> {
+        let mut worst_rank = None;
+        let mut worst_crosses = None;
+
+        let mut prev_rank: Option<&RefCell<BTreeSet<usize>>> = None;
+        for (rank, rank_order) in self.iter() {
+            if let Some(prev_rank) = prev_rank {
+                let crosses = self.crossing_count_to_next_rank(&prev_rank.borrow());
+                
+                if crosses > 0 && Some(crosses) > worst_crosses {
+                    worst_rank = Some(*rank);
+                    worst_crosses = Some(crosses);
+                }
+            }
+            prev_rank = Some(rank_order);
+        }
+
+        worst_rank
+    }
+
     fn crossing_count_to_next_rank(&self, rank: &BTreeSet<usize>) -> u32 {
         let mut lines = vec![];
         let nodes = self.nodes.borrow();
@@ -492,6 +513,51 @@ impl RankOrderings {
         }
     }
 
+    /// Pseudo-Randomize the position of nodes in the given rank.
+    /// 
+    /// * We want the randomization to be repeatable so the same graph
+    ///   always is layed out the same.
+    pub fn randomize_rank_positions(&mut self, rank: i32) {
+        let mut rank_positions = self.rank_to_positions(rank).expect("rank does not exit");
+        
+        println!("   BEFORE: {rank_positions:?}");
+        let position_count = rank_positions.len();
+        for idx in 0..position_count {
+            rank_positions.swap(idx, ((idx+1) * 7) % position_count);           
+            println!("      SWAP {idx} with {}", ((idx+1) * 7) % position_count);
+        }
+        println!("   AFTER: {rank_positions:?}");
+
+        for (new_position, node_idx) in rank_positions.iter().enumerate() {
+            if let Some(node_pos) = self.nodes.borrow().get(node_idx) {
+                println!("  RERANKING {node_idx} to {new_position}");
+                node_pos.borrow_mut().position = new_position;
+            } else {
+                panic!("node_idx {node_idx} not known");
+            }
+        }
+    }
+
+    pub fn randomize_rank_crossing_positions(&mut self) {
+        let mut bad_ranks = vec![];
+        let mut prev_rank: Option<&RefCell<BTreeSet<usize>>> = None;
+        for (rank, rank_order) in self.iter() {
+            if let Some(prev_rank) = prev_rank {
+                let crosses = self.crossing_count_to_next_rank(&prev_rank.borrow());
+                
+                if crosses > 0 {
+                    bad_ranks.push(*rank);
+                }
+            }
+            prev_rank = Some(rank_order);
+        }
+        
+        for rank in bad_ranks {
+            self.randomize_rank_positions(rank);
+        }
+    }
+
+    
     /// Return a vector of node_idx from the given rank ordered by position within the rank.
     fn rank_order_to_vec(&self, rank_order: &RankOrder) -> Vec<usize> {
         let rank_order = rank_order.borrow();
@@ -528,6 +594,16 @@ fn exchange_equal_positions(ordering: &mut Vec<&RefCell<NodePosition>>) {
         }
 
         if cur_pos_end != cur_pos_start {
+            // let mid_point = ((cur_pos_end - cur_pos_start) + 1) / 2;
+            // println!("---swap---");
+            // for idx in 0..mid_point {
+            //     let swap_pos1 = cur_pos_start + idx;
+            //     let swap_pos2 = cur_pos_end - idx;
+
+            //     ordering.swap(swap_pos1, swap_pos2);
+            //     println!("SWAPPING: {swap_pos1} and {swap_pos2}");
+            // }
+            
             ordering.swap(cur_pos_start, cur_pos_end);
             cur_pos_start = cur_pos_end;
         } else {
@@ -535,7 +611,6 @@ fn exchange_equal_positions(ordering: &mut Vec<&RefCell<NodePosition>>) {
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {

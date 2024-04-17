@@ -479,14 +479,21 @@ impl Graph {
     /// }
     fn set_horizontal_ordering_with_direction(&mut self, min: bool) -> &RankOrderings {
         const MAX_ITERATIONS: usize = 24;
-        let order = self.init_horizontal_order(min);
+        let mut order = self.init_horizontal_order(min);
         let mut best = order.clone();
 
         if best.crossing_count() != 0 {
+            // for _idx in 0..2 {
             for i in 0..MAX_ITERATIONS {
                 println!("Ordering pass {i}: cross count: {}", order.crossing_count());
                 let forward = i % 2 == 0;
                 let exchange_if_equal = i % 3 < 2;
+                let randomize = (i + 1) % 10 < 1;
+
+                if randomize {
+                    println!("Randomize on round {i}");
+                    order.randomize_rank_crossing_positions();
+                }
 
                 order.weighted_median(forward, exchange_if_equal);
                 println!("  After weighed_median: {}", order.crossing_count());
@@ -506,6 +513,23 @@ impl Graph {
                     }
                 }
             }
+
+            // if order.crossing_count() != 0 {
+            //     order.randomize_rank_crossing_positions();
+
+            // } else {
+            //     break;
+            // }
+
+            // if let Some(worst_rank) = best.get_rank_with_worst_crossing_count() {
+            //     println!("-- BEFORE RE_RANKING: {worst_rank}: {} --\n{best}", best.crossing_count());
+            //     order = best.clone();
+            //     order.randomize_rank_positions(worst_rank);
+            //     println!("-- AFTER RE_RANKING: {worst_rank}: {} --\n{order}", order.crossing_count());
+            // } else {
+            //     break;
+            // }
+            // }
         } else {
             println!("No reason to reduce crosses starting with zero...");
         }
