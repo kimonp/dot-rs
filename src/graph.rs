@@ -611,7 +611,6 @@ impl Graph {
         self.take_svg_snapshot(&format!("initial ordering: cc={}", order.crossing_count()), Some(&order));
 
         if best.crossing_count() != 0 {
-            // for _idx in 0..2 {
             for i in 0..MAX_ITERATIONS {
                 let cur_crossing_count = order.crossing_count();
                 let best_crossing_count = best.crossing_count();
@@ -620,14 +619,6 @@ impl Graph {
                 println!("Ordering pass {i}: cross count: {cur_crossing_count}");
                 let forward = i % 2 == 0;
                 let exchange_if_equal = i % 3 < 2;
-                // let randomize = (i + 1) % 10 < 1;
-
-                // if randomize {
-                //     println!("Randomize on round {i}");
-                //     self.new_snapshot_group(&format!("ordering pass: {i}, randomize"));
-                //     order.randomize_rank_crossing_positions();
-                //     self.take_svg_snapshot("after randomize", Some(&order));
-                // }
 
                 order.weighted_median(forward, exchange_if_equal, self);
                 println!("weighed_median: {}", order.crossing_count());
@@ -650,23 +641,6 @@ impl Graph {
                     }
                 }
             }
-
-            // if order.crossing_count() != 0 {
-            //     order.randomize_rank_crossing_positions();
-
-            // } else {
-            //     break;
-            // }
-
-            // if let Some(worst_rank) = best.get_rank_with_worst_crossing_count() {
-            //     println!("-- BEFORE RE_RANKING: {worst_rank}: {} --\n{best}", best.crossing_count());
-            //     order = best.clone();
-            //     order.randomize_rank_positions(worst_rank);
-            //     println!("-- AFTER RE_RANKING: {worst_rank}: {} --\n{order}", order.crossing_count());
-            // } else {
-            //     break;
-            // }
-            // }
         } else {
             println!("No reason to reduce crosses starting with zero...");
         }
