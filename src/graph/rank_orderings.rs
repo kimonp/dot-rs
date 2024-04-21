@@ -547,7 +547,7 @@ impl RankOrderings {
 /// Swap the first and last element of consecutive equal positions in ordering.
 /// 
 /// Do this by searching through the sorted vector only once.
-fn exchange_equal_positions(ordering: &mut Vec<&RefCell<NodePosition>>) {
+fn exchange_equal_positions(ordering: &mut [&RefCell<NodePosition>]) {
     let mut cur_pos_start = 0;
     while cur_pos_start < ordering.len() {
         let cur_median = ordering[cur_pos_start].borrow().median;
