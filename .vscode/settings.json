@@ -1,16 +1,26 @@
 {
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml",
-        "./graphvis_test_app/Cargo.toml",
-        "./Cargo.toml"
+        "/Users/kimonp/code/dot-rs/dot-rs-testing-app/Cargo.toml"
     ],
     "cSpell.words": [
+        "adjacents",
         "cutvalue",
+        "dioxus",
+        "dropbtn",
+        "graphviz",
+        "onmouseup",
+        "petgraph",
         "postorder",
         "rstest",
         "Sugiyama",
         "Tagawa",
         "Toda",
         "wmedian"
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "cSpell.ignoreWords": [
+        "Tsvg",
+        "evcxr"
     ]
 }

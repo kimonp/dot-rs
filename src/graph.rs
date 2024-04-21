@@ -12,10 +12,13 @@ mod rank_orderings;
 
 use rank_orderings::RankOrderings;
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet, VecDeque},
     fmt::Display,
     mem::replace,
 };
+
+use crate::svg::{SvgStyle, SVG};
 
 use self::{
     edge::{
@@ -52,8 +55,83 @@ pub struct Graph {
     rank_orderings: Option<RankOrderings>,
     /// Separation of nodes horizontally in pixels, assuming 72 pixels per inch.
     horizontal_node_separation: u32,
-    /// First node_idx in the graph that is virutal.  All subsequent nodes must be virtual too.
+    /// First node_idx in the graph that is virtual.  All subsequent nodes must be virtual too.
     first_virtual_idx: Option<usize>,
+    /// Snapshots that are taken during the layout process for debugging.
+    /// Snapshots are grouped into lists so the can be scrolled through
+    /// somewhat hierarchically.
+    svg_debug_snapshots: RefCell<Snapshots>,
+}
+
+type SnapShotVec = Vec<(String, String)>;
+
+#[derive(Debug, Clone, Default)]
+pub struct Snapshots {
+    total: usize,
+    groups: Vec<(String, SnapShotVec)>,
+}
+
+impl Snapshots {
+    fn new() -> Snapshots {
+        Snapshots { total: 0, groups: Vec::new() }
+    }
+
+    /// Add a new group to save snapshots to.
+    /// 
+    /// New snapshots can only be added to the current group
+    pub fn new_group(&mut self, group_title: &str) {
+       self.groups.push((group_title.to_string(), Vec::new()));
+    }
+
+    /// Add a new snapshot to the current group.
+    pub fn add(&mut self, title: &str, snap: &str) {
+        if let Some(last) = self.groups.last_mut() {
+            last.1.push((title.to_string(), snap.to_string()));
+        } else {
+            panic!("No snapshot group set!")
+        }
+        self.total += 1;
+    }
+    
+    pub fn get(&self, frame: usize) -> Option<(String, String, String)> {
+        let mut cur_frame = 0_usize;
+        for (title, group) in self.groups.iter() {
+            if cur_frame + group.len() > frame {
+                let index = frame - cur_frame;
+                let snapshot = group.get(index).expect("element not present");
+
+                return Some((title.clone(), snapshot.0.clone(), snapshot.1.clone()));
+            }
+            cur_frame += group.len();
+        }
+        None
+    }
+    
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.total
+    }
+
+    pub fn steps(&self, frame: usize) -> (usize, usize) {
+        let mut cur_frame = 0_usize;
+        let mut prev_frame = 0_usize;
+        for (_title, group) in self.groups.iter() {
+            if cur_frame + group.len() > frame {
+                let start_frame = if frame == cur_frame {
+                    prev_frame
+                } else {
+                    cur_frame
+                };
+                return (start_frame, cur_frame + group.len())
+            }
+            prev_frame = cur_frame;
+            cur_frame += group.len();
+        }        
+        (0, self.total_count())
+    }
 }
 
 impl Default for Graph {
@@ -70,6 +148,7 @@ impl Graph {
             rank_orderings: None,
             horizontal_node_separation: NODE_MIN_SEP_X as u32,
             first_virtual_idx: None,
+            svg_debug_snapshots: RefCell::new(Snapshots::new()),
         }
     }
 
@@ -81,6 +160,52 @@ impl Graph {
         self.set_horizontal_ordering();
         self.set_coordinates();
         // self.make_splines()
+    }
+
+    /// Saves a snapshot of the current state of the graph to SVG.
+    ///  * Used for debugging layout, specifically during min_cross
+    ///  * To be used during vertical layout, the ranks would have to be
+    ///    copied over from the aux_graph or other accommodation made.
+    ///
+    /// Can only be called after:
+    ///  * nodes have been ranked vertically
+    ///  * rank_orderings has been set in self.
+    #[allow(unused)]
+    pub(super) fn take_svg_snapshot(&self, title: &str, rank_orderings: Option<&RankOrderings>) {
+        let mut snapshot_graph = self.clone();
+        if let Some(rank_orderings) = rank_orderings {
+            snapshot_graph.set_coordinates_from_rank_orderings(rank_orderings);
+        }
+
+        let svg = SVG::new(snapshot_graph, SvgStyle::MinCross);
+
+        self.svg_debug_snapshots.borrow_mut().add(title, &svg.to_string());
+    }
+
+    #[allow(unused)]
+    pub(super) fn new_snapshot_group(&self, title: &str) {
+        self.svg_debug_snapshots.borrow_mut().new_group(title);
+    }
+
+    pub fn get_debug_svg_snapshots(&self) -> Snapshots {
+        self.svg_debug_snapshots.borrow().clone()
+    }
+
+    fn set_coordinates_from_rank_orderings(&mut self, rank_orderings: &RankOrderings) {
+        for (rank, _) in rank_orderings.iter() {
+            for (position, node_idx) in rank_orderings
+                .rank_to_positions(*rank)
+                .expect("rank does not exit")
+                .iter()
+                .cloned()
+                .enumerate()
+            {
+                let position = position as i32;
+                let node = self.get_node_mut(node_idx);
+
+                node.set_coordinates(position * NODE_MIN_SEP_X, rank * node.min_separation_y())
+            }
+        }
     }
 
     pub fn horizontal_node_separation(&self) -> u32 {
@@ -447,7 +572,7 @@ impl Graph {
     ///
     fn set_horizontal_ordering(&mut self) -> &RankOrderings {
         self.set_horizontal_ordering_with_direction(true);
-        self.set_horizontal_ordering_with_direction(false);
+        // self.set_horizontal_ordering_with_direction(false);
 
         self.rank_orderings.as_ref().unwrap()
     }
@@ -482,27 +607,39 @@ impl Graph {
         let mut order = self.init_horizontal_order(min);
         let mut best = order.clone();
 
+        self.new_snapshot_group("initial");
+        self.take_svg_snapshot(&format!("initial ordering: cc={}", order.crossing_count()), Some(&order));
+
         if best.crossing_count() != 0 {
             // for _idx in 0..2 {
             for i in 0..MAX_ITERATIONS {
-                println!("Ordering pass {i}: cross count: {}", order.crossing_count());
+                let cur_crossing_count = order.crossing_count();
+                let best_crossing_count = best.crossing_count();
+
+                self.new_snapshot_group(&format!("ordering pass: {i} cur_count={cur_crossing_count} best_count={best_crossing_count}"));
+                println!("Ordering pass {i}: cross count: {cur_crossing_count}");
                 let forward = i % 2 == 0;
                 let exchange_if_equal = i % 3 < 2;
-                let randomize = (i + 1) % 10 < 1;
+                // let randomize = (i + 1) % 10 < 1;
 
-                if randomize {
-                    println!("Randomize on round {i}");
-                    order.randomize_rank_crossing_positions();
-                }
+                // if randomize {
+                //     println!("Randomize on round {i}");
+                //     self.new_snapshot_group(&format!("ordering pass: {i}, randomize"));
+                //     order.randomize_rank_crossing_positions();
+                //     self.take_svg_snapshot("after randomize", Some(&order));
+                // }
 
-                order.weighted_median(forward, exchange_if_equal);
-                println!("  After weighed_median: {}", order.crossing_count());
+                order.weighted_median(forward, exchange_if_equal, self);
+                println!("weighed_median: {}", order.crossing_count());
+                // self.take_svg_snapshot("after weighted median", Some(&order));
 
-                order.transpose(exchange_if_equal);
+                self.new_snapshot_group(&format!("ordering pass: {i}, transpose"));
+                order.transpose(exchange_if_equal, Some(self));
                 println!(
                     "  After transpose ({exchange_if_equal}): {}",
                     order.crossing_count()
                 );
+                // self.take_svg_snapshot("after transpose", Some(&order));
 
                 let new_crossing_count = order.crossing_count();
                 if new_crossing_count < best.crossing_count() {
@@ -537,6 +674,9 @@ impl Graph {
             "-- Final order (crosses: {}): --\n{best}",
             best.crossing_count()
         );
+        self.new_snapshot_group("final");
+        self.take_svg_snapshot(&format!("final ordering: cc={}", best.crossing_count()), Some(&best));
+
 
         if self.should_update_ordering(&best) {
             self.set_node_positions(&best);
@@ -854,7 +994,7 @@ impl Graph {
     /// TODO: this currently set's x and y coordinates, but the x coordinate
     ///       will be overwritten later.  This should be cleaned up.
     fn set_y_coordinates(&mut self) {
-        // We set the y coorinate in reverse rank to match what GraphViz does.
+        // We set the y coordinate in reverse rank to match what GraphViz does.
         let _num_ranks = self.num_ranks().unwrap();
         for (node_idx, node) in self.nodes.iter_mut().enumerate() {
             let min_y = node.min_separation_y();
@@ -874,7 +1014,7 @@ impl Graph {
     }
 
     /// Documentation from paper: 4.2 Optimal Node Placement page 20
-    /// * The method involves constructing an auxiliary graph as illustrated in ﬁgure 4-2.
+    /// * The method involves constructing an auxiliary graph as illustrated in figure 4-2.
     /// * This transformation is the graphical analogue of the algebraic transformation mentioned above
     ///   for removing the absolute values from the optimization problem.
     /// * The nodes of the auxiliary graph G′ are the nodes of the original graph G plus,
@@ -887,11 +1027,11 @@ impl Graph {
     ///      * Ω(e) = function to bias for straighter long lines (see below)
     ///    * The other class of edges separates nodes in the same rank.  If v is the left neighbor of w,
     ///      then G′ has an edge f=e(v,w) with δ(f)=ρ(v,w) and ω(f)=0.
-    ///      * This edge forces the nodes to be sufﬁciently separated but does not affect the cost of the layout.
+    ///      * This edge forces the nodes to be sufficiently separated but does not affect the cost of the layout.
     ///      
     ///  QUESTIONS: ☑ ☐ ☒
     ///  * For the new graph G':
-    ///    * Are virtual nodes copied too? (almost certianly yes)
+    ///    * Are virtual nodes copied too? (almost certainly yes)
     ///  * Are the new nodes in graph G virtual nodes? (probably no, otherwise they would have said so)
     ///    * Are the new nodes in the same rank their source nodes?
     ///    * Do they have the same positions?
@@ -902,7 +1042,7 @@ impl Graph {
     ///   simplex method.
     ///   * Any solution of the positioning problem on G corresponds to a solution of the
     ///     level assignment problem on G′ with the same cost.
-    ///   * This is achieved by assigning each n_e the value min (x_u, x_v), using the notation of ﬁgure 4-2
+    ///   * This is achieved by assigning each n_e the value min (x_u, x_v), using the notation of figure 4-2
     ///     and where x_u and x_v are the X coordinates assigned to u and v in G.
     ///   * Conversely, any level assignment in G′ induces a valid positioning in G.
     ///   * In addition, in an optimal level assignment, one of e_u or e must have length 0, and the other

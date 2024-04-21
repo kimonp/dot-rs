@@ -10,6 +10,7 @@ use std::mem::swap;
 use std::{cell::RefCell, collections::BTreeMap};
 
 use super::crossing_lines::Line;
+use super::Graph;
 
 /// The usize in the BTree is the node_idx also used in the "nodes" HashMap<usize, <>>
 type RankOrder = RefCell<BTreeSet<usize>>;
@@ -199,14 +200,16 @@ impl RankOrderings {
     ///         }
     ///     } else ...
     /// }
-    pub fn weighted_median(&self, forward: bool, exchange_if_equal: bool) {
+    pub fn weighted_median(&self, forward: bool, exchange_if_equal: bool, graph: &Graph) {
         if forward {
             for (_rank, rank_order) in self.iter() {
                 self.adjust_rank(rank_order, Below, exchange_if_equal);
+                graph.take_svg_snapshot("weighted_median down step", Some(self));
             }
         } else {
             for (_rank, rank_order) in self.iter().rev() {
                 self.adjust_rank(rank_order, Above, exchange_if_equal);
+                graph.take_svg_snapshot("weighted_median up step", Some(self));
             }
         }
     }
@@ -391,6 +394,7 @@ impl RankOrderings {
         worst_rank
     }
 
+    /// Counts all the crossing lines to the rank below the given rank.
     fn crossing_count_to_next_rank(&self, rank: &BTreeSet<usize>) -> u32 {
         let mut lines = vec![];
         let nodes = self.nodes.borrow();
@@ -401,6 +405,34 @@ impl RankOrderings {
             for adj_idx in node_pos.borrow().below_adjacents.iter() {
                 let adj_pos = nodes.get(adj_idx).unwrap();
                 let line = Line::new_down(
+                    node_pos.borrow().position as u32,
+                    adj_pos.borrow().position as u32,
+                );
+                lines.push(line);
+            }
+        }
+        count_crosses(lines)
+    }
+
+    /// Counts all the crossing lines to the ranks above and below the given rank.
+    fn crossing_count_to_adjacent_ranks(&self, rank: &BTreeSet<usize>) -> u32 {
+        let mut lines = vec![];
+        let nodes = self.nodes.borrow();
+
+        for node_idx in rank.iter() {
+            let node_pos = nodes.get(node_idx).unwrap();
+
+            for adj_idx in node_pos.borrow().below_adjacents.iter() {
+                let adj_pos = nodes.get(adj_idx).unwrap();
+                let line = Line::new_down(
+                    node_pos.borrow().position as u32,
+                    adj_pos.borrow().position as u32,
+                );
+                lines.push(line);
+            }
+            for adj_idx in node_pos.borrow().above_adjacents.iter() {
+                let adj_pos = nodes.get(adj_idx).unwrap();
+                let line = Line::new_up(
                     node_pos.borrow().position as u32,
                     adj_pos.borrow().position as u32,
                 );
@@ -437,7 +469,7 @@ impl RankOrderings {
     ///         end
     ///     end
     /// end
-    pub fn transpose(&self, exchange_if_equal: bool) {
+    pub fn transpose(&self, exchange_if_equal: bool, graph: Option<&Graph>) {
         let mut improved = true;
 
         while improved {
@@ -459,7 +491,10 @@ impl RankOrderings {
                         if result != TransposeResult::Worse {
                             // println!("{_rank}: exchanged {position} with {}", position + 1);
                             rank_position.swap(position, position + 1);
-                            improved = result == TransposeResult::Better
+                            improved = result == TransposeResult::Better;
+                            if let Some(graph) = graph {
+                                graph.take_svg_snapshot(&format!("transpose step: exchange_if_equal:{exchange_if_equal}"), Some(self));
+                            }
                         } else {
                             // println!("{_rank}: no exchange for {position}");
                         }
@@ -479,9 +514,9 @@ impl RankOrderings {
         node_idx_b: usize,
         exchange_if_equal: bool,
     ) -> TransposeResult {
-        let cur_value = self.crossing_count_to_next_rank(rank);
+        let cur_value = self.crossing_count_to_adjacent_ranks(rank);
         self.exchange_positions(node_idx_a, node_idx_b);
-        let new_value = self.crossing_count_to_next_rank(rank);
+        let new_value = self.crossing_count_to_adjacent_ranks(rank);
 
         if new_value < cur_value {
             TransposeResult::Better
@@ -530,7 +565,7 @@ impl RankOrderings {
 
         for (new_position, node_idx) in rank_positions.iter().enumerate() {
             if let Some(node_pos) = self.nodes.borrow().get(node_idx) {
-                println!("  RERANKING {node_idx} to {new_position}");
+                println!("  RE_RANKING {node_idx} to {new_position}");
                 node_pos.borrow_mut().position = new_position;
             } else {
                 panic!("node_idx {node_idx} not known");
@@ -643,7 +678,7 @@ mod test {
         graph.set_horizontal_ordering();
     }
 
-    /// Fixture that generates two ranks, with crossing to oppoite lower ranks, e.g:
+    /// Fixture that generates two ranks, with crossing to opposite lower ranks, e.g:
     /// [0, 1, 2]
     ///  \  |  /
     ///     |
@@ -674,7 +709,7 @@ mod test {
         let ordering = double_rank_orderings(max);
 
         assert_eq!(ordering.crossing_count(), 10);
-        ordering.transpose(false);
+        ordering.transpose(false, None);
         assert_eq!(ordering.crossing_count(), 0);
     }
 
@@ -728,7 +763,7 @@ mod test {
 
     /// test that rank_order_to_vec():
     /// * returns a accurate count
-    /// * returns an accucate ordering
+    /// * returns an accurate ordering
     /// * If you swap two positions, a new ordering reflects that
     #[test]
     fn test_rank_order_to_vec() {
@@ -754,7 +789,7 @@ mod test {
 
     // Test that the 2_3 example from the paper has zero crosses after ordering.
     //
-    // After switching to breadth first search, this test is a bit bogus becase
+    // After switching to breadth first search, this test is a bit bogus because
     // it does not have any crosses to begin with.  TODO: find an initial graph
     // that starts with crosses which are removed.
     #[test]

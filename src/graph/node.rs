@@ -35,7 +35,6 @@ impl Rect {
     }
 
     pub fn height(&self) -> i32 {
-        println!("HEIGHT: {} vs {}", self.max.y(), self.min.y());
         self.max.y() - self.min.y()
     }
 
@@ -204,9 +203,9 @@ pub struct Node {
     // Arbitrary name set by the user.  Duplicates are possible, and up to the user to control.
     pub(super) name: String,
     // Rank is computed using the network simplex algorithm.  Used to determine both vertical_rank
-    // and coordianates.x.
+    // and coordinates.x.
     simplex_rank: RefCell<Option<i32>>,
-    /// Relative verticial ranking of this node.  Zero based, greater numbers are lower.
+    /// Relative vertical ranking of this node.  Zero based, greater numbers are lower.
     pub(super) vertical_rank: Option<i32>,
     /// Position is the relative horizontal position of this node compared to
     /// other nodes in the same rank.  Zero based, greater numbers are farther right.
@@ -215,7 +214,7 @@ pub struct Node {
     pub(super) coordinates: Option<Point>,
     /// Edges incoming to this node.  Each entry is a edge index into the graph's edges list.
     pub(super) in_edges: Vec<usize>,
-    /// Edges outcoming from this node.  Each entry is a edge index into the graph's edges list.
+    /// Edges outgoing from this node.  Each entry is a edge index into the graph's edges list.
     pub(super) out_edges: Vec<usize>,
 
     /// True if this node is part of the "spanning" tree under consideration.  Used during ranking.

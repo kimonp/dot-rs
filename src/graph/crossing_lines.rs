@@ -8,11 +8,23 @@ pub(super) struct Line {
 }
 
 impl Line {
+    /// Create a new line that assumes y1 is above y2.
     pub fn new_down(x1: u32, x2: u32) -> Line {
         let (min_x, max_x, line_type) = match x1.cmp(&x2) {
             Ordering::Less => (x1, x2, LineType::Down),
             Ordering::Equal => (x1, x2, LineType::Straight),
             Ordering::Greater => (x2, x1, LineType::Up),
+        };
+
+        Line::new(min_x, max_x, line_type)
+    }
+
+    /// Create a new line that assumes y1 is bellow y2.
+    pub fn new_up(x1: u32, x2: u32) -> Line {
+        let (min_x, max_x, line_type) = match x1.cmp(&x2) {
+            Ordering::Less => (x1, x2, LineType::Up),
+            Ordering::Equal => (x1, x2, LineType::Straight),
+            Ordering::Greater => (x2, x1, LineType::Down),
         };
 
         Line::new(min_x, max_x, line_type)

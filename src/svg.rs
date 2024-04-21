@@ -10,12 +10,37 @@ use crate::graph::Graph;
 
 pub struct SVG {
     graph: Graph,
-    debug: bool,
+    style: SvgStyle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SvgStyle {
+    Production,
+    MinCross,
+    Simplex,
+}
+
+impl SvgStyle {
+    fn show_virtual(&self) -> bool {
+        *self != SvgStyle::Production
+    }
+
+    fn show_simplex(&self) -> bool {
+        *self == SvgStyle::Simplex
+    }
+
+    fn oval_nodes(&self) -> bool {
+        *self == SvgStyle::Simplex
+    }
+
+    fn show_coordinates(&self) -> bool {
+        self.oval_nodes()
+    }
 }
 
 impl SVG {
-    pub fn new(graph: Graph, debug: bool) -> Self {
-        Self { graph, debug }
+    pub fn new(graph: Graph, style: SvgStyle) -> Self {
+        Self { graph, style }
     }
 
     /// Write out the graph as is to the given file name (with an svg suffix).
@@ -35,7 +60,7 @@ fn normalized_coords(node: &Node, node_rect: &Rect) -> (f64, f64) {
 
 impl Display for SVG {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
-        let debug = self.debug;
+        let style = self.style;
         // const DEFAULT_X: usize = 1;
         const DEFAULT_Y: i32 = 1;
         let node_rect = self.graph.graph_rect();
@@ -74,7 +99,11 @@ impl Display for SVG {
         ];
 
         let real_radius = (self.graph.horizontal_node_separation() / 4) as f64 * 0.8;
-        let virtual_radius = if debug { real_radius } else { 0.0 };
+        let virtual_radius = if style.show_virtual() {
+            real_radius
+        } else {
+            0.0
+        };
 
         for edge in self.graph.edges_iter() {
             let reversed = edge.reversed;
@@ -91,13 +120,13 @@ impl Display for SVG {
 
             let slope = (src_y - dst_y) / (src_x - dst_x); // # TODO
             let theta = slope.atan();
-            let show_dst = !dst_node.is_virtual() || debug;
+            let show_dst = !dst_node.is_virtual() || style.show_virtual();
             let node_radius = if show_dst {
                 // TODO: This is just an approximation if the node
                 //       is shows as an ellipse with x_radius=1.5*y_radius
                 let node_radius_x = real_radius * 1.5 * 0.8;
 
-                if debug {
+                if style.oval_nodes() {
                     node_radius_x
                 } else {
                     real_radius
@@ -117,10 +146,10 @@ impl Display for SVG {
                 dst_y -= y_offset;
             }
 
-            let dashed = if !debug || edge.in_spanning_tree() {
-                ""
+            let line_color = if style.show_simplex() && !edge.in_spanning_tree() {
+                "red"
             } else {
-                r#"stroke-dasharray="0.015""#
+                "black"
             };
             let marker = if show_dst {
                 r#"marker-end="url(#arrow-head)""#
@@ -129,10 +158,10 @@ impl Display for SVG {
             };
 
             svg.push(format!(
-                r#"<path {marker} d="M{src_x} {src_y} L{dst_x} {dst_y}" stroke="black" {dashed} stroke-width="{px_size}px"/>"#
+                r#"<path {marker} d="M{src_x} {src_y} L{dst_x} {dst_y}" stroke="{line_color}" stroke-width="{px_size}px"/>"#
             ));
 
-            if debug {
+            if style.show_simplex() {
                 let font_size = 12.0;
                 let font_style = format!("font-size:{font_size}; text-anchor: left");
                 let label_x = (src_x + dst_x) / 2.0 + (font_size / 3.0);
@@ -151,7 +180,7 @@ impl Display for SVG {
 
         for node in self.graph.nodes_iter() {
             let (x, y) = normalized_coords(node, &node_rect);
-            let name = if debug {
+            let name = if style.show_coordinates() {
                 format!(
                     "{}: {:?},{:?}",
                     node.name(),
@@ -165,12 +194,12 @@ impl Display for SVG {
             } else {
                 node.name().to_string()
             };
-            let font_size = if debug { 9.0 } else { 24.0 };
+            let font_size = if style.show_coordinates() { 9.0 } else if node.is_virtual() { 14.0 } else  { 24.0 };
             let font_style = format!("font-size:{font_size}; text-anchor: middle");
             let label_x = x;
             let label_y = y as f32 + (font_size / 3.0);
 
-            let show_node = !node.is_virtual() || debug;
+            let show_node = !node.is_virtual() || style.show_virtual();
             let node_radius = if show_node {
                 real_radius
             } else {
@@ -181,17 +210,17 @@ impl Display for SVG {
             } else {
                 "skyblue"
             };
-            let style = format!("fill: {fill}; stroke: black; stroke-width: {px_size}px;");
+            let node_style = format!("fill: {fill}; stroke: black; stroke-width: {px_size}px;");
 
-            if debug {
+            if style.oval_nodes() {
                 let node_radius_x = node_radius * 1.5;
 
                 svg.push(format!(
-                    r#"<ellipse cx="{x}" cy="{y}" ry="{node_radius}" rx="{node_radius_x}" style="{style}"/>"#
+                    r#"<ellipse cx="{x}" cy="{y}" ry="{node_radius}" rx="{node_radius_x}" style="{node_style}"/>"#
                 ));
             } else {
                 svg.push(format!(
-                    r#"<circle cx="{x}" cy="{y}" r="{node_radius}" style="{style}"/>"#
+                    r#"<circle cx="{x}" cy="{y}" r="{node_radius}" style="{node_style}"/>"#
                 ));
             }
 
