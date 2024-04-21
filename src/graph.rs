@@ -31,7 +31,7 @@ use self::{
     rank_orderings::AdjacentRank,
 };
 
-/// Simplist posible representation of a graph until more is needed.
+/// Simplest possible representation of a graph until more is needed.
 ///
 /// I chose to use indexed arrays to avoid interior mutability for now,
 /// as well as requiring any maps or sets, because initially it was unclear to me what
@@ -73,14 +73,17 @@ pub struct Snapshots {
 
 impl Snapshots {
     fn new() -> Snapshots {
-        Snapshots { total: 0, groups: Vec::new() }
+        Snapshots {
+            total: 0,
+            groups: Vec::new(),
+        }
     }
 
     /// Add a new group to save snapshots to.
-    /// 
+    ///
     /// New snapshots can only be added to the current group
     pub fn new_group(&mut self, group_title: &str) {
-       self.groups.push((group_title.to_string(), Vec::new()));
+        self.groups.push((group_title.to_string(), Vec::new()));
     }
 
     /// Add a new snapshot to the current group.
@@ -92,7 +95,7 @@ impl Snapshots {
         }
         self.total += 1;
     }
-    
+
     pub fn get(&self, frame: usize) -> Option<(String, String, String)> {
         let mut cur_frame = 0_usize;
         for (title, group) in self.groups.iter() {
@@ -106,7 +109,7 @@ impl Snapshots {
         }
         None
     }
-    
+
     pub fn group_count(&self) -> usize {
         self.groups.len()
     }
@@ -125,11 +128,11 @@ impl Snapshots {
                 } else {
                     cur_frame
                 };
-                return (start_frame, cur_frame + group.len())
+                return (start_frame, cur_frame + group.len());
             }
             prev_frame = cur_frame;
             cur_frame += group.len();
-        }        
+        }
         (0, self.total_count())
     }
 }
@@ -179,7 +182,9 @@ impl Graph {
 
         let svg = SVG::new(snapshot_graph, SvgStyle::MinCross);
 
-        self.svg_debug_snapshots.borrow_mut().add(title, &svg.to_string());
+        self.svg_debug_snapshots
+            .borrow_mut()
+            .add(title, &svg.to_string());
     }
 
     #[allow(unused)]
@@ -268,7 +273,7 @@ impl Graph {
         Rect::new(min, max)
     }
 
-    // Return the number of verticial ranks.
+    // Return the number of vertical ranks.
     fn num_ranks(&self) -> Option<usize> {
         self.rank_orderings.as_ref().map(|order| order.num_ranks())
     }
@@ -387,21 +392,21 @@ impl Graph {
 
     /// Rank nodes in the tree using the network simplex algorithm.
     pub fn rank_nodes_vertically(&mut self) {
-        self.make_asyclic();
+        self.make_acyclic();
         self.merge_edges();
         self.network_simplex_ranking(VerticalRank);
     }
 
-    /// Make the graph asyclic by reversing edges to previously visited nodes.
+    /// Make the graph acyclic by reversing edges to previously visited nodes.
     ///
-    /// From Paper section 2.1: Making the graph asyclic (page 6)
+    /// From Paper section 2.1: Making the graph acyclic (page 6)
     ///
-    /// * A useful procedure for breaking cycles is based on depth-ﬁrst search.
+    /// * A useful procedure for breaking cycles is based on depth-first search.
     /// * Edges are searched in the "natural order" of the graph input, starting
     ///   from some source or sink nodes if any exist.
-    /// * Depth-ﬁrst search partitions edges into two sets: tree edges and non-tree
+    /// * Depth-first search partitions edges into two sets: tree edges and non-tree
     ///   edges [AHU].
-    /// * The tree deﬁnes a partial order on nodes.
+    /// * The tree defines a partial order on nodes.
     /// * Given this partial order, the non-tree edges
     ///   further partition into three sets: cross edges, forward edges, and back edges.
     /// * Cross edges connect unrelated nodes in the partial order.
@@ -411,8 +416,8 @@ impl Graph {
     ///   create cycles.
     /// * Because reversing back edges makes them into forward edges, all cycles are
     ///   broken by this procedure.
-    fn make_asyclic(&mut self) {
-        // self.print_nodes("before make_asyclic()");
+    fn make_acyclic(&mut self) {
+        // self.print_nodes("before make_acyclic()");
         self.ignore_node_loops();
 
         let mut visited = vec![false; self.node_count()];
@@ -420,18 +425,18 @@ impl Graph {
 
         // Start with the source nodes
         for node_idx in self.get_source_nodes().iter().cloned() {
-            self.make_asyclic_worker(node_idx, &mut visited, &mut rec_stack)
+            self.make_acyclic_worker(node_idx, &mut visited, &mut rec_stack)
         }
 
         // In case we didn't visit anybody (e.g. there might be no source nodes
         // as the graph starts as potentially cyclic)
         for node_idx in 0..self.node_count() {
             if !visited[node_idx] {
-                self.make_asyclic_worker(node_idx, &mut visited, &mut rec_stack)
+                self.make_acyclic_worker(node_idx, &mut visited, &mut rec_stack)
             }
         }
 
-        // self.print_nodes("after make_asyclic()");
+        // self.print_nodes("after make_acyclic()");
     }
 
     /// On the given node
@@ -440,8 +445,8 @@ impl Graph {
     ///   * If an edge has not yet been visited, visit it recursively
     ///   * If an edge is currently on the stack, reverse the edge
     ///     (because this would cause a cycle)
-    /// * Remove the node from the recusive stack.
-    fn make_asyclic_worker(
+    /// * Remove the node from the recursive stack.
+    fn make_acyclic_worker(
         &mut self,
         node_idx: usize,
         visited: &mut [bool],
@@ -456,7 +461,7 @@ impl Graph {
                 let dst_node_idx = self.get_edge(edge_idx).dst_node;
 
                 if !visited[dst_node_idx] {
-                    self.make_asyclic_worker(dst_node_idx, visited, rec_stack);
+                    self.make_acyclic_worker(dst_node_idx, visited, rec_stack);
                 } else if rec_stack[dst_node_idx] {
                     self.reverse_edge(edge_idx);
                 }
@@ -604,11 +609,14 @@ impl Graph {
     /// }
     fn set_horizontal_ordering_with_direction(&mut self, min: bool) -> &RankOrderings {
         const MAX_ITERATIONS: usize = 24;
-        let mut order = self.init_horizontal_order(min);
+        let order = self.init_horizontal_order(min);
         let mut best = order.clone();
 
         self.new_snapshot_group("initial");
-        self.take_svg_snapshot(&format!("initial ordering: cc={}", order.crossing_count()), Some(&order));
+        self.take_svg_snapshot(
+            &format!("initial ordering: cc={}", order.crossing_count()),
+            Some(&order),
+        );
 
         if best.crossing_count() != 0 {
             for i in 0..MAX_ITERATIONS {
@@ -649,8 +657,10 @@ impl Graph {
             best.crossing_count()
         );
         self.new_snapshot_group("final");
-        self.take_svg_snapshot(&format!("final ordering: cc={}", best.crossing_count()), Some(&best));
-
+        self.take_svg_snapshot(
+            &format!("final ordering: cc={}", best.crossing_count()),
+            Some(&best),
+        );
 
         if self.should_update_ordering(&best) {
             self.set_node_positions(&best);
@@ -702,7 +712,7 @@ impl Graph {
 
     /// Edges between nodes more than one rank apart are replaced by chains of virtual nodes.
     ///
-    /// After runing, no edge spans more than one rank.
+    /// After running, no edge spans more than one rank.
     ///
     /// Documentation from paper: page 13
     /// * After rank assignment, edges between nodes more than one rank apart are
@@ -754,7 +764,7 @@ impl Graph {
             let virt_node_idx = self.add_virtual_node(new_rank, NodeType::RankFiller);
 
             let old_edge = self.get_edge_mut(cur_edge_idx);
-            let old_edge_reversed_for_asyclic = old_edge.reversed;
+            let old_edge_reversed_for_acyclic = old_edge.reversed;
             let orig_dst = replace(&mut old_edge.dst_node, virt_node_idx);
 
             self.get_node_mut(virt_node_idx).add_edge(cur_edge_idx, In);
@@ -763,9 +773,9 @@ impl Graph {
             self.get_node_mut(orig_dst).remove_edge(cur_edge_idx, In);
 
             cur_edge_idx = self.add_edge(virt_node_idx, orig_dst);
-            // If the edge was reversed to keep the graph asyclic, all the edges we add
+            // If the edge was reversed to keep the graph acyclic, all the edges we add
             // should be reversed in this way as well.
-            if old_edge_reversed_for_asyclic {
+            if old_edge_reversed_for_acyclic {
                 self.get_edge_mut(cur_edge_idx).reversed = true;
             }
 
@@ -908,7 +918,7 @@ impl Graph {
     ///  }
     ///  
     /// Documentation from paper: 4.2 Optimal Node Placement page 20
-    /// * The method involves constructing an auxiliary graph as illustrated in ﬁgure 4-2.
+    /// * The method involves constructing an auxiliary graph as illustrated in figure 4-2.
     /// * This transformation is the graphical analogue of the algebraic transformation mentioned above
     ///   for removing the absolute values from the optimization problem.
     /// * The nodes of the auxiliary graph G′ are the nodes of the original graph G plus,
@@ -921,12 +931,12 @@ impl Graph {
     ///      * Ω(e) = function to bias for straighter long lines (see below)
     ///    * The other class of edges separates nodes in the same rank.  If v is the left neighbor of w,
     ///      then G′ has an edge f=e(v,w) with δ(f)=ρ(v,w) and ω(f)=0.
-    ///      * This edge forces the nodes to be sufﬁciently separated but does not affect the cost of the layout.
+    ///      * This edge forces the nodes to be sufficiently separated but does not affect the cost of the layout.
     /// * We can now consider the level assignment problem on G′, which can be solved using the network
     ///   simplex method.
     ///   * Any solution of the positioning problem on G corresponds to a solution of the level assignment
     ///     problem on G′ with the same cost. This is achieved by assigning each new_v_node the value
-    ///     min (x_u, x_v), using the notation of ﬁgure 4-2 and where x_u and x_v are the X coordinates assigned
+    ///     min (x_u, x_v), using the notation of figure 4-2 and where x_u and x_v are the X coordinates assigned
     ///     to u and v in G.
     ///   * Conversely, any level assignment in G′ induces a valid positioning in G. In addition, in an optimal
     ///     level assignment, one of e_u or e_v must have length 0, and the other has length |x_u − x_v|. This
@@ -940,7 +950,7 @@ impl Graph {
 
         // This is necessary as part of initializing tree nodes.
         // XXX This should be more obvious in the name, because otherwise set_feasible_ranking can crash.
-        aux_graph.make_asyclic();
+        aux_graph.make_acyclic();
 
         aux_graph.network_simplex_ranking(XCoordinate);
         self.set_x_coordinates_from_aux(&aux_graph);
@@ -1103,7 +1113,7 @@ impl Graph {
             // let src_y = src_node.coordinates.unwrap().y();
             // let dst_x = dst_node.coordinates.unwrap().x();
 
-            // // ...assigning each new node n_e the value min(x_u, x_v), using the notation of ﬁgure 4-2
+            // // ...assigning each new node n_e the value min(x_u, x_v), using the notation of figure 4-2
             // // and where x_u and x_v are the X coordinates assigned to u and v in G.
             // new_node.set_coordinates(src_x.min(dst_x), src_y);
         }
@@ -1123,7 +1133,7 @@ impl Graph {
 
         // make edges to separate nodes on the same rank
         //
-        // But also, critially, switch the simplex rank on AuxGraph to be the x coordinate:
+        // But also, critically, switch the simplex rank on AuxGraph to be the x coordinate:
         // * Start with the position
         // * Multiply by node separation
         //
@@ -1443,7 +1453,7 @@ pub mod tests {
             dot_example_graph("tse_paper_example_2_3_extended")
         }
 
-        // Set the ranks /ngiven in example 2-3 (a)
+        // Set the ranks given in example 2-3 (a)
         pub fn configure_example_2_3_a() -> (Graph, Vec<(&'static str, &'static str, i32)>) {
             let mut graph = Graph::example_graph_from_paper_2_3();
             graph.configure_node("a", 0);
@@ -1633,16 +1643,16 @@ pub mod tests {
         }
     }
 
-    /// Test that two simple cyclic graphs are both made asyclic.
+    /// Test that two simple cyclic graphs are both made acyclic.
     #[test]
-    fn test_make_asyclic() {
+    fn test_make_acyclic() {
         let mut graph = Graph::new();
 
         let node_map = graph.add_nodes('a'..='d');
         let edges = vec![("a", "b"), ("b", "a"), ("c", "d"), ("d", "c")];
         graph.add_edges(&edges, &node_map);
 
-        graph.make_asyclic();
+        graph.make_acyclic();
 
         println!("{graph}");
 

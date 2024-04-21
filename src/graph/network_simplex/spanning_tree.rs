@@ -781,7 +781,6 @@ impl Graph {
                     parent_node.name,
                     self.get_node(*node_idx).name.clone()
                 )
-                    
             })
             .collect::<Vec<String>>();
 
@@ -818,7 +817,7 @@ impl Graph {
                             In => edge.src_node,
                             Out => edge.dst_node,
                         };
-                        
+
                         if tree_edge || disposition == Out {
                             Some((other_node_idx, tree_edge))
                         } else {
@@ -847,7 +846,7 @@ mod test {
         let c_idx = graph.name_to_node_idx("c").unwrap();
         let d_idx = graph.name_to_node_idx("d").unwrap();
 
-        graph.make_asyclic();
+        graph.make_acyclic();
         graph.merge_edges();
         graph.init_simplex_rank();
         graph.set_feasible_tree_for_simplex(true);
@@ -873,7 +872,7 @@ mod test {
     #[test]
     fn test_init_spanning_tree_ingore_tree_nodes() {
         let mut graph = Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }");
-        graph.make_asyclic();
+        graph.make_acyclic();
         graph.merge_edges();
         graph.init_simplex_rank();
 
@@ -887,7 +886,7 @@ mod test {
         // let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; }");
         let mut graph = Graph::example_graph_from_paper_2_3_extended();
 
-        graph.make_asyclic();
+        graph.make_acyclic();
         graph.merge_edges();
         graph.init_simplex_rank();
         graph.set_feasible_tree_for_simplex(true);

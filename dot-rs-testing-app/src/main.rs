@@ -3,7 +3,6 @@
 use dioxus::prelude::*;
 use log::LevelFilter;
 
-use std::borrow::Borrow;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str;
