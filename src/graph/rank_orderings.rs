@@ -10,15 +10,16 @@ use std::mem::swap;
 use std::{cell::RefCell, collections::BTreeMap};
 
 use super::crossing_lines::Line;
+use super::Graph;
 
 /// The usize in the BTree is the node_idx also used in the "nodes" HashMap<usize, <>>
 type RankOrder = RefCell<BTreeSet<usize>>;
 
 #[derive(Debug, Clone)]
 pub struct RankOrderings {
-    /// Ordered list of ranks in the graph, with a set of all node positons at that rank.
+    /// Ordered list of ranks in the graph, with a set of all node positions at that rank.
     ranks: BTreeMap<i32, RankOrder>,
-    /// Map of node_idx to node positions.  Node postions are shared refs into positions in "ranks".
+    /// Map of node_idx to node positions.  Node positions are shared refs into positions in "ranks".
     nodes: RefCell<HashMap<usize, RefCell<NodePosition>>>,
 }
 
@@ -47,9 +48,9 @@ impl Display for RankOrderings {
     }
 }
 
-/// NodePosition is the structure with the RankOderings struct that keeps
+/// NodePosition is the structure with the RankOrderings struct that keeps
 /// all the critical information about a node's position with ranks so that
-/// calculations can be done effeciently.
+/// calculations can be done efficiently.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct NodePosition {
     /// node_idx into the parent graph
@@ -94,6 +95,13 @@ impl Display for NodePosition {
 pub enum AdjacentRank {
     Above,
     Below,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum TransposeResult {
+    Better,
+    Worse,
+    Same,
 }
 
 impl RankOrderings {
@@ -173,13 +181,13 @@ impl RankOrderings {
     /// * wmedian re-orders the nodes within each rank based on the weighted median heuristic.
     /// * Depending on the parity of the current iteration number, the ranks are traversed from
     ///   top to bottom or from bottom to top.
-    /// * To simplify the presentation, ﬁgure the code below only shows one direction in detail
+    /// * To simplify the presentation, figure the code below only shows one direction in detail
     ///
     /// * In the forward traversal of the ranks, the main loop starts at rank 1 and ends at the maximum rank.
     /// * At each rank a vertex is assigned a median based on the adjacent vertices on the previous rank.
     /// * Then, the vertices in the rank are sorted by their medians.
     /// * An important consideration is what to do with vertices that have no adjacent vertices on the previous rank.
-    ///   * In our implementation such vertices are left ﬁxed in their current positions with non-ﬁxed vertices
+    ///   * In our implementation such vertices are left fixed in their current positions with non-fixed vertices
     ///     sorted into the remaining positions
     ///
     /// wmedian(order, iter) {
@@ -192,14 +200,16 @@ impl RankOrderings {
     ///         }
     ///     } else ...
     /// }
-    pub fn weighted_median(&self, index: usize) {
-        if index % 2 == 0 {
+    pub fn weighted_median(&self, forward: bool, exchange_if_equal: bool, graph: &Graph) {
+        if forward {
             for (_rank, rank_order) in self.iter() {
-                self.adjust_rank(rank_order, Below);
+                self.adjust_rank(rank_order, Below, exchange_if_equal);
+                graph.take_svg_snapshot("weighted_median down step", Some(self));
             }
         } else {
             for (_rank, rank_order) in self.iter().rev() {
-                self.adjust_rank(rank_order, Above);
+                self.adjust_rank(rank_order, Above, exchange_if_equal);
+                graph.take_svg_snapshot("weighted_median up step", Some(self));
             }
         }
     }
@@ -215,7 +225,7 @@ impl RankOrderings {
     ///                 median[v] = median_value(v, r-1)
     ///             }
     ///             sort(order[r], median);
-    fn adjust_rank(&self, rank_order: &RankOrder, which_rank: AdjacentRank) {
+    fn adjust_rank(&self, rank_order: &RankOrder, which_rank: AdjacentRank, exchange_if_equal: bool) {
         // Collect all the node_positions that should be re-ordered, and those that stay where they are
         let mut ordering = vec![];
         let mut static_pos = vec![];
@@ -240,6 +250,7 @@ impl RankOrderings {
         // Place them in order so that they can be inserted into their original places, one by one
         static_pos.sort_by(|a, b| a.borrow().position.cmp(&b.borrow().position));
 
+
         for node_pos in static_pos {
             let orig_pos = node_pos.borrow().position;
             if ordering.len() < orig_pos {
@@ -248,7 +259,11 @@ impl RankOrderings {
                 ordering.insert(orig_pos, node_pos);
             }
         }
-
+        
+        if exchange_if_equal {
+            exchange_equal_positions(&mut ordering);
+        }
+            
         // Set the values of all the newly calculated positions
         for (new_pos, node_pos) in ordering.iter().enumerate() {
             (*node_pos).borrow_mut().position = new_pos;
@@ -263,8 +278,8 @@ impl RankOrderings {
     /// * If adjacent nodes == 3: ...EXPLAIN: TODO...
     ///
     /// Documentation from paper: page 15
-    /// * The median value of a vertex is deﬁned as the median position of the adjacent
-    ///   vertices if that is uniquely deﬁned.
+    /// * The median value of a vertex is defined as the median position of the adjacent
+    ///   vertices if that is uniquely defined.
     ///   * Otherwise, it is interpolated between the two median positions using a measure
     ///     of tightness.
     ///   * Generally, the weighted median is biased toward the side where vertices are
@@ -343,7 +358,6 @@ impl RankOrderings {
     }
 
     /// Return the number of edges that cross from rank to rank.
-    ///
     pub fn crossing_count(&self) -> u32 {
         let mut crossing_count = 0;
 
@@ -358,6 +372,7 @@ impl RankOrderings {
         crossing_count
     }
 
+    /// Counts all the crossing lines to the rank below the given rank.
     fn crossing_count_to_next_rank(&self, rank: &BTreeSet<usize>) -> u32 {
         let mut lines = vec![];
         let nodes = self.nodes.borrow();
@@ -377,11 +392,39 @@ impl RankOrderings {
         count_crosses(lines)
     }
 
+    /// Counts all the crossing lines to the ranks above and below the given rank.
+    fn crossing_count_to_adjacent_ranks(&self, rank: &BTreeSet<usize>) -> u32 {
+        let mut lines = vec![];
+        let nodes = self.nodes.borrow();
+
+        for node_idx in rank.iter() {
+            let node_pos = nodes.get(node_idx).unwrap();
+
+            for adj_idx in node_pos.borrow().below_adjacents.iter() {
+                let adj_pos = nodes.get(adj_idx).unwrap();
+                let line = Line::new_down(
+                    node_pos.borrow().position as u32,
+                    adj_pos.borrow().position as u32,
+                );
+                lines.push(line);
+            }
+            for adj_idx in node_pos.borrow().above_adjacents.iter() {
+                let adj_pos = nodes.get(adj_idx).unwrap();
+                let line = Line::new_up(
+                    node_pos.borrow().position as u32,
+                    adj_pos.borrow().position as u32,
+                );
+                lines.push(line);
+            }
+        }
+        count_crosses(lines)
+    }
+
     /// Documentation from paper: Page 16
     /// * This is the main loop that iterates as long as the number of edge crossings can be reduced
     ///   by transpositions.
     ///   * TODO: As in the loop in the ordering function, an adaptive strategy could be applied
-    ///     here to terminate the loop once the improvement is a sufﬁciently small fraction of
+    ///     here to terminate the loop once the improvement is a sufficiently small fraction of
     ///     the number of crossings.
     /// * Each adjacent pair of vertices is examined.
     ///   * Their order is switched if this reduces the number of crossings.
@@ -404,7 +447,7 @@ impl RankOrderings {
     ///         end
     ///     end
     /// end
-    pub fn transpose(&self) {
+    pub fn transpose(&self, exchange_if_equal: bool, graph: Option<&Graph>) {
         let mut improved = true;
 
         while improved {
@@ -421,11 +464,15 @@ impl RankOrderings {
                     for position in 0..position_count - 1 {
                         let v = rank_position[position];
                         let w = rank_position[position + 1];
+                        let result = self.exchange_if_crosses_decrease(&rank_set, v, w, exchange_if_equal);
 
-                        if self.exchange_if_crosses_decrease(&rank_set, v, w) {
+                        if result != TransposeResult::Worse {
                             // println!("{_rank}: exchanged {position} with {}", position + 1);
                             rank_position.swap(position, position + 1);
-                            improved = true
+                            improved = result == TransposeResult::Better;
+                            if let Some(graph) = graph {
+                                graph.take_svg_snapshot(&format!("transpose step: exchange_if_equal:{exchange_if_equal}"), Some(self));
+                            }
                         } else {
                             // println!("{_rank}: no exchange for {position}");
                         }
@@ -443,17 +490,20 @@ impl RankOrderings {
         rank: &BTreeSet<usize>,
         node_idx_a: usize,
         node_idx_b: usize,
-    ) -> bool {
-        let cur_value = self.crossing_count_to_next_rank(rank);
+        exchange_if_equal: bool,
+    ) -> TransposeResult {
+        let cur_value = self.crossing_count_to_adjacent_ranks(rank);
         self.exchange_positions(node_idx_a, node_idx_b);
-        let new_value = self.crossing_count_to_next_rank(rank);
+        let new_value = self.crossing_count_to_adjacent_ranks(rank);
 
         if new_value < cur_value {
-            true
+            TransposeResult::Better
+        } else if cur_value > 0 && exchange_if_equal && new_value == cur_value {
+            TransposeResult::Same
         } else {
             self.exchange_positions(node_idx_b, node_idx_a);
 
-            false
+            TransposeResult::Worse
         }
     }
 
@@ -494,6 +544,42 @@ impl RankOrderings {
     }
 }
 
+/// Swap the first and last element of consecutive equal positions in ordering.
+/// 
+/// Do this by searching through the sorted vector only once.
+fn exchange_equal_positions(ordering: &mut [&RefCell<NodePosition>]) {
+    let mut cur_pos_start = 0;
+    while cur_pos_start < ordering.len() {
+        let cur_median = ordering[cur_pos_start].borrow().median;
+
+        // Find the last element that has the same median value as the current one
+        let mut cur_pos_end = cur_pos_start;
+        loop {
+            if cur_pos_end+1 == ordering.len() || ordering[cur_pos_end+1].borrow().median != cur_median {
+                break;
+            }
+            cur_pos_end += 1;
+        }
+
+        if cur_pos_end != cur_pos_start {
+            // let mid_point = ((cur_pos_end - cur_pos_start) + 1) / 2;
+            // println!("---swap---");
+            // for idx in 0..mid_point {
+            //     let swap_pos1 = cur_pos_start + idx;
+            //     let swap_pos2 = cur_pos_end - idx;
+
+            //     ordering.swap(swap_pos1, swap_pos2);
+            //     println!("SWAPPING: {swap_pos1} and {swap_pos2}");
+            // }
+            
+            ordering.swap(cur_pos_start, cur_pos_end);
+            cur_pos_start = cur_pos_end;
+        } else {
+            cur_pos_start += 1;
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -503,7 +589,7 @@ mod test {
     fn test_adjacent_position() {
         let mut graph = Graph::example_graph_from_paper_2_3();
         graph.rank_nodes_vertically();
-        let order = graph.init_horizontal_order();
+        let order = graph.init_horizontal_order(true);
 
         let node_f = graph.name_to_node_idx("f").unwrap();
         let node_g = graph.name_to_node_idx("g").unwrap();
@@ -525,7 +611,7 @@ mod test {
         graph.set_horizontal_ordering();
     }
 
-    /// Fixture that generates two ranks, with crossing to oppoite lower ranks, e.g:
+    /// Fixture that generates two ranks, with crossing to opposite lower ranks, e.g:
     /// [0, 1, 2]
     ///  \  |  /
     ///     |
@@ -556,7 +642,7 @@ mod test {
         let ordering = double_rank_orderings(max);
 
         assert_eq!(ordering.crossing_count(), 10);
-        ordering.transpose();
+        ordering.transpose(false, None);
         assert_eq!(ordering.crossing_count(), 0);
     }
 
@@ -574,9 +660,9 @@ mod test {
 
         assert_eq!(ordering.crossing_count(), 3);
         let rank = ordering.ranks.get(&0).unwrap().borrow();
-        ordering.exchange_if_crosses_decrease(&rank, 0, max - 1);
+        ordering.exchange_if_crosses_decrease(&rank, 0, max - 1, false);
         assert_eq!(ordering.crossing_count(), 0);
-        ordering.exchange_if_crosses_decrease(&rank, 0, max - 1);
+        ordering.exchange_if_crosses_decrease(&rank, 0, max - 1, false);
         assert_eq!(ordering.crossing_count(), 0);
     }
 
@@ -610,7 +696,7 @@ mod test {
 
     /// test that rank_order_to_vec():
     /// * returns a accurate count
-    /// * returns an accucate ordering
+    /// * returns an accurate ordering
     /// * If you swap two positions, a new ordering reflects that
     #[test]
     fn test_rank_order_to_vec() {
@@ -636,7 +722,7 @@ mod test {
 
     // Test that the 2_3 example from the paper has zero crosses after ordering.
     //
-    // After switching to breadth first search, this test is a bit bogus becase
+    // After switching to breadth first search, this test is a bit bogus because
     // it does not have any crosses to begin with.  TODO: find an initial graph
     // that starts with crosses which are removed.
     #[test]
@@ -646,7 +732,7 @@ mod test {
         graph.init_simplex_rank();
         graph.assign_simplex_rank(VerticalRank);
         graph.rank_nodes_vertically();
-        let order = graph.init_horizontal_order();
+        let order = graph.init_horizontal_order(true);
 
         assert_eq!(order.crossing_count(), 0);
         println!("ORDER: {order}");

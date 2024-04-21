@@ -46,7 +46,11 @@ impl Graph {
     ///
     /// GraphViz code: SEQ(ND_low(v), ND_lim(w), ND_lim(v))
     ///              : SEQ(maybe_ancestor_node_idx.min, child_idx.max, maybe_ancestor_node_idx.max)
-    pub(super) fn is_common_ancestor(&self, maybe_ancestor_node_idx: usize, child_idx: usize) -> bool {
+    pub(super) fn is_common_ancestor(
+        &self,
+        maybe_ancestor_node_idx: usize,
+        child_idx: usize,
+    ) -> bool {
         let maybe_ancestor_node = self.get_node(maybe_ancestor_node_idx);
         let ancestor_dist_min = maybe_ancestor_node
             .tree_dist_min()
@@ -55,31 +59,35 @@ impl Graph {
             .tree_dist_max()
             .expect("tree distance must be set");
 
-        self.node_distance_within_limits(child_idx, ancestor_dist_min, ancestor_dist_max)
+        self.node_in_tail_component(child_idx, ancestor_dist_min, ancestor_dist_max)
     }
 
-    /// Return true has a tree_dist_max such that: min <= tree_dist_max <= max
+    /// Return true if node_idx is in the tail component the node that holds min and max.
+    ///
+    /// * Consider a tree edge E = (child_node, parent_node)
+    /// * A node N is in the tail component of E if min(child_node) <= max(N) <= max(child_node)
+    /// * True if node_idx has a tree_dist_max such that: min <= tree_dist_max <= max
     ///
     /// GraphViz code: SEQ(ND_low(v), ND_lim(w), ND_lim(v))
     ///              : SEQ(min, node_idx, max)
     ///              
     /// From the paper: page 12: Section 2.4: Implementation details
-    /// 
+    ///
     /// Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder
-    /// traversal of the tree, starting from some ﬁxed root node v root, and labeling each node v with its
+    /// traversal of the tree, starting from some fixed root node v root, and labeling each node v with its
     /// postorder traversal number lim(v), the least number low(v) of any descendant in the search, and the
-    /// edge parent(v) by which the node was reached (see ﬁgure 2-5).
-    /// 
+    /// edge parent(v) by which the node was reached (see figure 2-5).
+    ///
     /// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
     /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
-    /// edge and v root is in the head component of the edge (i.e., lim (u)< lim (v)), then a node w is in the tail
+    /// edge and v root is in the head component of the edge (i.e., lim(u) < lim(v)), then a node w is in the tail
     /// component of e if and only if low(u) ≤ lim(w) ≤ lim(u).  These numbers can also be used to update the
-    /// tree efﬁciently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
+    /// tree efficiently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
     /// whose cut values must be adjusted are those in the path connecting w and x in the tree.  This path is determined
-    /// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the ﬁrst node
-    /// l such that low (l) ≤ lim(w) , lim(x) ≤ lim (l).  Of course, these postorder parameters must also be adjusted
+    /// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the first node
+    /// l such that low(l) ≤ lim(w) , lim(x) ≤ lim(l).  Of course, these postorder parameters must also be adjusted
     /// when exchanging tree edges, but only for nodes below l.
-    pub(super) fn node_distance_within_limits(&self, node_idx: usize, min: usize, max: usize) -> bool {
+    pub(super) fn node_in_tail_component(&self, node_idx: usize, min: usize, max: usize) -> bool {
         let tree_dist_max = self
             .get_node(node_idx)
             .tree_dist_max()
@@ -91,7 +99,7 @@ impl Graph {
     /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
     ///
     /// Documentation from the paper: pages 8-9
-    /// * The while loop code below ﬁnds an edge to a non-tree node that is adjacent to the tree, and adjusts the ranks of
+    /// * The while loop code below finds an edge to a non-tree node that is adjacent to the tree, and adjusts the ranks of
     ///   the tree nodes to make this edge tight.
     ///   * As the edge was picked to have minimal slack, the resulting ranking is still feasible.
     ///   * Thus, on every iteration, the maximal tight tree gains at least one node, and the algorithm
@@ -105,16 +113,16 @@ impl Graph {
     /// * A tree is a specific type of graph that is connected and acyclic, meaning it doesn't contain any cycles.
     ///   * The edges in a tree connect the vertices (nodes) in such a way that there is exactly one path between any two vertices.
     ///
-    /// Additional papar details: page 7
+    /// Additional paper details: page 7
     /// * A feasible ranking is one satisfying the length constraints l(e) ≥ δ(e) for all e.
     ///   * Thus, a ranking where the all edge rankings are > min_length().  Thus no rank < 1
     ///   * l(e) = length(e) = rank(e1)-rank(e2) = rank_diff(e)
-    ///     * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
+    ///     * length l(e) of e = (v,w) is defined as λ(w) − λ(v)
     ///     * λ(w) − λ(v) = rank(w) - rank(v)
     ///   * δ(e) = min_length(e) = 1 unless requested by user
     /// * Given any ranking, not necessarily feasible, the "slack" of an edge is the difference of its length and its
     ///   minimum length.
-    ///   * QUESTION: Is "its minimum length" == MIN_EDGE_LENGTH or just the minmum it can be in a tree?
+    ///   * QUESTION: Is "its minimum length" == MIN_EDGE_LENGTH or just the minium it can be in a tree?
     ///   * A(0) -> B(1) -> C(2)
     ///      \--------------/
     ///   * vs:
@@ -210,11 +218,27 @@ impl Graph {
         }
     }
 
+    /// Starting at the top of the tree, set the tree parent, dist.min & dst.max of all children.
+    ///
+    /// * If we are not initializing, we can stop when we get to a node that already
+    ///   has it's parent and tree_dist_min already correctly set
+    ///
+    ///
     /// In the graphviz 9.0 code, there are two functions:
     /// * dfs_range_init()
     /// * dfs_range()
     /// They are identical code, expect for the exit condition.  set_tree_parents_and_ranges()
     /// does either depending on the "initializing flag"
+    ///
+    /// From the paper: Page 13, Section 2.4
+    ///
+    /// These numbers can also be used to update the tree efficiently during the network simplex
+    /// iterations.  If f=(w, x) is the entering edge, the only edges whose cut values must be
+    /// adjusted are those in the path connecting w and x in the tree.  This path is determined
+    /// by following the parent edges back from w and x until the least common ancestor is
+    /// reached, i.e., the first node l such that low(l) ≤ lim(w), lim(x) ≤ lim(l).  Of course,
+    /// these postorder parameters must also be adjusted when exchanging tree edges, but only
+    /// for nodes below l.
     pub(super) fn set_tree_parents_and_ranges(
         &mut self,
         initializing: bool,
@@ -230,11 +254,16 @@ impl Graph {
             "None".to_string()
         };
         println!(
-            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min})\n  parent_edge:{par_str}",
-            node.name
+            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min})\n  cur_node: {}\n  parent_edge:{par_str}",
+            node.name,
+            self.node_to_string(node_idx),
         );
 
         if !initializing {
+            // Since we are not initializing, we can stop if:
+            // * our tree_parent already set correctly.
+            // * our tree_dst_min is already set correctly.
+            //   * when the path is invalidated, tree_dst_min is set to: None
             if let Some(tree_data) = node.spanning_tree() {
                 if tree_data.edge_idx_to_parent() == parent_edge_idx
                     && tree_data.tree_dist_min() == Some(min)
@@ -263,40 +292,43 @@ impl Graph {
 
         self.get_node_mut(node_idx).set_tree_dist_max(Some(max));
 
+        if max > self.node_count() {
+            panic!("set_tree_parents_and_ranges must be looping!")
+        }
         max + 1
     }
 
+    /// Set tree_dist_min=None for all nodes from from_node up to and including lca_node.
+    /// * This will give us a path from where cut_values will need to be updated.
+    /// * We will move progressively up the tree by moving through the tree_parent of from_node
     ///
     /// GraphViz comment for invalidate_path():
     ///   Invalidate DFS attributes by walking up the tree from to_node till lca
     ///   (inclusively). Called when updating tree to improve pruning in dfs_range().
     ///   Assigns ND_low(n) = -1 for the affected nodes.
     ///
-    pub(super) fn invalidate_path(&self, lca_node_idx: usize, to_node_idx: usize) {
-        let mut to_node_idx = to_node_idx;
+    pub(super) fn invalidate_path_to_lca(&self, lca_node_idx: usize, from_node_idx: usize) {
+        let lca_node = self.get_node(lca_node_idx);
+        let mut from_node_idx = from_node_idx;
 
         println!(
-            "Invalidate path for node {lca_node_idx}: {}",
-            self.node_to_string(lca_node_idx)
+            "Invalidate path from node: {}",
+            self.node_to_string(from_node_idx)
         );
-        println!(
-            "  to note {to_node_idx}: {}",
-            self.node_to_string(to_node_idx)
-        );
+        println!("  to lca node: {}", self.node_to_string(lca_node_idx));
         loop {
-            let to_node = self.get_node(to_node_idx);
+            let from_node = self.get_node(from_node_idx);
 
-            if to_node.tree_dist_min().is_none() {
+            if from_node.tree_dist_min().is_none() {
                 break;
             }
 
-            to_node.set_tree_dist_min(None);
+            // We are "invalidating" the node buy setting the tree_dst_min to None
+            from_node.set_tree_dist_min(None);
 
-            if let Some(parent_edge_idx) = to_node.spanning_tree_parent_edge_idx() {
-                let lca_node = self.get_node(lca_node_idx);
-
-                if to_node.tree_dist_max() >= lca_node.tree_dist_max() {
-                    if to_node_idx != lca_node_idx {
+            if let Some(parent_edge_idx) = from_node.spanning_tree_parent_edge_idx() {
+                if from_node.tree_dist_max() >= lca_node.tree_dist_max() {
+                    if from_node_idx != lca_node_idx {
                         panic!("invalidate_path: skipped over LCA");
                     }
                     break;
@@ -306,7 +338,7 @@ impl Graph {
                 let parent_src = self.get_node(parent_edge.src_node);
                 let parent_dst = self.get_node(parent_edge.dst_node);
 
-                to_node_idx = if parent_src.tree_dist_max() > parent_dst.tree_dist_max() {
+                from_node_idx = if parent_src.tree_dist_max() > parent_dst.tree_dist_max() {
                     parent_edge.src_node
                 } else {
                     parent_edge.dst_node
@@ -590,18 +622,18 @@ impl Graph {
 
         if let Some(cur_rank) = node.simplex_rank() {
             let new_rank = cur_rank - delta;
-            println!(
-                "Reranking {} by {delta} from {cur_rank} to {new_rank}",
-                node.name
-            );
+            // println!(
+            //     "Reranking {} by {delta} from {cur_rank} to {new_rank}",
+            //     node.name
+            // );
             node.set_simplex_rank(Some(new_rank));
 
-            let children = self
-                .non_parent_tree_nodes(node_idx)
-                .iter()
-                .map(|(node_idx, _)| self.get_node(*node_idx).name.clone())
-                .collect::<Vec<String>>();
-            println!("   {} reranking to: {:?}", node.name, children);
+            // let children = self
+            //     .non_parent_tree_nodes(node_idx)
+            //     .iter()
+            //     .map(|(node_idx, _)| self.get_node(*node_idx).name.clone())
+            //     .collect::<Vec<String>>();
+            // println!("   {} reranking to: {:?}", node.name, children);
 
             for (node_idx, _) in self.non_parent_tree_nodes(node_idx) {
                 self.rerank_by_tree(node_idx, delta)
@@ -693,11 +725,118 @@ impl Graph {
             })
             .collect()
     }
+
+    /// Print out the spanning tree of the graph
+    #[allow(unused)]
+    pub fn print_spanning_tree_in_dot(&self) {
+        let root_nodes = self
+            .nodes_iter()
+            .enumerate()
+            .filter_map(|(node_idx, node)| {
+                if node.in_spanning_tree() && node.spanning_tree_parent_edge_idx().is_none() {
+                    Some(node_idx)
+                } else {
+                    None
+                }
+            });
+
+        let mut count = 0;
+        for (index, root_idx) in root_nodes.enumerate() {
+            println!("TREE_ROOT {index}: digraph {{");
+            for node in self.nodes_iter() {
+                println!(
+                    r#"{} [label="{} ({}, {})"]; "#,
+                    node.name,
+                    node.name,
+                    node.tree_dist_min().unwrap_or_default(),
+                    node.tree_dist_max().unwrap_or_default()
+                )
+            }
+            self.print_tree_helper(root_idx);
+            println!("}}");
+
+            count += 1;
+        }
+
+        if count == 0 {
+            println!("NO ROOT nodes!");
+        }
+    }
+
+    #[allow(unused)]
+    pub fn print_tree_helper(&self, parent_idx: usize) {
+        let parent_node = self.get_node(parent_idx);
+        let child_nodes = self.non_parent_nodes(parent_idx);
+        let child_names = child_nodes
+            .iter()
+            .map(|(node_idx, tree_edge)| {
+                let label = if *tree_edge {
+                    ""
+                } else {
+                    " [color=red, penwidth=.5]"
+                };
+
+                format!(
+                    "{} -> {}{label}",
+                    parent_node.name,
+                    self.get_node(*node_idx).name.clone()
+                )
+            })
+            .collect::<Vec<String>>();
+
+        if !child_names.is_empty() {
+            println!("    {};", child_names.join("; "));
+        }
+
+        for (child_node_idx, tree_edge) in child_nodes.iter() {
+            if *tree_edge {
+                self.print_tree_helper(*child_node_idx)
+            }
+        }
+    }
+
+    #[allow(unused)]
+    // Returns all nodes connected to the given node which is not the parent node.
+    //
+    // Note that this goes through non-tree edges as well, which is generally
+    // not what you want!
+    fn non_parent_nodes(&self, node_idx: usize) -> Vec<(usize, bool)> {
+        let node = self.get_node(node_idx);
+        let parent_idx = self.get_node(node_idx).spanning_tree_parent_edge_idx();
+
+        node.get_all_edges_with_disposition(true)
+            .filter_map(|(edge_idx, disposition)| {
+                if parent_idx != Some(*edge_idx) {
+                    let edge = self.get_edge(*edge_idx);
+
+                    if edge.ignored {
+                        None
+                    } else {
+                        let tree_edge = edge.in_spanning_tree();
+                        let other_node_idx = match disposition {
+                            In => edge.src_node,
+                            Out => edge.dst_node,
+                        };
+
+                        if tree_edge || disposition == Out {
+                            Some((other_node_idx, tree_edge))
+                        } else {
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    impl Graph {}
 
     #[test]
     fn test_directional_non_parent_tree_nodes() {
@@ -707,7 +846,7 @@ mod test {
         let c_idx = graph.name_to_node_idx("c").unwrap();
         let d_idx = graph.name_to_node_idx("d").unwrap();
 
-        graph.make_asyclic();
+        graph.make_acyclic();
         graph.merge_edges();
         graph.init_simplex_rank();
         graph.set_feasible_tree_for_simplex(true);
@@ -733,7 +872,7 @@ mod test {
     #[test]
     fn test_init_spanning_tree_ingore_tree_nodes() {
         let mut graph = Graph::from("digraph { a -> b; a -> c; b -> d; c -> d; }");
-        graph.make_asyclic();
+        graph.make_acyclic();
         graph.merge_edges();
         graph.init_simplex_rank();
 
@@ -747,7 +886,7 @@ mod test {
         // let mut graph = Graph::from("digraph { a -> b; b -> a; c -> d; c -> a; }");
         let mut graph = Graph::example_graph_from_paper_2_3_extended();
 
-        graph.make_asyclic();
+        graph.make_acyclic();
         graph.merge_edges();
         graph.init_simplex_rank();
         graph.set_feasible_tree_for_simplex(true);

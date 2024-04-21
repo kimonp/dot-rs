@@ -26,6 +26,32 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug 'dot-rs-testing-app'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=dot-rs-testing-app",
+                    "--package=dot-rs-testing-app",
+                ],
+                "filter": {
+                    "name": "dot-rs-testing-app",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}/dot-rs-testing-app"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug with hot reload 'dot-rs-testing-app'",
+            "program": "dx",
+            "args": ["serve"],
+            "cwd": "${workspaceFolder}/dot-rs-testing-app"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in executable 'dot-rs'",
             "cargo": {
                 "args": [

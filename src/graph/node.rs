@@ -1,4 +1,4 @@
-//! Reprecents a node (vertice) within a graph.
+//! Represents a node (vertice) within a graph.
 
 use std::{cell::RefCell, collections::HashSet, fmt::Display};
 
@@ -35,7 +35,6 @@ impl Rect {
     }
 
     pub fn height(&self) -> i32 {
-        println!("HEIGHT: {} vs {}", self.max.y(), self.min.y());
         self.max.y() - self.min.y()
     }
 
@@ -87,7 +86,7 @@ pub enum NodeType {
     Real,
     /// Used so that edges never traverse more than one rank.
     RankFiller,
-    /// Used to help calculate the x coordiante
+    /// Used to help calculate the x coordinate
     XCoordCalc,
 }
 
@@ -107,7 +106,7 @@ impl NodeType {
 ///
 /// Note that this spanning tree shares nodes and edges with the tight, feasible spanning tree, but
 /// the direction of the edges are largely irrelevant.  What is important is edges that lead back
-/// to the root (edge_idx_to_parent) and away from the root.  So it's imporant to know in what context
+/// to the root (edge_idx_to_parent) and away from the root.  So it's important to know in what context
 /// the tree is being considered.
 /// 
 /// In SpanningTree Data, we have renamed the following fields from the paper to make it more understandable:
@@ -117,17 +116,17 @@ impl NodeType {
 /// From the paper: page 12: Section 2.4: Implementation details
 /// 
 /// Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder
-/// traversal of the tree, starting from some ﬁxed root node v root, and labeling each node v with its
+/// traversal of the tree, starting from some fixed root node v root, and labeling each node v with its
 /// postorder traversal number lim(v), the least number low(v) of any descendant in the search, and the
-/// edge parent(v) by which the node was reached (see ﬁgure 2-5).
+/// edge parent(v) by which the node was reached (see figure 2-5).
 /// 
 /// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
 /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
 /// edge and v root is in the head component of the edge (i.e., lim(u) < lim(v)), then a node w is in the tail
 /// component of e if and only if low(u) ≤ lim(w) ≤ lim(u).  These numbers can also be used to update the
-/// tree efﬁciently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
+/// tree efficiently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
 /// whose cut values must be adjusted are those in the path connecting w and x in the tree.  This path is determined
-/// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the ﬁrst node
+/// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the first node
 /// l such that low (l) ≤ lim(w) , lim(x) ≤ lim (l).  Of course, these postorder parameters must also be adjusted
 /// when exchanging tree edges, but only for nodes below l.
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -172,7 +171,6 @@ impl SpanningTreeData {
             tree_dist_min,
             tree_dist_max,
             sub_tree: None,
-            // asyclic_check: None,
         }
     }
 
@@ -204,9 +202,9 @@ pub struct Node {
     // Arbitrary name set by the user.  Duplicates are possible, and up to the user to control.
     pub(super) name: String,
     // Rank is computed using the network simplex algorithm.  Used to determine both vertical_rank
-    // and coordianates.x.
+    // and coordinates.x.
     simplex_rank: RefCell<Option<i32>>,
-    /// Relative verticial ranking of this node.  Zero based, greater numbers are lower.
+    /// Relative vertical ranking of this node.  Zero based, greater numbers are lower.
     pub(super) vertical_rank: Option<i32>,
     /// Position is the relative horizontal position of this node compared to
     /// other nodes in the same rank.  Zero based, greater numbers are farther right.
@@ -215,12 +213,12 @@ pub struct Node {
     pub(super) coordinates: Option<Point>,
     /// Edges incoming to this node.  Each entry is a edge index into the graph's edges list.
     pub(super) in_edges: Vec<usize>,
-    /// Edges outcoming from this node.  Each entry is a edge index into the graph's edges list.
+    /// Edges outgoing from this node.  Each entry is a edge index into the graph's edges list.
     pub(super) out_edges: Vec<usize>,
 
     /// True if this node is part of the "spanning" tree under consideration.  Used during ranking.
     spanning_tree: RefCell<Option<SpanningTreeData>>,
-    /// Added as a placeholder node during position assignement or other part of graphinc
+    /// Added as a placeholder node during position assignment or other part of layout.
     pub(super) node_type: NodeType,
 }
 
@@ -288,7 +286,7 @@ impl Node {
 
     /// If this node is in the tree, return the graph index of the parent.
     ///
-    /// Note that None is retuned if either this node is not a tree node,
+    /// Note that None is returned if either this node is not a tree node,
     /// or it has no parent.
     pub(super) fn spanning_tree_parent_edge_idx(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
@@ -353,7 +351,6 @@ impl Node {
             tree_dist_min: min,
             tree_dist_max: max,
             sub_tree: self.sub_tree(),
-            // asyclic_check: self.asyclic_check(),
         });
     }
 
@@ -389,7 +386,7 @@ impl Node {
 
     /// Set the node as a tree node, but don't set the parent, and set min or max to zero.
     ///
-    /// Used by asyclic tree for tree nodes, but does not use the other data.
+    /// Used by acyclic tree for tree nodes, but does not use the other data.
     /// This must be cleared by simplex for it runs.
     pub(super) fn set_empty_tree_node(&self) {
         self.set_tree_data(None, None, None);
@@ -412,7 +409,7 @@ impl Node {
         };
     }
 
-    /// Minimum separation of x coordiante from a point to this node.
+    /// Minimum separation of x coordinate from a point to this node.
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
@@ -420,7 +417,7 @@ impl Node {
     //     NODE_MIN_SEP_X
     // }
 
-    /// Minimum separation of y coordiante from a point to this node.
+    /// Minimum separation of y coordinate from a point to this node.
     ///
     /// TODO: For now this is just a constant, but in future
     ///       each node could differ.
@@ -529,6 +526,11 @@ impl Node {
     /// True if there are no incoming edges to a node.
     pub(super) fn no_in_edges(&self) -> bool {
         self.get_edges(EdgeDisposition::In).is_empty()
+    }
+
+    /// True if there are no outgoing edges from a node.
+    pub(super) fn no_out_edges(&self) -> bool {
+        self.get_edges(EdgeDisposition::Out).is_empty()
     }
 
     // /// True if there are no outgoing edges to a node.

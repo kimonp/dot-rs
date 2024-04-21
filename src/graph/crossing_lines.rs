@@ -8,11 +8,23 @@ pub(super) struct Line {
 }
 
 impl Line {
+    /// Create a new line that assumes y1 is above y2.
     pub fn new_down(x1: u32, x2: u32) -> Line {
         let (min_x, max_x, line_type) = match x1.cmp(&x2) {
             Ordering::Less => (x1, x2, LineType::Down),
             Ordering::Equal => (x1, x2, LineType::Straight),
             Ordering::Greater => (x2, x1, LineType::Up),
+        };
+
+        Line::new(min_x, max_x, line_type)
+    }
+
+    /// Create a new line that assumes y1 is bellow y2.
+    pub fn new_up(x1: u32, x2: u32) -> Line {
+        let (min_x, max_x, line_type) = match x1.cmp(&x2) {
+            Ordering::Less => (x1, x2, LineType::Up),
+            Ordering::Equal => (x1, x2, LineType::Straight),
+            Ordering::Greater => (x2, x1, LineType::Down),
         };
 
         Line::new(min_x, max_x, line_type)
@@ -100,6 +112,9 @@ fn lines_are_crossed(new: &Line, active: &Line) -> bool {
 
 #[cfg(test)]
 mod test {
+    use crate::dot_examples::dot_example_str;
+    use crate::graph::Graph;
+
     use super::*;
     use rstest::rstest;
     use LineType::Down;
@@ -124,5 +139,23 @@ mod test {
 
         let cross_count = count_crosses(lines);
         assert_eq!(cross_count, expected);
+    }
+
+    #[rstest(example_name, expected_crossings,
+        case::complex_crossing("complex_crossing", 0),
+        case::large_example("large_example", 2),
+    )]
+    fn test_example_crossings(example_name: &str, expected_crossings: u32) {
+        let dot = dot_example_str(example_name);
+        let mut graph = Graph::from(dot);
+
+        graph.rank_nodes_vertically();
+        graph.set_horizontal_ordering();
+
+        assert_eq!(
+            graph.rank_orderings.unwrap().crossing_count(),
+            expected_crossings,
+            "GraphViz crossing count is: {expected_crossings}"
+        );
     }
 }
