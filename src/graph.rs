@@ -1446,11 +1446,11 @@ pub mod tests {
         }
 
         pub fn example_graph_from_paper_2_3() -> Graph {
-            dot_example_graph("tse_paper_example_2_3")
+            dot_example_graph("tse_paper/example_2_3")
         }
 
         pub fn example_graph_from_paper_2_3_extended() -> Graph {
-            dot_example_graph("tse_paper_example_2_3_extended")
+            dot_example_graph("tse_paper/example_2_3_extended")
         }
 
         // Set the ranks given in example 2-3 (a)

@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::str;
 
 use dot_rs::api::{dot_to_svg, dot_to_svg_debug_snapshots};
-use dot_rs::dot_examples::{dot_example_str, DOT_EXAMPLES};
+use dot_rs::dot_examples::{get_all_dot_examples, get_dot_example};
 
 fn main() {
     // Init debug
@@ -72,8 +72,8 @@ fn DotExamples(selection: Selection) -> Element {
 fn AllAnimations() -> Element {
     let frame = use_signal(|| 0);
     let snapshots = use_signal(|| {
-        let dot = dot_example_str("large_example");
-        dot_to_svg_debug_snapshots(dot)
+        let dot = get_dot_example("layout/large_example");
+        dot_to_svg_debug_snapshots(&dot)
     });
     let max_frame = snapshots.read().total_count() - 1;
     let (step_back, step_forward) = snapshots.read().steps(*frame.read());
@@ -166,7 +166,9 @@ fn GraphSnapshots(svg: String) -> Element {
 
 #[component]
 fn AllDotExamples() -> Element {
-    let rows = DOT_EXAMPLES.iter().map(|(title, dot)| {
+    let examples= get_all_dot_examples();
+    println!("FOUND EXAMPLES: {examples:?}");
+    let rows = examples.iter().map(|(title, dot)| {
         rsx! {
             DotSet { title: title.to_string(), dot: dot.to_string() }
         }
@@ -180,18 +182,11 @@ fn AllDotExamples() -> Element {
 
 #[component]
 fn LargeDotExample() -> Element {
-    let rows = DOT_EXAMPLES
-        .iter()
-        .filter(|(title, _dot)| *title == "large_example")
-        .map(|(title, dot)| {
-            rsx! {
-                DotSet { title: title.to_string(), dot: dot.to_string() }
-            }
-        });
+    let title = "layout/large_example";
+    let dot = get_dot_example(title);
 
     rsx! {
-        div { "Large example" }
-        {rows}
+        DotSet { title: title.to_string(), dot }
     }
 }
 
