@@ -61,6 +61,8 @@ pub struct Graph {
     /// Snapshots are grouped into lists so the can be scrolled through
     /// somewhat hierarchically.
     svg_debug_snapshots: RefCell<Snapshots>,
+    /// Attributes for nodes.  For example, label="my_node_label"
+    node_attr: HashMap<String, HashMap<String, String>>,
 }
 
 type SnapShotVec = Vec<(String, String)>;
@@ -152,6 +154,7 @@ impl Graph {
             horizontal_node_separation: NODE_MIN_SEP_X as u32,
             first_virtual_idx: None,
             svg_debug_snapshots: RefCell::new(Snapshots::new()),
+            node_attr: HashMap::new(),
         }
     }
 
@@ -194,6 +197,27 @@ impl Graph {
 
     pub fn get_debug_svg_snapshots(&self) -> Snapshots {
         self.svg_debug_snapshots.borrow().clone()
+    }
+    
+    /// Gives a HashMap of node names and attributes, assign them.
+    pub fn set_node_attr(&mut self, attr: HashMap<String, HashMap<String, String>>) {
+        for (name, attrs) in attr.iter() {
+            self.node_attr.insert(name.clone(), attrs.clone());
+        }
+    }
+    
+    // fn get_node_name_map(&self) -> HashMap<String, usize> {
+    //     let mut name_map = HashMap::new();
+
+    //     for (node_idx, node) in self.nodes.iter().enumerate() {
+    //         name_map.insert(node.name.clone(), node_idx);
+    //     }
+    //     name_map
+    // }
+    
+    /// Return the label of a node, if there is any.
+    pub fn get_node_label(&self, node_name: &str) -> Option<&String> {
+        self.node_attr.get(node_name).and_then(|attr| attr.get("label"))
     }
 
     fn set_coordinates_from_rank_orderings(&mut self, rank_orderings: &RankOrderings) {

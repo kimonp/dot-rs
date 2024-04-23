@@ -1,8 +1,10 @@
-# https://graphviz.org/Gallery/directed/go-package.html
-digraph regexp { 
+/* https://graphviz.org/Gallery/directed/go-package.html
  fontname="Helvetica,Arial,sans-serif"
  node [fontname="Helvetica,Arial,sans-serif"]
  edge [fontname="Helvetica,Arial,sans-serif"]
+
+*/
+digraph regexp { 
  n0 [label="regexp", URL="https://godoc.org/regexp", tooltip="Package regexp implements regular expression search."];
  n1 [label="bytes", URL="https://godoc.org/bytes", tooltip="Package bytes implements functions for the manipulation of byte slices."];
  n2 [label="io", URL="https://godoc.org/io", tooltip="Package io provides basic interfaces to I/O primitives."];

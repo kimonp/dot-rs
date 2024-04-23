@@ -2,7 +2,7 @@
 /// * <https://framagit.org/Bromind/dot-parser/>
 /// And:
 /// * <https://graphviz.org/doc/info/lang.html>
-dotgraph = { strict? ~ (graph | digraph) ~ ident? ~ "{" ~ stmt_list ~ "}" }
+dotgraph = { c_comment? ~ strict? ~ (graph | digraph) ~ ident? ~ "{" ~ stmt_list ~ "}" }
 
 stmt_list = { ( stmt ~ ";"? ~ stmt_list )? }
 stmt = { subgraph | edge_stmt | attr_stmt | id_eq | node_stmt }
@@ -33,11 +33,14 @@ edge = { "edge" }
 strict = { "strict" }
 digraph = { "digraph" }
 
-ident = @{ ident1 | numeral | quote | html }
+ident = @{ ident1 | numeral | quote | html | c_comment }
 ident1 = _{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 numeral = _{ "-"? ~ ( ("." ~ ASCII_DIGIT+) | ( ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT*)? ) ) }
 
-quote = _{ "\"" ~ ( ("\\\"") | not_quote)+ ~ "\"" }
+c_comment = _{ "/*" ~ not_close_comment* ~ "*/" }
+not_close_comment = { !("*/") ~ ANY }
+
+quote = _{ "\"" ~ ( ("\\\"") | not_quote)* ~ "\"" }
 not_quote = { !("\"") ~ ANY }
 
 html = _{ "<" ~ not_lt_gt+ ~ ">" }

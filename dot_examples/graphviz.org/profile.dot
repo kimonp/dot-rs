@@ -1,9 +1,10 @@
-// https://graphviz.org/Gallery/directed/profile.html
-digraph prof {
+/* https://graphviz.org/Gallery/directed/profile.html
 	fontname="Helvetica,Arial,sans-serif"
 	node [fontname="Helvetica,Arial,sans-serif"]
 	edge [fontname="Helvetica,Arial,sans-serif"]
 	node [style=filled];
+*/
+digraph prof {
 	start -> main [color="0.002 0.999 0.999"];
 	start -> on_exit [color="0.649 0.701 0.701"];
 	main -> sort [color="0.348 0.839 0.839"];

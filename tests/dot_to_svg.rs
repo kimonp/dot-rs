@@ -34,7 +34,11 @@ pub fn write_svg_to_file(name: &str, svg: &str) {
     case::tse_paper_example_2_3_extended("tse_paper/example_2_3_extended"),
     case::tse_paper_example_2_3_simplified("tse_paper/example_2_3_simplified"),
     case::in_spread("basic/in_spread"),
-    case::large_example("layout/large_example")
+    case::large_example("layout/large_example"),
+    case::go_imports("graphviz.org/go_package_imports"),
+    // case::world("graphviz.org/world"),
+    case::unix("graphviz.org/unix"),
+    // case::profile("graphviz.org/profile"),
 )]
 fn test_dot_to_svg(test_title: &str) {
     let dot = get_dot_example(test_title);

@@ -1,9 +1,11 @@
-/* courtesy Ian Darwin and Geoff Collyer, Softquad Inc. */
-digraph unix {
+/* courtesy Ian Darwin and Geoff Collyer, Softquad Inc. 
+
 	fontname="Helvetica,Arial,sans-serif"
 	node [fontname="Helvetica,Arial,sans-serif"]
 	edge [fontname="Helvetica,Arial,sans-serif"]
 	node [color=lightblue2, style=filled];
+*/
+digraph unix {
 	"5th Edition" -> "6th Edition";
 	"5th Edition" -> "PWB 1.0";
 	"6th Edition" -> "LSX";
