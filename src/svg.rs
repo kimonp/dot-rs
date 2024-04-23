@@ -180,10 +180,16 @@ impl Display for SVG {
 
         for node in self.graph.nodes_iter() {
             let (x, y) = normalized_coords(node, &node_rect);
+            let label = self.graph.get_node_label(node.name());
+            let node_name = if let Some(label) = label {
+                label
+            } else {
+                node.name()
+            };
             let name = if style.show_coordinates() {
                 format!(
                     "{}: {:?},{:?}",
-                    node.name(),
+                    node_name,
                     node.coordinates()
                         .unwrap_or(Point::new(DEFAULT_Y, DEFAULT_Y))
                         .x(),
@@ -192,9 +198,10 @@ impl Display for SVG {
                         .y(),
                 )
             } else {
-                node.name().to_string()
+                node_name.to_string()
             };
-            let font_size = if style.show_coordinates() { 9.0 } else if node.is_virtual() { 14.0 } else  { 24.0 };
+            let oval_nodes = style.oval_nodes() || name.len() > 3;
+            let font_size = if oval_nodes { 12.0 } else if node.is_virtual() { 14.0 } else  { 24.0 };
             let font_style = format!("font-size:{font_size}; text-anchor: middle");
             let label_x = x;
             let label_y = y as f32 + (font_size / 3.0);
@@ -212,8 +219,8 @@ impl Display for SVG {
             };
             let node_style = format!("fill: {fill}; stroke: black; stroke-width: {px_size}px;");
 
-            if style.oval_nodes() {
-                let node_radius_x = node_radius * 1.5;
+            if oval_nodes {
+                let node_radius_x = node_radius * 2.0;
 
                 svg.push(format!(
                     r#"<ellipse cx="{x}" cy="{y}" ry="{node_radius}" rx="{node_radius_x}" style="{node_style}"/>"#

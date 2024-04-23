@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::str;
 
 use dot_rs::api::{dot_to_svg, dot_to_svg_debug_snapshots};
-use dot_rs::dot_examples::{dot_example_str, DOT_EXAMPLES};
+use dot_rs::dot_examples::{get_all_dot_examples, get_dot_example, get_dot_example_category};
 
 fn main() {
     // Init debug
@@ -19,8 +19,13 @@ fn main() {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum Selection {
-    LargeExample,
     AllExamples,
+    BasicExamples,
+    LayoutExamples,
+    TsePaperExamples,
+    CrossingExamples,
+    CyclicExamples,
+    GraphVizExamples,
     Animations,
 }
 
@@ -35,7 +40,12 @@ fn App() -> Element {
         div { class: "dropdown",
             button { class: "dropbtn", "Select Function" }
             div { class: "dropdown-content",
-                div { onmouseup: move |_| selection.set(LargeExample), "Large Example" }
+                div { onmouseup: move |_| selection.set(BasicExamples), "Basic Examples" }
+                div { onmouseup: move |_| selection.set(LayoutExamples), "Layout Examples" }
+                div { onmouseup: move |_| selection.set(TsePaperExamples), "TSE Paper Examples" }
+                div { onmouseup: move |_| selection.set(CrossingExamples), "Crossing Examples" }
+                div { onmouseup: move |_| selection.set(CyclicExamples), "Cyclic Examples" }
+                div { onmouseup: move |_| selection.set(GraphVizExamples), "GraphViz Examples" }
                 div { onmouseup: move |_| selection.set(AllExamples), "All Examples" }
                 div { onmouseup: move |_| selection.set(Animations), "Animations" }
             }
@@ -44,23 +54,29 @@ fn App() -> Element {
     }
 }
 
-// fn set_selection(event: Event<MouseData>, mut signal: Signal<Selection>, selection: Selection) {
-//     if event.
-//     signal.set(selection);
-// }
-
-// fn click_select_menu(item: Selections) {
-//     log::info!("Clicked!");
-// }
-
 #[component]
 fn DotExamples(selection: Selection) -> Element {
     match selection {
         Animations => rsx! {
             AllAnimations {}
         },
-        LargeExample => rsx! {
-            LargeDotExample {}
+        BasicExamples => rsx! {
+            DotExampleCategory { category: "basic" }
+        },
+        LayoutExamples => rsx! {
+            DotExampleCategory { category: "layout" }
+        },
+        TsePaperExamples => rsx! {
+            DotExampleCategory { category: "tse_paper" }
+        },
+        CyclicExamples => rsx! {
+            DotExampleCategory { category: "cyclic" }
+        },
+        CrossingExamples => rsx! {
+            DotExampleCategory { category: "crossings" }
+        },
+        GraphVizExamples => rsx! {
+            DotExampleCategory { category: "graphviz.org" }
         },
         AllExamples => rsx! {
             AllDotExamples {}
@@ -72,12 +88,15 @@ fn DotExamples(selection: Selection) -> Element {
 fn AllAnimations() -> Element {
     let frame = use_signal(|| 0);
     let snapshots = use_signal(|| {
-        let dot = dot_example_str("large_example");
-        dot_to_svg_debug_snapshots(dot)
+        let dot = get_dot_example("graphviz.org/go_package_imports");
+        dot_to_svg_debug_snapshots(&dot)
     });
     let max_frame = snapshots.read().total_count() - 1;
     let (step_back, step_forward) = snapshots.read().steps(*frame.read());
-    let (group_title, title, svg) = snapshots.read().get(*frame.read() as usize).expect("invalid frame");
+    let (group_title, title, svg) = snapshots
+        .read()
+        .get(*frame.read() as usize)
+        .expect("invalid frame");
 
     rsx! {
         link { rel: "stylesheet", href: "style.css" }
@@ -166,32 +185,41 @@ fn GraphSnapshots(svg: String) -> Element {
 
 #[component]
 fn AllDotExamples() -> Element {
-    let rows = DOT_EXAMPLES.iter().map(|(title, dot)| {
+    let examples = get_all_dot_examples();
+    let rows = examples.iter().map(|(title, dot)| {
         rsx! {
             DotSet { title: title.to_string(), dot: dot.to_string() }
         }
     });
 
     rsx! {
-        div { "All examples" }
+        h2 { "All examples" }
         {rows}
     }
 }
 
 #[component]
-fn LargeDotExample() -> Element {
-    let rows = DOT_EXAMPLES
-        .iter()
-        .filter(|(title, _dot)| *title == "large_example")
-        .map(|(title, dot)| {
-            rsx! {
-                DotSet { title: title.to_string(), dot: dot.to_string() }
-            }
-        });
+fn DotExampleCategory(category: String) -> Element {
+    let examples = get_dot_example_category(&category);
+    let rows = examples.iter().map(|(title, dot)| {
+        rsx! {
+            DotSet { title: title.to_string(), dot: dot.to_string() }
+        }
+    });
 
     rsx! {
-        div { "Large example" }
-        {rows}
+        h2 { {category} }
+        { rows }
+    }
+}
+
+#[component]
+fn LargeDotExample() -> Element {
+    let title = "layout/large_example";
+    let dot = get_dot_example(title);
+
+    rsx! {
+        DotSet { title: title.to_string(), dot }
     }
 }
 

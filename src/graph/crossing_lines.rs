@@ -112,7 +112,7 @@ fn lines_are_crossed(new: &Line, active: &Line) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::dot_examples::dot_example_str;
+    use crate::dot_examples::get_dot_example;
     use crate::graph::Graph;
 
     use super::*;
@@ -142,12 +142,12 @@ mod test {
     }
 
     #[rstest(example_name, expected_crossings,
-        case::complex_crossing("complex_crossing", 0),
-        case::large_example("large_example", 2),
+        case::complex_crossing("crossings/complex_crossing", 0),
+        case::large_example("layout/large_example", 2),
     )]
     fn test_example_crossings(example_name: &str, expected_crossings: u32) {
-        let dot = dot_example_str(example_name);
-        let mut graph = Graph::from(dot);
+        let dot = get_dot_example(example_name);
+        let mut graph = Graph::from(&dot);
 
         graph.rank_nodes_vertically();
         graph.set_horizontal_ordering();

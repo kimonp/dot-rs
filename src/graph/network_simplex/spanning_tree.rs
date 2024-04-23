@@ -170,6 +170,12 @@ impl Graph {
             let edge_idx = self
                 .find_tightest_incident_edge(sub_tree)
                 .expect("cant find inter tree edge");
+            //  .find_tightest_incident_edge(sub_tree);
+            // let edge_idx = if let Some(edge_idx) = edge_idx {
+            //     edge_idx
+            // } else {
+            //     break
+            // };
 
             println!("   Merging with edge: {edge_idx}");
             let modified_sub_tree_idx = self.merge_sub_trees(edge_idx);
@@ -473,8 +479,8 @@ impl Graph {
             return best_edge_idx;
         }
 
-        println!("tigtest_incident_edge_search: {search_node_idx}");
         let search_sub_tree_root = self.find_node_sub_tree_root(search_node_idx);
+        println!("tightest_incident_edge_search: {search_node_idx} sub_tree:{search_sub_tree_root:?}");
         for (edge_idx, next_node_idx) in
             self.get_node_edges_and_adjacent_node(search_node_idx, true)
         {
@@ -499,9 +505,14 @@ impl Graph {
                 {
                     best_edge_idx = Some(edge_idx);
                     best_cur_slack = edge_slack;
+                } else {
+                    println!("no edge candidates with slack: {edge_slack:?} < {best_cur_slack:?}");
                 }
+            } else {
+                println!("no edge candidates: {search_node_idx} == {next_node_idx}");
             }
         }
+        println!("  tightest_incident_edge_search result: best_edge_idx: {best_edge_idx:?}");
 
         best_edge_idx
     }

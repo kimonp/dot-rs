@@ -393,6 +393,7 @@ impl RankOrderings {
     }
 
     /// Counts all the crossing lines to the ranks above and below the given rank.
+    #[allow(unused)]
     fn crossing_count_to_adjacent_ranks(&self, rank: &BTreeSet<usize>) -> u32 {
         let mut lines = vec![];
         let nodes = self.nodes.borrow();
@@ -467,7 +468,7 @@ impl RankOrderings {
                         let result = self.exchange_if_crosses_decrease(&rank_set, v, w, exchange_if_equal);
 
                         if result != TransposeResult::Worse {
-                            // println!("{_rank}: exchanged {position} with {}", position + 1);
+                            println!("{_rank}: exchanged {position} with {}", position + 1);
                             rank_position.swap(position, position + 1);
                             improved = result == TransposeResult::Better;
                             if let Some(graph) = graph {
@@ -487,14 +488,15 @@ impl RankOrderings {
     /// Return true if the row was exchanged (thus reducing the cross count).
     fn exchange_if_crosses_decrease(
         &self,
-        rank: &BTreeSet<usize>,
+        _rank: &BTreeSet<usize>,
         node_idx_a: usize,
         node_idx_b: usize,
         exchange_if_equal: bool,
     ) -> TransposeResult {
-        let cur_value = self.crossing_count_to_adjacent_ranks(rank);
+        // TODO: Is it possible just to look at the adjacent ranks, or at least not all ranks?
+        let cur_value = self.crossing_count();
         self.exchange_positions(node_idx_a, node_idx_b);
-        let new_value = self.crossing_count_to_adjacent_ranks(rank);
+        let new_value = self.crossing_count();
 
         if new_value < cur_value {
             TransposeResult::Better
@@ -502,7 +504,6 @@ impl RankOrderings {
             TransposeResult::Same
         } else {
             self.exchange_positions(node_idx_b, node_idx_a);
-
             TransposeResult::Worse
         }
     }
