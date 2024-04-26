@@ -466,7 +466,7 @@ impl Graph {
     /// On the given node
     /// * Mark the node as visited, and mark it on the recursive stack
     /// * Do a depth first search of it's outbound edges
-    ///   * If an edge has not yet been visited, visit it recursively
+    ///   * If an edge has not yet been visited, visit it and its children recursively
     ///   * If an edge is currently on the stack, reverse the edge
     ///     (because this would cause a cycle)
     /// * Remove the node from the recursive stack.
