@@ -10,7 +10,7 @@
 //! Given a feasible spanning tree, we can associate an integer cut value with each tree edge as
 //! follows. If the tree edge is deleted ("cut"), the tree breaks into two connected components,
 //! the tail component containing the tail node of the edge, and the head component containing
-//! the head node. The cut value is deﬁned as the sum of the weights of all edges from the
+//! the head node. The cut value is defined as the sum of the weights of all edges from the
 //! tail component to the head component, including the tree edge, minus the sum of the weights
 //! of all edges from the head component to the tail component.
 
@@ -208,14 +208,14 @@ impl Graph {
     ///   cutvalue without looking through all the other nodes and edges.
     /// * This only works in the context of a depth first search, where the cutvalues
     ///   of nodes farther away from the root have already been calculated.
-    /// * This works because the cutvalues of tree leaves can be locally calcualted
+    /// * This works because the cutvalues of tree leaves can be locally calculated
     ///   and the result of the cutvalues can be built from there.
     ///
     /// GraphViz: x_val()
     ///
     /// From paper: page 11, section 2.4:
     ///
-    /// To reduce this cost (of caculating cutvalues), we note that the cut values can be
+    /// To reduce this cost (of calculating cutvalues), we note that the cut values can be
     /// computed using information local to an edge if the search is ordered from the leaves
     /// of the feasible tree inward.  It is trivial to compute the cut value of a tree edge
     /// with one of its endpoints a leaf in the tree, since either the head or the tail
@@ -224,7 +224,7 @@ impl Graph {
     /// the sum of the known cut values plus a term dependent only on the edges incident to
     /// the given node.
     ///
-    /// We illustrate this computation in ﬁgure 2-4 in the case where two tree edges, with
+    /// We illustrate this computation in figure 2-4 in the case where two tree edges, with
     /// known cut values, join a third, with the shown orientations. The other cases are handled
     /// similarly.  We assume the cut values of (u, w) and (v, w) are known.  The edges labeled
     /// with capital letters represent the set of all non-tree edges with the given direction

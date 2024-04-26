@@ -64,7 +64,7 @@ impl Graph {
     ///   * leave_edge returns a tree edge with a negative cut value, or nil if there is none,
     ///     meaning the solution is optimal.  Any edge with a negative cut value may be selected as the
     ///     edge to remove.
-    ///   * enter_edge ﬁnds a non-tree edge to replace e.  This is done by breaking the edge e, which
+    ///   * enter_edge finds a non-tree edge to replace e.  This is done by breaking the edge e, which
     ///     divides the tree into a head and tail component. All edges going from the head component to
     ///     the tail are considered, with an edge of minimum slack being chosen.  This is necessary to
     ///     maintain feasibility.
@@ -192,7 +192,7 @@ impl Graph {
     ///
     /// Documentation from the paper:
     ///   * l(e) = length(e) = rank(e.dst_node)-rank(e.src_node) = rank_diff(e)
-    ///     * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
+    ///     * length l(e) of e = (v,w) is defined as λ(w) − λ(v)
     ///     * λ(w) − λ(v) = rank(v) - rank(w)
     fn simplex_rank_diff(&self, edge_idx: usize) -> Option<i32> {
         let edge = self.get_edge(edge_idx);
@@ -210,7 +210,7 @@ impl Graph {
     ///   * CLARIFICATION: First place all nodes with no in-edges in a queue.
     /// * As nodes are taken off the queue, they are assigned the least rank
     ///   that satisfies their in-edges, and their out-edges are marked as scanned.
-    /// * In the simplist case, where minLength() == 1 for all edges, this corresponds
+    /// * In the simplest case, where minLength() == 1 for all edges, this corresponds
     ///   to viewing the graph as a poset (partially ordered set) and assigning the
     ///   the minimal elements to rank 0.  These nodes are removed from the poset and the
     ///   new set of minimal elements are assigned rank 1, etc.
@@ -291,7 +291,7 @@ impl Graph {
     /// If any edge has a negative cut value, return the first one found starting with start_idx.
     /// Otherwise, return None.
     ///
-    /// start_idx is used to support a finding in the paper that network simplex effeciency is very sensitive to
+    /// start_idx is used to support a finding in the paper that network simplex efficiency is very sensitive to
     /// the choice of edge via leave_edge(). From the paper:
     ///   The network simplex is also very sensitive to the choice of the negative edge to replace.  We observed
     ///   that searching cyclically through all the tree edges, instead of searching from the beginning of the
@@ -526,7 +526,7 @@ impl Graph {
     ///   * The purpose is to reduce crowding and improve the aspect ratio of the drawing,
     ///     following principle A4.
     ///   * The adjustment does not change the cost of the rank assignment.
-    ///   * Nodes are adjusted in a greedy fashion, which works sufﬁciently well.
+    ///   * Nodes are adjusted in a greedy fashion, which works sufficiently well.
     ///   * Globally balancing ranks is considered in a forthcoming paper [GNV2]:
     ///     "On the Rank Assignment Problem"
     ///     * Unclear if this paper was ever created or submitted
@@ -536,7 +536,7 @@ impl Graph {
     ///   * Only look at non-virtual nodes
     ///   * Get a count of how many nodes are in each rank.
     ///   * Sort nodes so that we can step through them by most popular rank to least popular.
-    ///   * For each node, ranked by rank population (higest to lowest)
+    ///   * For each node, ranked by rank population (highest to lowest)
     ///     * consider all the ranks between the highest rank and lowest
     ///       rank the node is connected to another node.
     ///     * If any of those ranks has fewer nodes then where it is currently,
@@ -563,13 +563,13 @@ impl Graph {
     /// * for each tree_edge with a cutvalue of zero:
     ///   * find a non_tree_edge with the lowest remaining cutvalue.
     ///     * if non_tree_edge has a slack > 1:
-    ///       * select the head or tail node of to tree_edge whos has a descendent farther from the root (deepest descendent)
+    ///       * select the head or tail node of to tree_edge who's has a descendent farther from the root (deepest descendent)
     ///         * Rerank the selected node and all tree descendent nodes by:
     ///           * if you selected the tail: -non_tree_edge_slack / 2
     ///           * if you selected the head: non_tree_edge_slack / 2
     ///
     /// * Note that this only steps through all tree edges once.
-    /// * However, the reranking of nodes can affect subsequent rerankings
+    /// * However, the re-ranking of nodes can affect subsequent re-rankings
     ///
     /// How it works:
     /// * As of now, I don't fully understand how it works.
@@ -591,7 +591,7 @@ impl Graph {
     /// From the paper: (page 20 section 4.2: Optimal node placement)
     /// * We can now consider the level assignment problem on G′, which can be solved using the network simplex method.
     ///   Any solution of the positioning problem on G corresponds to a solution of the level assignment problem on G′ with the same cost.
-    ///   This is achieved by assigning each n e the value uv min (x_u, x_v), using the notation of ﬁgure 4-2 and where x_u  and x_v  are
+    ///   This is achieved by assigning each n e the value uv min (x_u, x_v), using the notation of figure 4-2 and where x_u  and x_v  are
     ///   the X coordinates assigned to u and v in G.  Conversely, any level assignment in G′ induces a valid positioning in G.
     ///   In addition, in an optimal level assignment, one of e u or e must have length 0, and the other has length | x_u − x_v |. This
     ///   means the cost of an original edge (u, v) in G equals the sum of the cost of the two edges e_u, e_v in G′ and, globally, the
@@ -660,14 +660,14 @@ mod tests {
         /// TODO: make this O(1) by keeping track of the count of nodes which are currently "feasible".
         ///
         /// Documentation from the paper:
-        /// * The function tight_tree() ﬁnds a maximal tree of tight edges containing some ﬁxed node.
+        /// * The function tight_tree() finds a maximal tree of tight edges containing some fixed node.
         ///   * tight_tree() returns the number of nodes in the tree.
         /// * Note that such a maximal tree is just a spanning tree for the subgraph induced by all nodes reachable from the
-        ///   ﬁxed node in the underlying undirected graph using only tight edges.
+        ///   fixed node in the underlying undirected graph using only tight edges.
         ///   * An edge is "tight" if its slack is zero.
         ///     * The "slack" of an edge is the difference of its length and its minimum length.
         ///     * Thus a edge is "tight" if its length == its minimum length
-        ///       * QUESTION: Is "its minimum length" == MIN_EDGE_LENGTH or just the minmum it can be in a tree?
+        ///       * QUESTION: Is "its minimum length" == MIN_EDGE_LENGTH or just the minimum it can be in a tree?
         ///         * If they meant MIN_EDGE_LENGTH, wouldn't they have said "THE minimum edge length"?
         /// * In particular, all such (feasible) trees have the same number of nodes.
         ///
@@ -696,7 +696,7 @@ mod tests {
     }
 
     /// * l(e) = length(e) = rank(e.dst_node)-rank(e.src_node) = rank_diff(e)
-    ///   * length l(e) of e = (v,w) is deﬁned as λ(w) − λ(v)
+    ///   * length l(e) of e = (v,w) is defined as λ(w) − λ(v)
     ///   * λ(w) − λ(v) = rank(w) - rank(v)
     #[test]
     fn test_set_edge_length() {
@@ -776,14 +776,14 @@ mod tests {
     /// Given a specific example, we know which edges we expect it to return.
     ///
     /// Ignored because the new_enter_edge_for_simplex unit test needs to be re-imagined.  Looks like
-    /// the min/max/ranges stuff is not being inited properly in the test.
+    /// the min/max/ranges stuff is not being initialized properly in the test.
     #[ignore]
     #[test]
     fn test_enter_edge_for_simplex() {
         // let (mut graph, _expected_cutvals) = Graph::configure_example_2_3_a_extended();
         // graph.init_cutvalues();
         let mut graph = Graph::example_graph_from_paper_2_3();
-        // graph.make_asyclic();
+        // graph.make_acyclic();
         // graph.merge_edges();
         graph.set_feasible_tree_for_simplex(true);
 
