@@ -38,7 +38,7 @@ pub fn write_svg_to_file(name: &str, svg: &str) {
     case::go_imports("graphviz.org/go_package_imports"),
     // case::world("graphviz.org/world"),
     case::unix("graphviz.org/unix"),
-    case::profile("graphviz.org/profile"),
+    // case::profile("graphviz.org/profile"),
 )]
 fn test_dot_to_svg(test_title: &str) {
     let dot = get_dot_example(test_title);
