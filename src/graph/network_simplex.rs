@@ -143,7 +143,7 @@ impl Graph {
                     self.get_node(src_idx).spanning_tree(),
                     self.get_node(dst_idx).spanning_tree(),
                 ) {
-                    if src_tree.tree_dist_max() < dst_tree.tree_dist_max() {
+                    if src_tree.traversal_number() < dst_tree.traversal_number() {
                         (src_idx, delta)
                     } else {
                         (dst_idx, -delta)
@@ -339,15 +339,23 @@ impl Graph {
         let (disposition, search_node_idx, min, max) = {
             let src_node = self.get_node(edge.src_node);
             let dst_node = self.get_node(edge.dst_node);
-            let src_node_max = src_node.tree_dist_max().expect("must have subtree_max");
-            let dst_node_max = dst_node.tree_dist_max().expect("must have subtree_max");
+            let src_node_max = src_node
+                .tree_traversal_number()
+                .expect("must have traversal_number");
+            let dst_node_max = dst_node
+                .tree_traversal_number()
+                .expect("must have traversal_number");
 
             if src_node_max < dst_node_max {
-                let src_node_min = src_node.tree_dist_min().expect("must have subtree_min");
+                let src_node_min = src_node
+                    .tree_descendent_min_traversal_number()
+                    .expect("must have min_traversal");
 
                 (In, edge.src_node, src_node_min, src_node_max)
             } else {
-                let dst_node_min = dst_node.tree_dist_min().expect("must have subtree_min");
+                let dst_node_min = dst_node
+                    .tree_descendent_min_traversal_number()
+                    .expect("must have min_traversal");
 
                 (Out, edge.dst_node, dst_node_min, dst_node_max)
             }
@@ -390,40 +398,60 @@ impl Graph {
         let mut candidate_edge_idx = candidate_edge_idx;
         let search_node = self.get_node(search_node_idx);
         let search_node_tree_dist_max = search_node
-            .tree_dist_max()
+            .tree_traversal_number()
             .expect("Search node must have dist_max set");
 
         // println!(
         //     "   select_edge_for_simplex: SEARCH_NODE: {}",
         //     self.node_to_string(search_node_idx)
         // );
-        for edge_idx in search_node.get_edges(disposition).iter().cloned() {
-            let edge = self.get_edge(edge_idx);
+
+        // Recursively all the edges of the search_node for a candidate edge
+        // that are farther away from the root of the tree.
+        for (edge_idx, edge_disposition) in
+            search_node.get_all_edges_with_disposition(disposition == Out)
+        {
+            let edge = self.get_edge(*edge_idx);
             if edge.ignored {
                 continue;
             }
-            let node_idx = match disposition {
-                In => edge.src_node,
-                Out => edge.dst_node,
+            let disposition_match = disposition == edge_disposition;
+            // Select the node on the other side on this edge (based on which way we are looking)
+            let node_idx = if disposition_match {
+                match disposition {
+                    In => edge.src_node,
+                    Out => edge.dst_node,
+                }
+            } else {
+                match disposition.opposite() {
+                    In => edge.src_node,
+                    Out => edge.dst_node,
+                }
             };
             let node_tree_dist_max = self
                 .get_node(node_idx)
-                .tree_dist_max()
+                .tree_traversal_number()
                 .expect("Candidate node must have a subtree");
             // println!(
             //     "   select_edge_for_simplex: checking '{disposition}' edge: {}",
             //     self.edge_to_string(edge_idx)
             // );
 
-            if !edge.in_spanning_tree() {
-                let slack = self.simplex_slack(edge_idx).expect("Edge must have slack");
+            if !edge.in_spanning_tree() && !disposition_match {
+                // If the edge is not in the spanning tree, and it does not point in the direction
+                // that we are searching, skip it: it connects to the wrong side of the tree.
+            } else if !edge.in_spanning_tree() {
+                // If the edge not in the spanning tree, but is pointing in the direction we
+                // are searching, we may have a candidate edge.  If is on the correct side of the
+                // tree, selected it if it has smallest slack of any candidate so far.
+                let slack = self.simplex_slack(*edge_idx).expect("Edge must have slack");
                 let candidate_slack = candidate_edge_idx
                     .map(|edge_idx| self.simplex_slack(edge_idx).expect("edge must have slack"));
 
                 if !self.node_in_tail_component(node_idx, min, max)
                     && (candidate_slack.is_none() || Some(slack) < candidate_slack)
                 {
-                    candidate_edge_idx = Some(edge_idx);
+                    candidate_edge_idx = Some(*edge_idx);
                     // println!(
                     //     "   selected: {edge_idx} because: !({min} <= {} <= {max}) and: Some({slack}) < {:?}: {}",
                     //     self.get_node(node_idx)
@@ -450,43 +478,6 @@ impl Graph {
                 //     "   select_edge_for_simplex: rejected edge: {}",
                 //     self.edge_to_string(edge_idx)
                 // );
-            }
-        }
-
-        // println!("   select_edge_for_simplex: next phase");
-        for edge_idx in self
-            .node_tree_edges(search_node_idx, disposition.opposite())
-            .iter()
-            .cloned()
-        {
-            // println!(
-            //     "   select_edge_for_simplex: checking edge {}: {}",
-            //     disposition.opposite(),
-            //     self.edge_to_string(edge_idx)
-            // );
-            let edge = self.get_edge(edge_idx);
-            if edge.ignored {
-                continue;
-            }
-            let node_idx = match disposition.opposite() {
-                In => edge.src_node,
-                Out => edge.dst_node,
-            };
-            let node_tree_dist_max = self
-                .get_node(node_idx)
-                .tree_dist_max()
-                .expect("Candidate node must have a dist_max");
-
-            if node_tree_dist_max < search_node_tree_dist_max {
-                candidate_edge_idx = self.select_edge_for_simplex(
-                    disposition,
-                    node_idx,
-                    min,
-                    max,
-                    candidate_edge_idx,
-                );
-            } else {
-                // println!("   select_edge_for_simplex: rejected edge {edge_idx}: {node_tree_dist_max} < {search_node_tree_dist_max}");
             }
         }
 
@@ -616,9 +607,10 @@ impl Graph {
                         let src_node = self.get_node(tree_edge.src_node);
                         let dst_node = self.get_node(tree_edge.dst_node);
 
-                        if let (Some(src_dist_max), Some(dst_dist_max)) =
-                            (src_node.tree_dist_max(), dst_node.tree_dist_max())
-                        {
+                        if let (Some(src_dist_max), Some(dst_dist_max)) = (
+                            src_node.tree_traversal_number(),
+                            dst_node.tree_traversal_number(),
+                        ) {
                             let (rerank_node_idx, delta) = if src_dist_max < dst_dist_max {
                                 (tree_edge.src_node, non_tree_edge_slack / 2)
                             } else {

@@ -108,18 +108,18 @@ impl NodeType {
 /// the direction of the edges are largely irrelevant.  What is important is edges that lead back
 /// to the root (edge_idx_to_parent) and away from the root.  So it's important to know in what context
 /// the tree is being considered.
-/// 
+///
 /// In SpanningTree Data, we have renamed the following fields from the paper to make it more understandable:
 /// * node.tree_dist_max(): lim(n)
 /// * node.tree_dist_min(): low(n)
 ///
 /// From the paper: page 12: Section 2.4: Implementation details
-/// 
+///
 /// Another valuable optimization, similar to a technique described in [Ch], is to perform a postorder
 /// traversal of the tree, starting from some fixed root node v root, and labeling each node v with its
 /// postorder traversal number lim(v), the least number low(v) of any descendant in the search, and the
 /// edge parent(v) by which the node was reached (see figure 2-5).
-/// 
+///
 /// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
 /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
 /// edge and v root is in the head component of the edge (i.e., lim(u) < lim(v)), then a node w is in the tail
@@ -132,10 +132,10 @@ impl NodeType {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct SpanningTreeData {
     edge_idx_to_parent: Option<usize>,
-    // minimum distance to the root node of all nodes under this node.
-    tree_dist_min: Option<usize>,
-    // maximum distance to the root node of all nodes under this node.
-    tree_dist_max: Option<usize>,
+    /// The number assigned to this node during a postorder traversal of the spanning tree.
+    traversal_number: Option<usize>,
+    /// The minimum traversal number of any tree descendent of this node.
+    descendent_min_traversal_number: Option<usize>,
     /// Reference to the subtree that this node is a member of.
     sub_tree: Option<SubTree>,
 }
@@ -146,16 +146,16 @@ impl Display for SpanningTreeData {
             .edge_idx_to_parent()
             .map(|p| p.to_string())
             .unwrap_or("-".to_string());
-        let min = self
-            .tree_dist_min
+        let min_traversal_num = self
+            .descendent_min_traversal_number
             .map(|m| m.to_string())
             .unwrap_or("-".to_string());
-        let max = self
-            .tree_dist_max
+        let traversal_num = self
+            .traversal_number
             .map(|m| m.to_string())
             .unwrap_or("-".to_string());
 
-        write!(fmt, "edge_to_parent:{parent} min:{min} max:{max}")
+        write!(fmt, "edge_to_parent:{parent} min_desc_trav_num:{min_traversal_num} trav_num:{traversal_num}")
     }
 }
 
@@ -163,13 +163,13 @@ impl SpanningTreeData {
     #[cfg(test)]
     fn new(
         edge_idx_to_parent: Option<usize>,
-        tree_dist_min: Option<usize>,
-        tree_dist_max: Option<usize>,
+        descendent_min_traversal_number: Option<usize>,
+        traversal_number: Option<usize>,
     ) -> SpanningTreeData {
         SpanningTreeData {
             edge_idx_to_parent,
-            tree_dist_min,
-            tree_dist_max,
+            descendent_min_traversal_number,
+            traversal_number,
             sub_tree: None,
         }
     }
@@ -181,14 +181,14 @@ impl SpanningTreeData {
         self.edge_idx_to_parent
     }
 
-    /// The minimal distance to the root of all nodes for which this node is an ancestor.
-    pub fn tree_dist_min(&self) -> Option<usize> {
-        self.tree_dist_min
+    /// The number assigned to this node during a postorder traversal of the spanning tree.
+    pub fn traversal_number(&self) -> Option<usize> {
+        self.traversal_number
     }
 
-    /// The maximum distance to the root of all nodes for which this node is an ancestor.
-    pub fn tree_dist_max(&self) -> Option<usize> {
-        self.tree_dist_max
+    /// The minimum traversal number of any tree descendent of this node.
+    pub fn descendent_min_traversal_number(&self) -> Option<usize> {
+        self.descendent_min_traversal_number
     }
 }
 
@@ -296,35 +296,37 @@ impl Node {
         }
     }
 
-    pub(super) fn tree_dist_max(&self) -> Option<usize> {
+    // The number assigned to this node during a postorder traversal of the spanning tree.
+    pub(super) fn tree_traversal_number(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
-            tree_data.tree_dist_max()
+            tree_data.traversal_number()
         } else {
             None
         }
     }
 
-    pub(super) fn tree_dist_min(&self) -> Option<usize> {
+    /// The minimum traversal number of any tree descendent of this node.
+    pub(super) fn tree_descendent_min_traversal_number(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
-            tree_data.tree_dist_min()
+            tree_data.descendent_min_traversal_number()
         } else {
             None
         }
     }
 
-    pub(super) fn set_tree_dist_min(&self, min: Option<usize>) {
+    pub(super) fn set_tree_descendent_min(&self, min: Option<usize>) {
         if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
-            data.tree_dist_min = min
+            data.descendent_min_traversal_number = min
         } else {
-            panic!("trying to set tree_dist_min but node not in spanning tree");
+            panic!("trying to set descendent_min_traversal but node not in spanning tree");
         }
     }
 
-    pub(super) fn set_tree_dist_max(&self, max: Option<usize>) {
+    pub(super) fn set_tree_traversal_number(&self, max: Option<usize>) {
         if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
-            data.tree_dist_max = max
+            data.traversal_number = max
         } else {
-            panic!("trying to set tree_dist_max but node not in spanning tree");
+            panic!("trying to set traversal_number but node not in spanning tree");
         }
     }
 
@@ -348,8 +350,8 @@ impl Node {
     ) {
         *self.spanning_tree.borrow_mut() = Some(SpanningTreeData {
             edge_idx_to_parent: parent,
-            tree_dist_min: min,
-            tree_dist_max: max,
+            descendent_min_traversal_number: min,
+            traversal_number: max,
             sub_tree: self.sub_tree(),
         });
     }
