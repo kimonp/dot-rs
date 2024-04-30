@@ -260,7 +260,7 @@ impl Graph {
             "None".to_string()
         };
         println!(
-            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min})\n  cur_node: {}\n  parent_edge:{par_str}",
+            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min_traversal_number})\n  cur_node: {}\n  parent_edge:{par_str}",
             node.name,
             self.node_to_string(node_idx),
         );
