@@ -319,7 +319,8 @@ impl Graph {
         None
     }
 
-    /// Given a tree edge, return the non-tree edge with the lowest remaining cut-value.
+    /// Given a tree edge, return the non-tree edge with the lowest remaining cut-value that
+    /// reconnects rejoins the two spanning trees left by removing tree_edge_idx from the tree.
     ///
     /// * Determines if we will be searching In or Out from the src_node or the dst_node respectively
     ///   based on the whichever has the smallest subtree max.
@@ -377,14 +378,15 @@ impl Graph {
             })
     }
 
-    /// Recursively find the first edge that satisfies the edge selection criteria for network simplex.
+    /// Recursively find the non-tree edge with the smallest slack that crosses the search
+    /// tree boundary to the disconnected portion of the tree, as per min/max.
     ///
     /// Selection criteria:
     /// * Edge must not currently be in the spanning tree.
     /// * If disposition is In:
-    ///   * The src_node (tail) of the edge must have a sub_tree_max >= min and <= max
+    ///   * The src_node (tail) of the edge must have a traversal_number >= min and <= max
     /// * If disposition is Out:
-    ///   * The dst_node (tail) of the edge must have a sub_tree_max >= min and <= max
+    ///   * The dst_node (tail) of the edge must have a traversal_number >= min and <= max
     ///   
     /// GraphViz: dfs_enter_out_edge() and dfs_enter_in_edge()
     fn select_edge_for_simplex(
@@ -608,11 +610,11 @@ impl Graph {
                         let src_node = self.get_node(tree_edge.src_node);
                         let dst_node = self.get_node(tree_edge.dst_node);
 
-                        if let (Some(src_dist_max), Some(dst_dist_max)) = (
+                        if let (Some(src_traversal_number), Some(dest_traversal_number)) = (
                             src_node.tree_traversal_number(),
                             dst_node.tree_traversal_number(),
                         ) {
-                            let (rerank_node_idx, delta) = if src_dist_max < dst_dist_max {
+                            let (rerank_node_idx, delta) = if src_traversal_number < dest_traversal_number {
                                 (tree_edge.src_node, non_tree_edge_slack / 2)
                             } else {
                                 (tree_edge.dst_node, -non_tree_edge_slack / 2)
