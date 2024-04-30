@@ -397,7 +397,7 @@ impl Graph {
     ) -> Option<usize> {
         let mut candidate_edge_idx = candidate_edge_idx;
         let search_node = self.get_node(search_node_idx);
-        let search_node_tree_dist_max = search_node
+        let search_node_traversal_number = search_node
             .tree_traversal_number()
             .expect("Search node must have dist_max set");
 
@@ -407,7 +407,8 @@ impl Graph {
         // );
 
         // Recursively all the edges of the search_node for a candidate edge
-        // that are farther away from the root of the tree.
+        // crosses from the head component to the tail component (or vice versa,
+        // depending on disposition).
         for (edge_idx, edge_disposition) in
             search_node.get_all_edges_with_disposition(disposition == Out)
         {
@@ -428,7 +429,7 @@ impl Graph {
                     Out => edge.dst_node,
                 }
             };
-            let node_tree_dist_max = self
+            let node_traversal_number = self
                 .get_node(node_idx)
                 .tree_traversal_number()
                 .expect("Candidate node must have a subtree");
@@ -465,7 +466,7 @@ impl Graph {
                     //     self.node_to_string(node_idx)
                     // )
                 }
-            } else if node_tree_dist_max < search_node_tree_dist_max {
+            } else if node_traversal_number < search_node_traversal_number {
                 candidate_edge_idx = self.select_edge_for_simplex(
                     disposition,
                     node_idx,
