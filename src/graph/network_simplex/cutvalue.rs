@@ -61,7 +61,7 @@ impl Graph {
 
         let lca = self.get_node(lca_idx);
         let lca_min = lca
-            .tree_descendent_min_traversal_number()
+            .tree_descendant_min_traversal_number()
             .expect("lca does not have a min_traversal_number");
 
         self.invalidate_path_to_lca(lca_idx, sel_dst_node_idx);

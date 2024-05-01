@@ -134,8 +134,8 @@ pub struct SpanningTreeData {
     edge_idx_to_parent: Option<usize>,
     /// The number assigned to this node during a postorder traversal of the spanning tree.
     traversal_number: Option<usize>,
-    /// The minimum traversal number of any tree descendent of this node.
-    descendent_min_traversal_number: Option<usize>,
+    /// The minimum traversal number of any tree descendant of this node.
+    descendant_min_traversal_number: Option<usize>,
     /// Reference to the subtree that this node is a member of.
     sub_tree: Option<SubTree>,
 }
@@ -147,7 +147,7 @@ impl Display for SpanningTreeData {
             .map(|p| p.to_string())
             .unwrap_or("-".to_string());
         let min_traversal_num = self
-            .descendent_min_traversal_number
+            .descendant_min_traversal_number
             .map(|m| m.to_string())
             .unwrap_or("-".to_string());
         let traversal_num = self
@@ -163,12 +163,12 @@ impl SpanningTreeData {
     #[cfg(test)]
     fn new(
         edge_idx_to_parent: Option<usize>,
-        descendent_min_traversal_number: Option<usize>,
+        descendant_min_traversal_number: Option<usize>,
         traversal_number: Option<usize>,
     ) -> SpanningTreeData {
         SpanningTreeData {
             edge_idx_to_parent,
-            descendent_min_traversal_number,
+            descendant_min_traversal_number,
             traversal_number,
             sub_tree: None,
         }
@@ -186,9 +186,9 @@ impl SpanningTreeData {
         self.traversal_number
     }
 
-    /// The minimum traversal number of any tree descendent of this node.
-    pub fn descendent_min_traversal_number(&self) -> Option<usize> {
-        self.descendent_min_traversal_number
+    /// The minimum traversal number of any tree descendant of this node.
+    pub fn descendant_min_traversal_number(&self) -> Option<usize> {
+        self.descendant_min_traversal_number
     }
 }
 
@@ -305,20 +305,20 @@ impl Node {
         }
     }
 
-    /// The minimum traversal number of any tree descendent of this node.
-    pub(super) fn tree_descendent_min_traversal_number(&self) -> Option<usize> {
+    /// The minimum traversal number of any tree descendant of this node.
+    pub(super) fn tree_descendant_min_traversal_number(&self) -> Option<usize> {
         if let Some(tree_data) = self.spanning_tree() {
-            tree_data.descendent_min_traversal_number()
+            tree_data.descendant_min_traversal_number()
         } else {
             None
         }
     }
 
-    pub(super) fn set_tree_descendent_min(&self, min: Option<usize>) {
+    pub(super) fn set_tree_descendant_min(&self, min: Option<usize>) {
         if let Some(data) = &mut self.spanning_tree.borrow_mut().as_mut() {
-            data.descendent_min_traversal_number = min
+            data.descendant_min_traversal_number = min
         } else {
-            panic!("trying to set descendent_min_traversal but node not in spanning tree");
+            panic!("trying to set descendant_min_traversal but node not in spanning tree");
         }
     }
 
@@ -350,7 +350,7 @@ impl Node {
     ) {
         *self.spanning_tree.borrow_mut() = Some(SpanningTreeData {
             edge_idx_to_parent: parent,
-            descendent_min_traversal_number: min,
+            descendant_min_traversal_number: min,
             traversal_number: max,
             sub_tree: self.sub_tree(),
         });

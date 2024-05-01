@@ -319,8 +319,8 @@ impl Graph {
         None
     }
 
-    /// Given a tree edge, return the non-tree edge with the lowest remaining cut-value that
-    /// reconnects rejoins the two spanning trees left by removing tree_edge_idx from the tree.
+    /// Given a tree edge, return the non-tree edge with the lowest remaining slack that
+    /// reconnects the two spanning trees left by removing tree_edge_idx from the tree.
     ///
     /// * Determines if we will be searching In or Out from the src_node or the dst_node respectively
     ///   based on the whichever has the smallest subtree max.
@@ -349,13 +349,13 @@ impl Graph {
 
             if src_node_max < dst_node_max {
                 let src_node_min = src_node
-                    .tree_descendent_min_traversal_number()
+                    .tree_descendant_min_traversal_number()
                     .expect("must have min_traversal");
 
                 (In, edge.src_node, src_node_min, src_node_max)
             } else {
                 let dst_node_min = dst_node
-                    .tree_descendent_min_traversal_number()
+                    .tree_descendant_min_traversal_number()
                     .expect("must have min_traversal");
 
                 (Out, edge.dst_node, dst_node_min, dst_node_max)
@@ -614,11 +614,12 @@ impl Graph {
                             src_node.tree_traversal_number(),
                             dst_node.tree_traversal_number(),
                         ) {
-                            let (rerank_node_idx, delta) = if src_traversal_number < dest_traversal_number {
-                                (tree_edge.src_node, non_tree_edge_slack / 2)
-                            } else {
-                                (tree_edge.dst_node, -non_tree_edge_slack / 2)
-                            };
+                            let (rerank_node_idx, delta) =
+                                if src_traversal_number < dest_traversal_number {
+                                    (tree_edge.src_node, non_tree_edge_slack / 2)
+                                } else {
+                                    (tree_edge.dst_node, -non_tree_edge_slack / 2)
+                                };
                             // println!("  rerank by node {rerank_node_idx} by: {delta}");
                             self.rerank_by_tree(rerank_node_idx, delta);
                         } else {

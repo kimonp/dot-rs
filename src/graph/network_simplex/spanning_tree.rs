@@ -52,14 +52,14 @@ impl Graph {
         child_idx: usize,
     ) -> bool {
         let maybe_ancestor_node = self.get_node(maybe_ancestor_node_idx);
-        let descendent_min_traversal = maybe_ancestor_node
-            .tree_descendent_min_traversal_number()
+        let descendant_min_traversal = maybe_ancestor_node
+            .tree_descendant_min_traversal_number()
             .expect("tree distance must be set");
         let traversal_number = maybe_ancestor_node
             .tree_traversal_number()
             .expect("tree distance must be set");
 
-        self.node_in_tail_component(child_idx, descendent_min_traversal, traversal_number)
+        self.node_in_tail_component(child_idx, descendant_min_traversal, traversal_number)
     }
 
     /// Return true if node_idx is in the tail component the node that holds min and max.
@@ -87,13 +87,19 @@ impl Graph {
     /// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the first node
     /// l such that low(l) ≤ lim(w) , lim(x) ≤ lim(l).  Of course, these postorder parameters must also be adjusted
     /// when exchanging tree edges, but only for nodes below l.
-    pub(super) fn node_in_tail_component(&self, node_idx: usize, descendent_min_traversal: usize, max_traversal_number: usize) -> bool {
+    pub(super) fn node_in_tail_component(
+        &self,
+        node_idx: usize,
+        descendant_min_traversal: usize,
+        max_traversal_number: usize,
+    ) -> bool {
         let node_traversal_number = self
             .get_node(node_idx)
             .tree_traversal_number()
             .expect("tree_dist_max must be set");
 
-        descendent_min_traversal <= node_traversal_number && node_traversal_number <= max_traversal_number
+        descendant_min_traversal <= node_traversal_number
+            && node_traversal_number <= max_traversal_number
     }
 
     /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
@@ -272,7 +278,7 @@ impl Graph {
             //   * when the path is invalidated, tree_dst_min is set to: None
             if let Some(tree_data) = node.spanning_tree() {
                 if tree_data.edge_idx_to_parent() == parent_edge_idx
-                    && tree_data.descendent_min_traversal_number() == Some(min_traversal_number)
+                    && tree_data.descendant_min_traversal_number() == Some(min_traversal_number)
                 {
                     return tree_data.traversal_number().unwrap_or(0) + 1;
                 }
@@ -282,8 +288,11 @@ impl Graph {
         }
 
         let cur_max_traversal_number = node.tree_traversal_number();
-        self.get_node_mut(node_idx)
-            .set_tree_data(parent_edge_idx, Some(min_traversal_number), cur_max_traversal_number);
+        self.get_node_mut(node_idx).set_tree_data(
+            parent_edge_idx,
+            Some(min_traversal_number),
+            cur_max_traversal_number,
+        );
 
         let mut max_traversal_number = min_traversal_number;
         for (node_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
@@ -325,12 +334,12 @@ impl Graph {
         loop {
             let from_node = self.get_node(from_node_idx);
 
-            if from_node.tree_descendent_min_traversal_number().is_none() {
+            if from_node.tree_descendant_min_traversal_number().is_none() {
                 break;
             }
 
-            // We are "invalidating" the node buy setting the tree_descendent_min to None
-            from_node.set_tree_descendent_min(None);
+            // We are "invalidating" the node buy setting the tree_descendant_min to None
+            from_node.set_tree_descendant_min(None);
 
             if let Some(parent_edge_idx) = from_node.spanning_tree_parent_edge_idx() {
                 if from_node.tree_traversal_number() >= lca_node.tree_traversal_number() {
@@ -622,7 +631,7 @@ impl Graph {
         }
     }
 
-    /// Re-rank the given node by subtracting delta to the rank, and all descendent nodes in the tree.
+    /// Re-rank the given node by subtracting delta to the rank, and all descendant nodes in the tree.
     ///
     /// * First reduces the rank of node_idx by delta
     /// * Then recursively reduces the rank of all tree descendants of node_idx
@@ -762,7 +771,7 @@ impl Graph {
                     r#"{} [label="{} ({}, {})"]; "#,
                     node.name,
                     node.name,
-                    node.tree_descendent_min_traversal_number()
+                    node.tree_descendant_min_traversal_number()
                         .unwrap_or_default(),
                     node.tree_traversal_number().unwrap_or_default()
                 )
