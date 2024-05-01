@@ -52,14 +52,14 @@ impl Graph {
         child_idx: usize,
     ) -> bool {
         let maybe_ancestor_node = self.get_node(maybe_ancestor_node_idx);
-        let ancestor_dist_min = maybe_ancestor_node
-            .tree_dist_min()
+        let descendant_min_traversal = maybe_ancestor_node
+            .tree_descendant_min_traversal_number()
             .expect("tree distance must be set");
-        let ancestor_dist_max = maybe_ancestor_node
-            .tree_dist_max()
+        let traversal_number = maybe_ancestor_node
+            .tree_traversal_number()
             .expect("tree distance must be set");
 
-        self.node_in_tail_component(child_idx, ancestor_dist_min, ancestor_dist_max)
+        self.node_in_tail_component(child_idx, descendant_min_traversal, traversal_number)
     }
 
     /// Return true if node_idx is in the tail component the node that holds min and max.
@@ -79,21 +79,27 @@ impl Graph {
     /// edge parent(v) by which the node was reached (see figure 2-5).
     ///
     /// This provides an inexpensive way to test whether a node lies in the head or tail component of a tree edge,
-    /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u ,v) is a tree
+    /// and thus whether a non-tree edge crosses between the two components.  For example, if e = (u, v) is a tree
     /// edge and v root is in the head component of the edge (i.e., lim(u) < lim(v)), then a node w is in the tail
     /// component of e if and only if low(u) ≤ lim(w) ≤ lim(u).  These numbers can also be used to update the
-    /// tree efficiently during the network simplex iterations.  If f = (w ,x) is the entering edge, the only edges
+    /// tree efficiently during the network simplex iterations.  If f = (w, x) is the entering edge, the only edges
     /// whose cut values must be adjusted are those in the path connecting w and x in the tree.  This path is determined
     /// by following the parent edges back from w and x until the least common ancestor is reached, i.e., the first node
     /// l such that low(l) ≤ lim(w) , lim(x) ≤ lim(l).  Of course, these postorder parameters must also be adjusted
     /// when exchanging tree edges, but only for nodes below l.
-    pub(super) fn node_in_tail_component(&self, node_idx: usize, min: usize, max: usize) -> bool {
-        let tree_dist_max = self
+    pub(super) fn node_in_tail_component(
+        &self,
+        node_idx: usize,
+        descendant_min_traversal: usize,
+        max_traversal_number: usize,
+    ) -> bool {
+        let node_traversal_number = self
             .get_node(node_idx)
-            .tree_dist_max()
+            .tree_traversal_number()
             .expect("tree_dist_max must be set");
 
-        min <= tree_dist_max && tree_dist_max <= max
+        descendant_min_traversal <= node_traversal_number
+            && node_traversal_number <= max_traversal_number
     }
 
     /// Sets a feasible tree within the given graph by setting feasible_tree_member on tree member nodes.
@@ -250,7 +256,7 @@ impl Graph {
         initializing: bool,
         node_idx: usize,
         parent_edge_idx: Option<usize>,
-        min: usize,
+        min_traversal_number: usize,
     ) -> usize {
         let node = self.get_node(node_idx);
 
@@ -260,7 +266,7 @@ impl Graph {
             "None".to_string()
         };
         println!(
-            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min})\n  cur_node: {}\n  parent_edge:{par_str}",
+            "set_tree_parents_and_ranges('{}', {parent_edge_idx:?}, {min_traversal_number})\n  cur_node: {}\n  parent_edge:{par_str}",
             node.name,
             self.node_to_string(node_idx),
         );
@@ -272,36 +278,39 @@ impl Graph {
             //   * when the path is invalidated, tree_dst_min is set to: None
             if let Some(tree_data) = node.spanning_tree() {
                 if tree_data.edge_idx_to_parent() == parent_edge_idx
-                    && tree_data.tree_dist_min() == Some(min)
+                    && tree_data.descendant_min_traversal_number() == Some(min_traversal_number)
                 {
-                    return tree_data.tree_dist_max().unwrap_or(0) + 1;
+                    return tree_data.traversal_number().unwrap_or(0) + 1;
                 }
             } else {
                 panic!("Setting tree ranges on a node that is not in the tree!");
             }
         }
 
-        let cur_max = node.tree_dist_max();
-        self.get_node_mut(node_idx)
-            .set_tree_data(parent_edge_idx, Some(min), cur_max);
+        let cur_max_traversal_number = node.tree_traversal_number();
+        self.get_node_mut(node_idx).set_tree_data(
+            parent_edge_idx,
+            Some(min_traversal_number),
+            cur_max_traversal_number,
+        );
 
-        let mut max = min;
-
+        let mut max_traversal_number = min_traversal_number;
         for (node_idx, edge_idx) in self.non_parent_tree_nodes(node_idx) {
-            max = max.max(self.set_tree_parents_and_ranges(
+            max_traversal_number = max_traversal_number.max(self.set_tree_parents_and_ranges(
                 initializing,
                 node_idx,
                 Some(edge_idx),
-                max,
+                max_traversal_number,
             ));
         }
 
-        self.get_node_mut(node_idx).set_tree_dist_max(Some(max));
+        self.get_node_mut(node_idx)
+            .set_tree_traversal_number(Some(max_traversal_number));
 
-        if max > self.node_count() {
+        if max_traversal_number > self.node_count() {
             panic!("set_tree_parents_and_ranges must be looping!")
         }
-        max + 1
+        max_traversal_number + 1
     }
 
     /// Set tree_dist_min=None for all nodes from from_node up to and including lca_node.
@@ -325,15 +334,15 @@ impl Graph {
         loop {
             let from_node = self.get_node(from_node_idx);
 
-            if from_node.tree_dist_min().is_none() {
+            if from_node.tree_descendant_min_traversal_number().is_none() {
                 break;
             }
 
-            // We are "invalidating" the node buy setting the tree_dst_min to None
-            from_node.set_tree_dist_min(None);
+            // We are "invalidating" the node buy setting the tree_descendant_min to None
+            from_node.set_tree_descendant_min(None);
 
             if let Some(parent_edge_idx) = from_node.spanning_tree_parent_edge_idx() {
-                if from_node.tree_dist_max() >= lca_node.tree_dist_max() {
+                if from_node.tree_traversal_number() >= lca_node.tree_traversal_number() {
                     if from_node_idx != lca_node_idx {
                         panic!("invalidate_path: skipped over LCA");
                     }
@@ -344,11 +353,12 @@ impl Graph {
                 let parent_src = self.get_node(parent_edge.src_node);
                 let parent_dst = self.get_node(parent_edge.dst_node);
 
-                from_node_idx = if parent_src.tree_dist_max() > parent_dst.tree_dist_max() {
-                    parent_edge.src_node
-                } else {
-                    parent_edge.dst_node
-                };
+                from_node_idx =
+                    if parent_src.tree_traversal_number() > parent_dst.tree_traversal_number() {
+                        parent_edge.src_node
+                    } else {
+                        parent_edge.dst_node
+                    };
             } else {
                 break;
             }
@@ -480,7 +490,9 @@ impl Graph {
         }
 
         let search_sub_tree_root = self.find_node_sub_tree_root(search_node_idx);
-        println!("tightest_incident_edge_search: {search_node_idx} sub_tree:{search_sub_tree_root:?}");
+        println!(
+            "tightest_incident_edge_search: {search_node_idx} sub_tree:{search_sub_tree_root:?}"
+        );
         for (edge_idx, next_node_idx) in
             self.get_node_edges_and_adjacent_node(search_node_idx, true)
         {
@@ -619,7 +631,7 @@ impl Graph {
         }
     }
 
-    /// Re-rank the given node by subtracting delta to the rank, and all descendent nodes in the tree.
+    /// Re-rank the given node by subtracting delta to the rank, and all descendant nodes in the tree.
     ///
     /// * First reduces the rank of node_idx by delta
     /// * Then recursively reduces the rank of all tree descendants of node_idx
@@ -759,8 +771,9 @@ impl Graph {
                     r#"{} [label="{} ({}, {})"]; "#,
                     node.name,
                     node.name,
-                    node.tree_dist_min().unwrap_or_default(),
-                    node.tree_dist_max().unwrap_or_default()
+                    node.tree_descendant_min_traversal_number()
+                        .unwrap_or_default(),
+                    node.tree_traversal_number().unwrap_or_default()
                 )
             }
             self.print_tree_helper(root_idx);

@@ -61,8 +61,8 @@ impl Graph {
 
         let lca = self.get_node(lca_idx);
         let lca_min = lca
-            .tree_dist_min()
-            .expect("lca does not have a sub_tree_idx_min");
+            .tree_descendant_min_traversal_number()
+            .expect("lca does not have a min_traversal_number");
 
         self.invalidate_path_to_lca(lca_idx, sel_dst_node_idx);
         self.invalidate_path_to_lca(lca_idx, sel_src_node_idx);
@@ -146,11 +146,11 @@ impl Graph {
         let parent_edge = self.get_edge(parent_edge_idx);
         let parent_src_dist_max = self
             .get_node(parent_edge.src_node)
-            .tree_dist_max()
+            .tree_traversal_number()
             .expect("tree_dist_max not set");
         let parent_dst_dist_max = self
             .get_node(parent_edge.dst_node)
-            .tree_dist_max()
+            .tree_traversal_number()
             .expect("tree_dist_max not set");
 
         (parent_src_dist_max, parent_dst_dist_max)
