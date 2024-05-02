@@ -50,10 +50,6 @@ impl Graph {
                         node_attrs.insert(node_name, attrs);
                     }
                 }
-                Rule::c_comment => {
-                }
-                Rule::not_close_comment => {
-                }
                 Rule::ident => {
                 }
                 _ => unreachable!("Found rule: {:?}", record.as_rule()),
