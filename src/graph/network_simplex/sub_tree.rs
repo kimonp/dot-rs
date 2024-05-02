@@ -125,7 +125,7 @@ struct InternalSubTree {
     /// longer in the heap (the heap is one large fixed block of memory which
     /// contains pointers to subtree structs). It is used to:
     /// * Tell if a sub_tree is in the tree (not -1)
-    /// * Effeciently fix the heap when the merge chanes a sub_tree's size
+    /// * Efficiently fix the heap when the merge changes a sub_tree's size
     /// node_idx, so heap_idx would alway be equal to node_idx.
     heap_idx: Option<usize>,
     /// Pointer to the parent of this sub_tree or none if this is the root of the sub_tree.
