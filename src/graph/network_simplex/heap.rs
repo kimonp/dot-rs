@@ -5,6 +5,8 @@
 //! Items must support the HeapIndex trait, which lets the heap inform
 //! the item of it's index into the heap so that re-order can be called
 //! with the correct index.
+
+#[derive(Debug)]
 pub(super) struct MinHeap<T> {
     data: Vec<T>,
 }
