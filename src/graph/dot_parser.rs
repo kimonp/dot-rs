@@ -160,7 +160,7 @@ fn get_node(node_stmt: Pair<'_, Rule>) -> (String, HashMap<String, String>) {
         if attr.as_rule() == Rule::a_list {
             let mut cur_key: Option<String> = None;
             for ident in attr.into_inner() {
-                // TODO: THis is a bit messed up because idents are recursive for lists, so
+                // TODO: This is a bit messed up because idents are recursive for lists, so
                 //       we also need to look for a_lists at this level, too.  As written, this
                 //       will only find the first attribute...
                 if ident.as_rule() == Rule::ident {
