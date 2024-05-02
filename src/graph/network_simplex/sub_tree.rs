@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 /// SubTree is analogous to the subtree_s struct found in GraphViz: lib/common/ns.c
 ///
-/// The Subtree allows for internal mutability and cloning, which is convenieng for
+/// The Subtree allows for internal mutability and cloning, which is convenient for
 /// recursive uses within network simplex.
 #[derive(Debug, Clone, Eq)]
 pub(crate) struct SubTree(Rc<RefCell<InternalSubTree>>);

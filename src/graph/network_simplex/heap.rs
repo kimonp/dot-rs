@@ -1,6 +1,6 @@
 //! A specialized min heap for network simplex that allows you to
 //! change the size of one item in the heap and re-heapify the heap
-//! effeciently.
+//! efficiently.
 //!
 //! Items must support the HeapIndex trait, which lets the heap inform
 //! the item of it's index into the heap so that re-order can be called
@@ -45,7 +45,7 @@ impl<T: Ord + HeapIndex + Eq> MinHeap<T> {
     /// Reorders the item at heap_idx in the heap.
     ///
     /// Assumes item at heap_idx has increased in size and needs to
-    /// be placed deaper in the heap.
+    /// be placed deeper in the heap.
     pub fn reorder_item(&mut self, heap_idx: usize) {
         let mut cur_item_idx = heap_idx;
         loop {
@@ -79,7 +79,7 @@ impl<T: Ord + HeapIndex + Eq> MinHeap<T> {
         }
     }
 
-    /// Given a heap in random order, "heapifys" it so that pop will always return
+    /// Given a heap in random order, "heapifies" it so that pop will always return
     /// the smallest entry.
     pub fn order_heap(&mut self) {
         let midpoint = self.len() / 2;
