@@ -16,7 +16,11 @@ edge_rhs  =  { edgeop ~ node_id ~ edge_rhs? }
 edgeop    = _{ "--" | "->" }
 
 node_stmt = { node_id ~ attr_list? }
-node_id   = { ident ~ port? }
+// KNO-12: node_id should have a port as the comment below, but this
+//         seems to cause whitespace to be sucked into identifiers,
+//         so I am removing it until I get it figured out.
+// node_id   = { ident ~ port? }
+node_id   = { ident }
 
 port = {
     ":" ~ compass_pt
@@ -56,6 +60,6 @@ nw         = { "nw" }
 c          = { "c" }
 underscore = { "_" }
 
-WHITESPACE = _{ " " | "\t" | NEWLINE }
-COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" | SingleLineComment }
-SingleLineComment = { "//" ~ (!"\n" ~ ANY)* }
+WHITESPACE        = _{ " " | "\t" | NEWLINE }
+COMMENT           = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" | SingleLineComment }
+SingleLineComment =  { "//" ~ (!"\n" ~ ANY)* }
