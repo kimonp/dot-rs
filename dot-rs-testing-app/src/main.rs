@@ -88,7 +88,7 @@ fn DotExamples(selection: Selection) -> Element {
 fn AllAnimations() -> Element {
     let frame = use_signal(|| 0);
     let snapshots = use_signal(|| {
-        let dot = get_dot_example("graphviz.org/go_package_imports");
+        let dot = get_dot_example("layout/large_example");
         dot_to_svg_debug_snapshots(&dot)
     });
     let max_frame = snapshots.read().total_count() - 1;

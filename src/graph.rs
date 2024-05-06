@@ -653,15 +653,15 @@ impl Graph {
                 let exchange_if_equal = i % 3 < 2;
 
                 order.weighted_median(forward, exchange_if_equal, self);
-                println!("weighed_median: {}", order.crossing_count());
+                // println!("weighed_median: {}", order.crossing_count());
                 // self.take_svg_snapshot("after weighted median", Some(&order));
 
                 self.new_snapshot_group(&format!("ordering pass: {i}, transpose"));
                 order.transpose(exchange_if_equal, Some(self));
-                println!(
-                    "  After transpose ({exchange_if_equal}): {}",
-                    order.crossing_count()
-                );
+                // println!(
+                //     "  After transpose ({exchange_if_equal}): {}",
+                //     order.crossing_count()
+                // );
                 // self.take_svg_snapshot("after transpose", Some(&order));
 
                 let new_crossing_count = order.crossing_count();

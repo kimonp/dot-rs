@@ -137,6 +137,7 @@ impl Graph {
     /// * Thus, a ranking is feasible if the slack of every edge is non-negative.
     /// * An edge is "tight" if its slack is zero.
     ///
+    /// In GraphViz code: feasible_tree()
     pub(super) fn set_feasible_tree_for_simplex(&mut self, init_rank: bool) {
         if init_rank {
             self.init_simplex_rank();
@@ -169,19 +170,15 @@ impl Graph {
         while min_heap.len() > 1 {
             let sub_tree = min_heap.pop().expect("can't be empty");
             println!(
-                "   finding edge for: {:?} with heap of {}",
+                "   finding edge for sub_tree: {:?} with heap entry count: {}",
                 sub_tree,
                 min_heap.len()
             );
-            let edge_idx = self
-                .find_tightest_incident_edge(sub_tree)
-                .expect("cant find inter tree edge");
-            //  .find_tightest_incident_edge(sub_tree);
-            // let edge_idx = if let Some(edge_idx) = edge_idx {
-            //     edge_idx
-            // } else {
-            //     break
-            // };
+
+            // println!("HEAP: {min_heap:?}");
+            let edge_idx = self.find_tightest_incident_edge(sub_tree).unwrap_or_else(||
+                panic!("Graph does not seem to be fully connected.  Dot-rs requires a connected graph.  {} subtrees disconnected.", min_heap.len()+1)
+            );
 
             println!("   Merging with edge: {edge_idx}");
             let modified_sub_tree_idx = self.merge_sub_trees(edge_idx);
@@ -531,7 +528,7 @@ impl Graph {
 
     /// Given a node_idx, find it's root sub_tree.
     fn find_node_sub_tree_root(&self, node_idx: usize) -> Option<SubTree> {
-        println!("Finding root of: {node_idx}");
+        println!("Finding root of node: {}", self.get_node(node_idx));
         self.get_node(node_idx)
             .sub_tree()
             .map(|sub_tree| sub_tree.find_root())
@@ -749,74 +746,90 @@ impl Graph {
             .collect()
     }
 
-    /// Print out the spanning tree of the graph
+    /// For debugging: print out the spanning tree of the graph
     #[allow(unused)]
-    pub fn print_spanning_tree_in_dot(&self) {
-        let root_nodes = self
-            .nodes_iter()
-            .enumerate()
-            .filter_map(|(node_idx, node)| {
-                if node.in_spanning_tree() && node.spanning_tree_parent_edge_idx().is_none() {
-                    Some(node_idx)
+    pub fn print_spanning_tree_in_dot_by_node(&self) {
+        println!("digraph {{");
+        for (node_idx, node) in self.nodes_iter().enumerate() {
+            if let Some(parent_edge_idx) = node.spanning_tree_parent_edge_idx() {
+                let parent_edge = self.get_edge(parent_edge_idx);
+                let parent_node_idx = if parent_edge.src_node == node_idx {
+                    parent_edge.dst_node
                 } else {
-                    None
-                }
-            });
+                    parent_edge.src_node
+                };
+                let parent_node = self.get_node(parent_node_idx);
 
-        let mut count = 0;
-        for (index, root_idx) in root_nodes.enumerate() {
-            println!("TREE_ROOT {index}: digraph {{");
-            for node in self.nodes_iter() {
                 println!(
-                    r#"{} [label="{} ({}, {})"]; "#,
+                    "    {} -> {} [color=red, penwidth=.5]",
                     node.name,
-                    node.name,
-                    node.tree_descendant_min_traversal_number()
-                        .unwrap_or_default(),
-                    node.tree_traversal_number().unwrap_or_default()
-                )
+                    parent_node.clone()
+                );
             }
-            self.print_tree_helper(root_idx);
-            println!("}}");
+            let child_nodes = self.non_parent_nodes(node_idx, true);
+            let child_names = child_nodes
+                .iter()
+                .map(|(node_idx, _tree_edge)| {
+                    format!("{} -> {}", node.name, self.get_node(*node_idx).name.clone())
+                })
+                .collect::<Vec<String>>();
 
-            count += 1;
+            if !child_names.is_empty() {
+                println!("    {}", child_names.join("; "));
+            }
         }
-
-        if count == 0 {
-            println!("NO ROOT nodes!");
-        }
+        println!("}}");
     }
 
+    /// For debugging: print out a sub_tree using dot
     #[allow(unused)]
-    pub fn print_tree_helper(&self, parent_idx: usize) {
-        let parent_node = self.get_node(parent_idx);
-        let child_nodes = self.non_parent_nodes(parent_idx);
-        let child_names = child_nodes
-            .iter()
-            .map(|(node_idx, tree_edge)| {
-                let label = if *tree_edge {
-                    ""
-                } else {
-                    " [color=red, penwidth=.5]"
-                };
+    fn print_sub_trees_in_dot(&self) {
+        println!("digraph {{");
 
-                format!(
-                    "{} -> {}{label}",
-                    parent_node.name,
-                    self.get_node(*node_idx).name.clone()
-                )
-            })
-            .collect::<Vec<String>>();
-
-        if !child_names.is_empty() {
-            println!("    {};", child_names.join("; "));
-        }
-
-        for (child_node_idx, tree_edge) in child_nodes.iter() {
-            if *tree_edge {
-                self.print_tree_helper(*child_node_idx)
+        for (node_idx, node) in self.nodes_iter().enumerate() {
+            if let Some(sub_tree) = node.sub_tree() {
+                let start_node = self.get_node(sub_tree.start_node_idx());
+                println!(
+                    r#"    {} [label="{}: {}:{}"]"#,
+                    node.name,
+                    node.name,
+                    sub_tree.start_node_idx(),
+                    start_node.name
+                );
             }
         }
+
+        for (node_idx, node) in self.nodes_iter().enumerate() {
+            if let Some(sub_tree) = node.sub_tree() {
+                let node_tree_edges = self.node_tree_edges(node_idx, Out);
+                let peer_nodes = node_tree_edges
+                    .iter()
+                    .map(|edge_idx| self.get_edge(*edge_idx).dst_node);
+
+                for peer_idx in peer_nodes {
+                    let peer_node = self.get_node(peer_idx);
+                    if let Some(peer_sub_tree) = peer_node.sub_tree() {
+                        if peer_sub_tree.start_node_idx() == sub_tree.start_node_idx() {
+                            if sub_tree.parent().is_some()
+                                && peer_sub_tree.parent() == sub_tree.parent()
+                            {
+                                println!("    {} -> {} [color=red]", node.name, peer_node.name);
+                            } else {
+                                println!(
+                                    r#"    {} -> {} [label="{}"]"#,
+                                    node.name,
+                                    peer_node.name,
+                                    sub_tree.size()
+                                );
+                            }
+                        } else {
+                            println!("REJECTED: {} -> {}", node.name, peer_node.name);
+                        }
+                    }
+                }
+            }
+        }
+        println!("}}");
     }
 
     #[allow(unused)]
@@ -824,7 +837,7 @@ impl Graph {
     //
     // Note that this goes through non-tree edges as well, which is generally
     // not what you want!
-    fn non_parent_nodes(&self, node_idx: usize) -> Vec<(usize, bool)> {
+    fn non_parent_nodes(&self, node_idx: usize, out_only: bool) -> Vec<(usize, bool)> {
         let node = self.get_node(node_idx);
         let parent_idx = self.get_node(node_idx).spanning_tree_parent_edge_idx();
 
@@ -842,7 +855,9 @@ impl Graph {
                             Out => edge.dst_node,
                         };
 
-                        if tree_edge || disposition == Out {
+                        if out_only && disposition == In {
+                            None
+                        } else if tree_edge || disposition == Out {
                             Some((other_node_idx, tree_edge))
                         } else {
                             None

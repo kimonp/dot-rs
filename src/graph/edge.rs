@@ -1,9 +1,9 @@
-//! Reprecents an edge connecting two nodes within a graph.
+//! Represents an edge connecting two nodes within a graph.
 
 use std::{cell::RefCell, fmt::Display};
 
 /// Minimum allowed edge weight.  In future implementations, user could set this.
-/// Edge weight could be used when drawing to deletemine the stroke width of an edge.
+/// Edge weight could be used when drawing to determine the stroke width of an edge.
 pub const MIN_EDGE_WEIGHT: u32 = 1;
 
 /// Minimum allowed edge length.  In future implementations, user could set this.

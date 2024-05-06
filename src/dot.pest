@@ -2,61 +2,64 @@
 /// * <https://framagit.org/Bromind/dot-parser/>
 /// And:
 /// * <https://graphviz.org/doc/info/lang.html>
-dotgraph = { c_comment? ~ strict? ~ (graph | digraph) ~ ident? ~ "{" ~ stmt_list ~ "}" }
+dotgraph = { strict? ~ (graph | digraph) ~ ident? ~ "{" ~ stmt_list ~ "}" }
 
-stmt_list = { ( stmt ~ ";"? ~ stmt_list )? }
-stmt = { subgraph | edge_stmt | attr_stmt | id_eq | node_stmt }
+stmt_list = { (stmt ~ ";"? ~ stmt_list)? }
+stmt      = { subgraph | edge_stmt | attr_stmt | id_eq | node_stmt }
 
 attr_stmt = { (graph | node | edge) ~ attr_list }
 attr_list = { "[" ~ a_list ~ "]" ~ attr_list? }
-a_list = { ident ~ "=" ~ ident ~ ( ";" | "," )? ~ a_list? }
+a_list    = { ident ~ "=" ~ ident ~ (";" | ",")? ~ a_list? }
 
-edge_stmt = { (node_id) ~ edge_rhs ~ attr_list? }
-edge_rhs = { edgeop ~ (node_id) ~ edge_rhs? }
-edgeop = _{ "--" | "->" }
+edge_stmt =  { node_id ~ edge_rhs ~ attr_list? }
+edge_rhs  =  { edgeop ~ node_id ~ edge_rhs? }
+edgeop    = _{ "--" | "->" }
 
 node_stmt = { node_id ~ attr_list? }
-node_id = { ident ~ ( port )? }
+// KNO-12: node_id should have a port as the comment below, but this
+//         seems to cause whitespace to be sucked into identifiers,
+//         so I am removing it until I get it figured out.
+// node_id   = { ident ~ port? }
+node_id   = { ident }
 
 port = {
-	 ":" ~ compass_pt
-	| ":" ~ ident ~ ( ":" ~ compass_pt)?
-	}
+    ":" ~ compass_pt
+  | ":" ~ ident ~ (":" ~ compass_pt)?
+}
 
 subgraph = { "subgraph" ~ ident? ~ "{" ~ stmt_list ~ "}" }
 
 compass_pt = { n | ne | e | se | s | sw | w | nw | c | underscore }
 
-graph = { "graph" }
-node = { "node" }
-edge = { "edge" }
-strict = { "strict" }
+graph   = { "graph" }
+node    = { "node" }
+edge    = { "edge" }
+strict  = { "strict" }
 digraph = { "digraph" }
 
-ident = @{ ident1 | numeral | quote | html | c_comment }
-ident1 = _{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-numeral = _{ "-"? ~ ( ("." ~ ASCII_DIGIT+) | ( ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT*)? ) ) }
+ident   = @{ ident1 | numeral | quote | html }
+ident1  = _{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+numeral = _{ "-"? ~ (("." ~ ASCII_DIGIT+) | (ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT*)?)) }
 
-c_comment = _{ "/*" ~ not_close_comment* ~ "*/" }
-not_close_comment = { !("*/") ~ ANY }
+quote     = _{ "\"" ~ (("\\\"") | not_quote)* ~ "\"" }
+not_quote =  { !("\"") ~ ANY }
 
-quote = _{ "\"" ~ ( ("\\\"") | not_quote)* ~ "\"" }
-not_quote = { !("\"") ~ ANY }
-
-html = _{ "<" ~ not_lt_gt+ ~ ">" }
-not_lt_gt = { !("<" | ">") ~ ANY }
+html      = _{ "<" ~ not_lt_gt+ ~ ">" }
+not_lt_gt =  { !("<" | ">") ~ ANY }
 
 id_eq = { ident ~ "=" ~ ident }
 
-n = { "n" }
-ne = { "ne" }
-e = { "e" }
-se = { "se" }
-s = { "s" }
-sw = { "sw" }
-w = { "w" }
-nw = { "nw" }
-c = { "c" }
+n          = { "n" }
+ne         = { "ne" }
+e          = { "e" }
+se         = { "se" }
+s          = { "s" }
+sw         = { "sw" }
+w          = { "w" }
+nw         = { "nw" }
+c          = { "c" }
 underscore = { "_" }
 
-WHITESPACE = _{ " " | "\t" | NEWLINE }
+WHITESPACE        = _{ " " | "\t" | NEWLINE }
+COMMENT           = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" | SingleLineComment }
+SingleLineComment =  { "//" ~ (!"\n" ~ ANY)* }

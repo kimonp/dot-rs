@@ -468,7 +468,7 @@ impl RankOrderings {
                         let result = self.exchange_if_crosses_decrease(&rank_set, v, w, exchange_if_equal);
 
                         if result != TransposeResult::Worse {
-                            println!("{_rank}: exchanged {position} with {}", position + 1);
+                            // println!("{_rank}: exchanged {position} with {}", position + 1);
                             rank_position.swap(position, position + 1);
                             improved = result == TransposeResult::Better;
                             if let Some(graph) = graph {
@@ -495,8 +495,10 @@ impl RankOrderings {
     ) -> TransposeResult {
         // TODO: Is it possible just to look at the adjacent ranks, or at least not all ranks?
         let cur_value = self.crossing_count();
+        // let cur_value = self.crossing_count_to_adjacent_ranks(rank);
         self.exchange_positions(node_idx_a, node_idx_b);
         let new_value = self.crossing_count();
+        // let new_value = self.crossing_count_to_adjacent_ranks(rank);
 
         if new_value < cur_value {
             TransposeResult::Better
