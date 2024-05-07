@@ -29,20 +29,24 @@ fn write_graphviz_svg_example(test_title: &str, dot_str: &str) {
 fn system_call_dot_to_svg_file(dot_str: &str, svg_path: &str) {
     let graph = dot_str.to_string();
     let dot_bin = "dot";
-    let mut dot_child = Command::new(dot_bin)
+    let result = Command::new(dot_bin)
         .arg("-Tsvg")
         .arg(&format!("-o{svg_path}"))
         .stdin(Stdio::piped())
-        .spawn()
-        .expect("Failed to start dot process");
-
-    let mut stdin = dot_child.stdin.take().expect("Failed to open stdin");
-    std::thread::spawn(move || {
-        stdin
-            .write_all(graph.as_bytes())
-            .expect("Failed to write to stdin");
-    });
-    let _status = dot_child.wait_with_output().expect("Failed to wait on dot");
+        .stderr(Stdio::piped())
+        .spawn();
+    
+    if let Ok(mut dot_child) = result {
+        let mut stdin = dot_child.stdin.take().expect("Failed to open stdin");
+        std::thread::spawn(move || {
+            stdin
+                .write_all(graph.as_bytes())
+                .expect("Failed to write to stdin");
+        });
+        let _status = dot_child.wait_with_output().expect("Failed to wait on dot");
+    } else {
+        // Don't expect this to work in CI since no dot is installed.
+    }
 }
 
 #[rstest(
