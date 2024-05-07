@@ -12,7 +12,7 @@ This is not production quality because:
 * Runs quite a bit slow, but this could probably be easily fixed
   with some investigation.
   
-  Examples:
+Some side by size comparison examples:
 
 dot-rs | GraphViz
 --- | --- |
