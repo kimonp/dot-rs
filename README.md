@@ -13,7 +13,7 @@ This is not production quality because:
   with some investigation.
   
   Examples:
-  <div class="row">
-  <div class="column">Col 1</div>
-  <div class="column">Col 2</div>
-</div>
+
+dot | dot-rs | GraphViz
+--- | --- | --- |
+{ a -> b; b -> c} | there | bye
