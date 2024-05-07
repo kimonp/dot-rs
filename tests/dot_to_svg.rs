@@ -2,15 +2,47 @@
 
 use std::fs::File;
 use std::io::Write;
+use std::process::{Command, Stdio};
 
 use dot_rs::api::dot_to_svg;
-use dot_rs::dot_examples::get_dot_example;
+use dot_rs::dot_examples::{get_dot_example, get_svg_example_path, SvgGenerator};
 use rstest::rstest;
 
-pub fn write_svg_to_file(name: &str, svg: &str) {
-    let mut file = File::create(format!("{name}.svg")).unwrap();
-
+/// Writes both the dot-rs and GraphViz version of the SVG to the examples directory.
+fn write_svg_to_example_file(test_title: &str, svg: &str) {
+    let dot_rs_svg_file_path = get_svg_example_path(test_title, SvgGenerator::DotRs);
+    let mut file = File::create(dot_rs_svg_file_path).unwrap();
     file.write_all(svg.as_bytes()).unwrap();
+}
+
+fn write_graphviz_svg_example(test_title: &str, dot_str: &str) {
+    let graphviz_svg_file_path = get_svg_example_path(test_title, SvgGenerator::GraphViz);
+
+    system_call_dot_to_svg_file(dot_str, &graphviz_svg_file_path);
+}
+
+/// Calls dot via a system command and returns the svg as a string.
+///
+/// Note: graphviz (and dot) needs to be installed for this to work: https://graphviz.org/download/
+///
+/// Example command: echo 'digraph { a -> b; a -> c; b -> d; c -> d;}' | dot -Tsvg example.svg
+fn system_call_dot_to_svg_file(dot_str: &str, svg_path: &str) {
+    let graph = dot_str.to_string();
+    let dot_bin = "dot";
+    let mut dot_child = Command::new(dot_bin)
+        .arg("-Tsvg")
+        .arg(&format!("-o{svg_path}"))
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("Failed to start dot process");
+
+    let mut stdin = dot_child.stdin.take().expect("Failed to open stdin");
+    std::thread::spawn(move || {
+        stdin
+            .write_all(graph.as_bytes())
+            .expect("Failed to write to stdin");
+    });
+    let _status = dot_child.wait_with_output().expect("Failed to wait on dot");
 }
 
 #[rstest(
@@ -44,5 +76,6 @@ fn test_dot_to_svg(test_title: &str) {
     let dot = get_dot_example(test_title);
     let svg = dot_to_svg(&dot);
 
-    write_svg_to_file("test_dot_to_svg", &svg);
+    write_svg_to_example_file(test_title, &svg);
+    write_graphviz_svg_example(test_title, &dot)
 }
