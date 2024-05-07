@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="936" height="954"
+                    viewBox="-36 -36 936 954"
+                    preserveAspectRatio="xMinYMin meet"
+                    >
+<defs>
+                    <marker
+                        id="arrow-head"
+                        orient="auto"
+                        viewBox="0 0 15 10"
+                        refX="15" refY="5"
+                        markerWidth="10" markerHeight="15"
+                    >
+                        <path d="M0,0 L15,5 L0,10 Z" fill="black"/>
+                    </marker>
+                </defs>
+<path  d="M432 450 L360 522" stroke="black" stroke-width="1px"/>
+<path  d="M432 450 L216 522" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 450 L497.5462813517561 512.0964770700847" stroke="black" stroke-width="1px"/>
+<path  d="M432 450 L787 522" stroke="black" stroke-width="1px"/>
+<path  d="M432 450 L706 522" stroke="black" stroke-width="1px"/>
+<path  d="M432 450 L288 522" stroke="black" stroke-width="1px"/>
+<path  d="M432 450 L72 522" stroke="black" stroke-width="1px"/>
+<path  d="M432 450 L432 522" stroke="black" stroke-width="1px"/>
+<path  d="M432 450 L616 522" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 594 L360 651.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 594 L228.8797515503988 659.5601242248006" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 594 L491.1202484496012 659.5601242248006" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 594 L562.3389605080725 661.4463201693575" stroke="black" stroke-width="1px"/>
+<path  d="M360 594 L432 666" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 666 L418.3389605080726 733.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 666 L216 723.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M508 522 L778.041589133301 590.4612479492876" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M508 522 L706.3649051224254 589.3692130604463" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M508 522 L301.6857186582435 589.5210375300294" stroke="black" stroke-width="1px"/>
+<path  d="M508 522 L504 594" stroke="black" stroke-width="1px"/>
+<path  d="M508 522 L576 594" stroke="black" stroke-width="1px"/>
+<path  d="M792 594 L864 666" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 594 L374.12036172994925 663.1759276540101" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 594 L720 651.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 594 L588.8797515503987 659.5601242248006" stroke="black" stroke-width="1px"/>
+<path  d="M720 594 L648 666" stroke="black" stroke-width="1px"/>
+<path  d="M720 594 L792 666" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 594 L226.1823376490863 655.8176623509137" stroke="black" stroke-width="1px"/>
+<path  d="M288 594 L144 666" stroke="black" stroke-width="1px"/>
+<path  d="M288 594 L72 666" stroke="black" stroke-width="1px"/>
+<path  d="M288 594 L288 666" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 594 L349.81766235091374 655.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 594 L490.3389605080726 661.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 594 L562.0299479979072 662.5074869994768" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 738 L216 795.6" stroke="black" stroke-width="1px"/>
+<path  d="M216 738 L432 810" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 738 L277.81766235091374 799.8176623509137" stroke="black" stroke-width="1px"/>
+<path  d="M216 738 L360 810" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 666 L508.8411136998683 732.1516060888304" stroke="black" stroke-width="1px"/>
+<path  d="M360 666 L144 738" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 738 L634.3389605080725 805.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 810 L551.981524238465 874.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 810 L338.05709366664894 878.8762014074114" stroke="black" stroke-width="1px"/>
+<path  d="M720 666 L630 738" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 666 L535.5330252982335 733.0788998915515" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 666 L720 723.6" stroke="black" stroke-width="1px"/>
+<path  d="M720 738 L576 810" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 810 L312.01847576153506 874.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 810 L317.56012422480063 869.1202484496013" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 522 L360 579.6" stroke="black" stroke-width="1px"/>
+<path  d="M216 522 L216 594" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 594 L216 651.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M787 522 L791.0024025790323 579.6345971380654" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M706 522 L717.251476908928 579.8647383887725" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 522 L288 579.6" stroke="black" stroke-width="1px"/>
+<path  d="M72 522 L36 594" stroke="black" stroke-width="1px"/>
+<path  d="M36 594 L0 666" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M0 666 L202.3389605080726 733.4463201693575" stroke="black" stroke-width="1px"/>
+<path  d="M432 522 L432 594" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 594 L493.81766235091374 655.8176623509137" stroke="black" stroke-width="1px"/>
+<path  d="M616 522 L648 594" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 594 L586.1823376490863 655.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M504 594 L504 651.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M576 594 L576 651.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 666 L432 723.6" stroke="black" stroke-width="1px"/>
+<path  d="M864 666 L828 738" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M828 738 L661.3700643487477 804.6519742605009" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 666 L445.6610394919274 733.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 666 L730.1823376490863 727.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 666 L205.8176623509137 727.8176623509137" stroke="black" stroke-width="1px"/>
+<path  d="M72 666 L72 738" stroke="black" stroke-width="1px"/>
+<path  d="M72 738 L72 810" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M72 810 L310.15405515397214 878.0440157582777" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 666 L419.1202484496012 731.5601242248006" stroke="black" stroke-width="1px"/>
+<path  d="M144 738 L144 810" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 810 L310.62993565125225 876.6519742605009" stroke="black" stroke-width="1px"/>
+<path  d="M630 738 L504 810" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M504 810 L337.37006434874775 876.6519742605009" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 810 L528.018475761535 874.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 810 L330.43987577519937 869.1202484496013" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M576 810 L337.84594484602786 878.0440157582777" stroke="black" stroke-width="1px"/>
+<ellipse cx="432" cy="450" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="454" style="font-size:12; text-anchor: middle">regexp</text>
+<ellipse cx="360" cy="594" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="598" style="font-size:12; text-anchor: middle">bytes</text>
+<circle cx="216" cy="666" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="674" style="font-size:24; text-anchor: middle">io</text>
+<ellipse cx="508" cy="522" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="508" y="526" style="font-size:12; text-anchor: middle">regexp/syntax</text>
+<ellipse cx="792" cy="594" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="792" y="598" style="font-size:12; text-anchor: middle">sort</text>
+<ellipse cx="720" cy="594" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="720" y="598" style="font-size:12; text-anchor: middle">strconv</text>
+<ellipse cx="288" cy="594" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="288" y="598" style="font-size:12; text-anchor: middle">strings</text>
+<ellipse cx="216" cy="738" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="742" style="font-size:12; text-anchor: middle">sync</text>
+<ellipse cx="504" cy="666" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="504" y="670" style="font-size:12; text-anchor: middle">unicode</text>
+<ellipse cx="576" cy="666" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="576" y="670" style="font-size:12; text-anchor: middle">unicode/utf8</text>
+<ellipse cx="360" cy="666" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="670" style="font-size:12; text-anchor: middle">internal/bytealg</text>
+<ellipse cx="432" cy="738" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="742" style="font-size:12; text-anchor: middle">errors</text>
+<ellipse cx="648" cy="810" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="648" y="814" style="font-size:12; text-anchor: middle">internal/reflectlite</text>
+<ellipse cx="720" cy="666" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="720" y="670" style="font-size:12; text-anchor: middle">math</text>
+<ellipse cx="720" cy="738" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="720" y="742" style="font-size:12; text-anchor: middle">math/bits</text>
+<ellipse cx="324" cy="882" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="324" y="886" style="font-size:12; text-anchor: middle">unsafe</text>
+<ellipse cx="216" cy="810" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="814" style="font-size:12; text-anchor: middle">internal/race</text>
+<ellipse cx="540" cy="882" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="540" y="886" style="font-size:12; text-anchor: middle">runtime</text>
+<ellipse cx="288" cy="810" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="288" y="814" style="font-size:12; text-anchor: middle">sync/atomic</text>
+<ellipse cx="522" cy="738" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="522" y="742" style="font-size:12; text-anchor: middle">internal/cpu</text>
+<circle cx="360" cy="522" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="216" cy="522" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="216" cy="594" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="787" cy="522" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="706" cy="522" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="288" cy="522" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="72" cy="522" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="36" cy="594" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="0" cy="666" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="432" cy="522" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="432" cy="594" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="616" cy="522" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="648" cy="594" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="504" cy="594" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="576" cy="594" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="432" cy="666" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="864" cy="666" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="828" cy="738" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="648" cy="666" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="792" cy="666" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="144" cy="666" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="72" cy="666" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="72" cy="738" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="72" cy="810" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="288" cy="666" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="144" cy="738" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="144" cy="810" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="630" cy="738" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="504" cy="810" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="432" cy="810" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="360" cy="810" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="576" cy="810" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+</svg>

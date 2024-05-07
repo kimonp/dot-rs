@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="198"
+                    viewBox="-36 -36 144 198"
+                    preserveAspectRatio="xMinYMin meet"
+                    >
+<defs>
+                    <marker
+                        id="arrow-head"
+                        orient="auto"
+                        viewBox="0 0 15 10"
+                        refX="15" refY="5"
+                        markerWidth="10" markerHeight="15"
+                    >
+                        <path d="M0,0 L15,5 L0,10 Z" fill="black"/>
+                    </marker>
+                </defs>
+<path marker-end="url(#arrow-head)" d="M36 54 L6.4398757751993925 113.1202484496012" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M36 54 L65.5601242248006 113.1202484496012" stroke="black" stroke-width="1px"/>
+<circle cx="36" cy="54" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="36" y="62" style="font-size:24; text-anchor: middle">a</text>
+<circle cx="0" cy="126" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="0" y="134" style="font-size:24; text-anchor: middle">b</text>
+<circle cx="72" cy="126" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="72" y="134" style="font-size:24; text-anchor: middle">c</text>
+</svg>

@@ -1,0 +1,280 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2412" height="1782"
+                    viewBox="-36 -36 2412 1782"
+                    preserveAspectRatio="xMinYMin meet"
+                    >
+<defs>
+                    <marker
+                        id="arrow-head"
+                        orient="auto"
+                        viewBox="0 0 15 10"
+                        refX="15" refY="5"
+                        markerWidth="10" markerHeight="15"
+                    >
+                        <path d="M0,0 L15,5 L0,10 Z" fill="black"/>
+                    </marker>
+                </defs>
+<path  d="M1116 1134 L756 1206" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1116 1134 L1247.1202484496011 1199.5601242248006" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L922.1540551539722 1346.0440157582777" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L1065.8322732945612 1347.4240496899201" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L780.018475761535 1342.0123171743567" stroke="black" stroke-width="1px"/>
+<path  d="M684 1278 L1476 1350" stroke="black" stroke-width="1px"/>
+<path  d="M684 1278 L1620 1350" stroke="black" stroke-width="1px"/>
+<path  d="M684 1278 L504 1350" stroke="black" stroke-width="1px"/>
+<path  d="M684 1278 L720 1350" stroke="black" stroke-width="1px"/>
+<path  d="M684 1278 L864 1350" stroke="black" stroke-width="1px"/>
+<path  d="M684 1278 L72 1350" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L158.27368176982995 1348.0968424306893" stroke="black" stroke-width="1px"/>
+<path  d="M684 1278 L1008 1350" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L230.23255244616888 1347.8103765467433" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L302.16772670543867 1347.4240496899201" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L374.05709366664894 1346.8762014074114" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L445.84594484602786 1346.0440157582777" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L1533.6497410812738 1348.8041450901062" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L587.981524238465 1342.0123171743567" stroke="black" stroke-width="1px"/>
+<path  d="M684 1278 L0 1350" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M684 1278 L654.4398757751994 1337.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M936 1350 L1497.7111985753231 1420.2138998219154" stroke="black" stroke-width="1px"/>
+<path  d="M936 1350 L1080 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M936 1350 L518.2040725031828 1419.6326545828028" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M936 1350 L733.6610394919275 1417.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M936 1350 L874.1823376490863 1411.8176623509137" stroke="black" stroke-width="1px"/>
+<path  d="M936 1350 L792 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1512 1422 L1415.981524238465 1486.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1512 1422 L1541.5601242248006 1481.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1512 1422 L1608.018475761535 1486.0123171743567" stroke="black" stroke-width="1px"/>
+<path  d="M1512 1422 L837 1494" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1512 1422 L1821.9429063333512 1490.8762014074114" stroke="black" stroke-width="1px"/>
+<path  d="M1080 1350 L1800 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1080 1350 L1141.8176623509137 1411.8176623509137" stroke="black" stroke-width="1px"/>
+<path  d="M1080 1350 L1872 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1080 1350 L590.2552727087208 1419.9635324701828" stroke="black" stroke-width="1px"/>
+<path  d="M1080 1350 L1008 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1080 1350 L734.1203617299492 1419.1759276540101" stroke="black" stroke-width="1px"/>
+<path  d="M1080 1350 L936 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1080 1350 L1713.6880742207 1420.4097860245222" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1080 1350 L877.6610394919275 1417.4463201693575" stroke="black" stroke-width="1px"/>
+<path  d="M1080 1350 L1944 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1548 1494 L1451.981524238465 1558.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1620 1494 L1620 1551.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1404 1494 L1433.5601242248006 1553.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1152 1422 L1122.4398757751994 1481.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1323 1638 L1323 1695.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1620 1566 L1336.9946415219174 1634.6073596310503" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1116 1494 L1116 1551.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 1350 L589.6610394919275 1417.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 1350 L1641.6497410812738 1420.8041450901062" stroke="black" stroke-width="1px"/>
+<path  d="M792 1350 L648 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 1350 L446.12036172994925 1419.1759276540101" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M963 1566 L963 1623.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M945 1494 L959.5074869994768 1552.0299479979071" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M945 1494 L899.64 1554.48" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M504 1422 L930.7881665168302 1491.679700655809" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M504 1422 L643.9706106883057 1487.8685226768498" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 1422 L1003.0053584780826 1490.6073596310503" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 1422 L428.01720722400347 1490.7018335943521" stroke="black" stroke-width="1px"/>
+<path  d="M1017 1494 L1035 1566" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1404 1278 L1404 1335.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1404 1278 L1678.0299479979071 1346.507486999477" stroke="black" stroke-width="1px"/>
+<path  d="M1404 1350 L2016 1422" stroke="black" stroke-width="1px"/>
+<path  d="M1404 1350 L1440 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1404 1350 L1570.6299356512523 1416.651974260501" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1404 1350 L1237.3700643487477 1416.651974260501" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1404 1350 L1307.981524238465 1414.0123171743567" stroke="black" stroke-width="1px"/>
+<path  d="M1404 1350 L2088 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1404 1350 L1374.4398757751994 1409.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1260 1206 L1391.1202484496011 1271.5601242248006" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1656 1422 L1685.5601242248006 1481.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1548 1566 L1965.795927496817 1635.6326545828028" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1584 1422 L1554.4398757751994 1481.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1548 1494 L1548 1551.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M657 1494 L735.7554891440203 1557.0043913152163" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M657 1494 L445.7149077196703 1561.6112295297055" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1692 1494 L1692 1551.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1692 1494 L1753.8176623509137 1555.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M2160 1422 L2189.560124224801 1481.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M2160 1422 L2063.9815242384648 1486.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M2160 1422 L2130.439875775199 1481.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M2160 1422 L2256.0184757615352 1486.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1548 1350 L2145.6986312977506 1420.3174860350296" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M756 1206 L694.1823376490863 1267.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1476 1350 L1642.6299356512523 1416.651974260501" stroke="black" stroke-width="1px"/>
+<path  d="M1620 1350 L2268 1422" stroke="black" stroke-width="1px"/>
+<path  d="M2268 1422 L2340 1494" stroke="black" stroke-width="1px"/>
+<path  d="M2340 1494 L2196 1566" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M2196 1566 L1993.6610394919273 1633.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M504 1350 L565.8176623509137 1411.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 1350 L517.6610394919275 1417.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M864 1350 L732.8797515503987 1415.5601242248006" stroke="black" stroke-width="1px"/>
+<path  d="M72 1350 L252 1422" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M252 1422 L400.8411136998683 1488.1516060888302" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1008 1350 L876.8797515503987 1415.5601242248006" stroke="black" stroke-width="1px"/>
+<path  d="M0 1350 L90 1422" stroke="black" stroke-width="1px"/>
+<path  d="M90 1422 L216 1494" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 1494 L418.3389605080726 1561.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1080 1422 L1109.5601242248006 1481.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 1422 L669.7058823529412 1487.2235294117647" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1800 1422 L1561.8459448460278 1490.0440157582777" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1872 1422 L1633.8459448460278 1490.0440157582777" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1008 1422 L954.4824663533067 1483.162895596221" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M936 1422 L670.9431934614147 1490.4017565260865" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1944 1422 L1847.981524238465 1486.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 1422 L655.2138998219154 1479.7111985753231" stroke="black" stroke-width="1px"/>
+<path  d="M2016 1422 L1980 1494" stroke="black" stroke-width="1px"/>
+<path  d="M1980 1494 L1980 1566" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1980 1566 L1980 1623.6" stroke="black" stroke-width="1px"/>
+<path  d="M1440 1422 L1476 1494" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1476 1494 L1537.8176623509137 1555.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M2088 1422 L2058.439875775199 1481.1202484496011" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M837 1494 L758.2445108559797 1557.0043913152163" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M1035 1566 L1309.0299479979071 1634.507486999477" stroke="black" stroke-width="1px"/>
+<ellipse cx="1116" cy="1134" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1116" y="1138" style="font-size:12; text-anchor: middle">start</text>
+<ellipse cx="684" cy="1278" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="684" y="1282" style="font-size:12; text-anchor: middle">main</text>
+<ellipse cx="1260" cy="1206" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1260" y="1210" style="font-size:12; text-anchor: middle">on_exit</text>
+<ellipse cx="936" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="936" y="1354" style="font-size:12; text-anchor: middle">sort</text>
+<ellipse cx="1080" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1080" y="1354" style="font-size:12; text-anchor: middle">merge</text>
+<ellipse cx="792" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="792" y="1354" style="font-size:12; text-anchor: middle">term</text>
+<ellipse cx="1656" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1656" y="1426" style="font-size:12; text-anchor: middle">signal</text>
+<ellipse cx="1980" cy="1638" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1980" y="1642" style="font-size:12; text-anchor: middle">sbrk</text>
+<ellipse cx="576" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="576" y="1426" style="font-size:12; text-anchor: middle">unlink</text>
+<ellipse cx="504" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="504" y="1426" style="font-size:12; text-anchor: middle">newfile</text>
+<ellipse cx="720" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="720" y="1426" style="font-size:12; text-anchor: middle">fclose</text>
+<ellipse cx="414" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="414" y="1498" style="font-size:12; text-anchor: middle">close</text>
+<circle cx="144" cy="1350" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="144" y="1358" style="font-size:24; text-anchor: middle">brk</text>
+<ellipse cx="864" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="864" y="1426" style="font-size:12; text-anchor: middle">setbuf</text>
+<ellipse cx="216" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="1354" style="font-size:12; text-anchor: middle">copyproto</text>
+<ellipse cx="288" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="288" y="1354" style="font-size:12; text-anchor: middle">initree</text>
+<ellipse cx="360" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="1354" style="font-size:12; text-anchor: middle">safeoutfil</text>
+<ellipse cx="432" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="1354" style="font-size:12; text-anchor: middle">getpid</text>
+<ellipse cx="1548" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1548" y="1354" style="font-size:12; text-anchor: middle">sprintf</text>
+<ellipse cx="576" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="576" y="1354" style="font-size:12; text-anchor: middle">creat</text>
+<circle cx="432" cy="1566" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="1574" style="font-size:24; text-anchor: middle">rem</text>
+<ellipse cx="648" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="648" y="1354" style="font-size:12; text-anchor: middle">oldfile</text>
+<ellipse cx="1512" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1512" y="1426" style="font-size:12; text-anchor: middle">msort</text>
+<ellipse cx="1116" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1116" y="1498" style="font-size:12; text-anchor: middle">filbuf</text>
+<ellipse cx="657" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="657" y="1498" style="font-size:12; text-anchor: middle">setfil</text>
+<ellipse cx="1404" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1404" y="1498" style="font-size:12; text-anchor: middle">qsort</text>
+<ellipse cx="1548" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1548" y="1498" style="font-size:12; text-anchor: middle">insert</text>
+<ellipse cx="1620" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1620" y="1498" style="font-size:12; text-anchor: middle">wline</text>
+<circle cx="747" cy="1566" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="747" y="1574" style="font-size:24; text-anchor: middle">div</text>
+<ellipse cx="1836" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1836" y="1498" style="font-size:12; text-anchor: middle">cmpsave</text>
+<ellipse cx="1152" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1152" y="1426" style="font-size:12; text-anchor: middle">rline</text>
+<ellipse cx="945" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="945" y="1498" style="font-size:12; text-anchor: middle">fopen</text>
+<circle cx="1728" cy="1422" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1728" y="1430" style="font-size:24; text-anchor: middle">mul</text>
+<ellipse cx="1440" cy="1566" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1440" y="1570" style="font-size:12; text-anchor: middle">cmpa</text>
+<ellipse cx="1620" cy="1566" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1620" y="1570" style="font-size:12; text-anchor: middle">flsbuf</text>
+<ellipse cx="1323" cy="1638" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1323" y="1642" style="font-size:12; text-anchor: middle">xflsbuf</text>
+<ellipse cx="1323" cy="1710" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1323" y="1714" style="font-size:12; text-anchor: middle">write</text>
+<ellipse cx="1116" cy="1566" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1116" y="1570" style="font-size:12; text-anchor: middle">read</text>
+<ellipse cx="432" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="1426" style="font-size:12; text-anchor: middle">exit</text>
+<ellipse cx="963" cy="1566" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="963" y="1570" style="font-size:12; text-anchor: middle">endopen</text>
+<ellipse cx="963" cy="1638" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="963" y="1642" style="font-size:12; text-anchor: middle">open</text>
+<ellipse cx="891" cy="1566" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="891" y="1570" style="font-size:12; text-anchor: middle">findiop</text>
+<ellipse cx="1017" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1017" y="1498" style="font-size:12; text-anchor: middle">fflush</text>
+<ellipse cx="1404" cy="1278" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1404" y="1282" style="font-size:12; text-anchor: middle">malloc</text>
+<ellipse cx="1404" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1404" y="1354" style="font-size:12; text-anchor: middle">morecore</text>
+<ellipse cx="1692" cy="1350" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1692" y="1354" style="font-size:12; text-anchor: middle">demote</text>
+<ellipse cx="1548" cy="1566" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1548" y="1570" style="font-size:12; text-anchor: middle">getfreehdr</text>
+<ellipse cx="1584" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1584" y="1426" style="font-size:12; text-anchor: middle">free</text>
+<ellipse cx="1224" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1224" y="1426" style="font-size:12; text-anchor: middle">getpagesize</text>
+<ellipse cx="1296" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1296" y="1426" style="font-size:12; text-anchor: middle">putfreehdr</text>
+<ellipse cx="2052" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="2052" y="1498" style="font-size:12; text-anchor: middle">udiv</text>
+<ellipse cx="1368" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1368" y="1426" style="font-size:12; text-anchor: middle">umul</text>
+<ellipse cx="1692" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1692" y="1498" style="font-size:12; text-anchor: middle">sigvec</text>
+<ellipse cx="1692" cy="1566" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1692" y="1570" style="font-size:12; text-anchor: middle">sigblock</text>
+<ellipse cx="1764" cy="1566" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="1764" y="1570" style="font-size:12; text-anchor: middle">sigsetmask</text>
+<ellipse cx="2160" cy="1422" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="2160" y="1426" style="font-size:12; text-anchor: middle">doprnt</text>
+<ellipse cx="2196" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="2196" y="1498" style="font-size:12; text-anchor: middle">urem</text>
+<ellipse cx="2124" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="2124" y="1498" style="font-size:12; text-anchor: middle">strlen</text>
+<ellipse cx="2268" cy="1494" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="2268" y="1498" style="font-size:12; text-anchor: middle">localeconv</text>
+<circle cx="756" cy="1206" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1476" cy="1350" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1620" cy="1350" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="2268" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="2340" cy="1494" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="2196" cy="1566" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="504" cy="1350" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="720" cy="1350" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="864" cy="1350" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="72" cy="1350" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="252" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1008" cy="1350" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="0" cy="1350" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="90" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="216" cy="1494" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1080" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="792" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1800" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1872" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1008" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="936" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1944" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="648" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="2016" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1980" cy="1494" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1980" cy="1566" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1440" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1476" cy="1494" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="2088" cy="1422" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="837" cy="1494" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="1035" cy="1566" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+</svg>
