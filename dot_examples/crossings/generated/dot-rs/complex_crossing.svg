@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="472"
+                    viewBox="-36 -36 360 472"
+                    preserveAspectRatio="xMinYMin meet"
+                    >
+<defs>
+                    <marker
+                        id="arrow-head"
+                        orient="auto"
+                        viewBox="0 0 15 10"
+                        refX="15" refY="5"
+                        markerWidth="10" markerHeight="15"
+                    >
+                        <path d="M0,0 L15,5 L0,10 Z" fill="black"/>
+                    </marker>
+                </defs>
+<path marker-end="url(#arrow-head)" d="M94 112 L135.78630034326704 172.17227249430454" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M198 112 L152.64 172.48" stroke="black" stroke-width="1px"/>
+<path  d="M198 112 L252 184" stroke="black" stroke-width="1px"/>
+<path  d="M144 184 L216 256" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 328 L216 385.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 184 L144 241.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 184 L82.18233764908629 245.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 256 L205.8176623509137 317.81766235091374" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 256 L144 313.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M72 256 L133.8176623509137 317.81766235091374" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M72 256 L72 313.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M72 256 L10.182337649086286 317.81766235091374" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 328 L277.81766235091374 389.81766235091374" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 328 L119.98152423846494 392.0123171743567" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M72 328 L101.5601242248006 387.1202484496012" stroke="black" stroke-width="1px"/>
+<path  d="M94 112 L31 184" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M0 328 L0.0000000000000008817456953860943 385.6" stroke="black" stroke-width="1px"/>
+<path  d="M31 184 L0 256" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M0 256 L0.0000000000000008817456953860943 313.6" stroke="black" stroke-width="1px"/>
+<path  d="M252 184 L288 256" stroke="black" stroke-width="1px"/>
+<path  d="M288 256 L288 328" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 328 L288 385.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 256 L216 313.6" stroke="black" stroke-width="1px"/>
+<circle cx="94" cy="112" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="94" y="120" style="font-size:24; text-anchor: middle">1</text>
+<circle cx="144" cy="184" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="144" y="192" style="font-size:24; text-anchor: middle">8</text>
+<circle cx="198" cy="112" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="198" y="120" style="font-size:24; text-anchor: middle">2</text>
+<circle cx="288" cy="400" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="288" y="408" style="font-size:24; text-anchor: middle">20</text>
+<circle cx="216" cy="328" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="336" style="font-size:24; text-anchor: middle">16</text>
+<circle cx="216" cy="400" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="408" style="font-size:24; text-anchor: middle">19</text>
+<circle cx="144" cy="256" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="144" y="264" style="font-size:24; text-anchor: middle">11</text>
+<circle cx="72" cy="256" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="72" y="264" style="font-size:24; text-anchor: middle">10</text>
+<circle cx="144" cy="328" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="144" y="336" style="font-size:24; text-anchor: middle">15</text>
+<circle cx="72" cy="328" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="72" y="336" style="font-size:24; text-anchor: middle">14</text>
+<circle cx="0" cy="328" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="0" y="336" style="font-size:24; text-anchor: middle">13</text>
+<circle cx="108" cy="400" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="108" y="408" style="font-size:24; text-anchor: middle">18</text>
+<circle cx="0" cy="400" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="0" y="408" style="font-size:24; text-anchor: middle">17</text>
+<circle cx="31" cy="184" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="0" cy="256" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="252" cy="184" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="288" cy="256" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="288" cy="328" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="216" cy="256" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+</svg>

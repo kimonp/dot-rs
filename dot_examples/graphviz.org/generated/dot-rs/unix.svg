@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1008" height="990"
+                    viewBox="-36 -36 1008 990"
+                    preserveAspectRatio="xMinYMin meet"
+                    >
+<defs>
+                    <marker
+                        id="arrow-head"
+                        orient="auto"
+                        viewBox="0 0 15 10"
+                        refX="15" refY="5"
+                        markerWidth="10" markerHeight="15"
+                    >
+                        <path d="M0,0 L15,5 L0,10 Z" fill="black"/>
+                    </marker>
+                </defs>
+<path marker-end="url(#arrow-head)" d="M180 198 L150.4398757751994 257.1202484496012" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M180 198 L209.5601242248006 257.1202484496012" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 270 L82.18233764908629 331.81766235091374" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 270 L561.7959274968172 339.63265458280284" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 270 L12.879751550398788 335.56012422480063" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 270 L144 327.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 270 L275.1202484496012 335.56012422480063" stroke="black" stroke-width="1px"/>
+<path  d="M288 342 L288 414" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 342 L226.1823376490863 403.81766235091374" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 342 L633.8796382700508 411.17592765401014" stroke="black" stroke-width="1px"/>
+<path  d="M648 414 L720 486" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 414 L779.1202484496013 479.56012422480063" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 414 L586.1823376490863 475.81766235091374" stroke="black" stroke-width="1px"/>
+<path  d="M648 414 L648 486" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 414 L516.8797515503987 479.56012422480063" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 414 L850.3389605080725 481.44632016935753" stroke="black" stroke-width="1px"/>
+<path  d="M576 486 L576 558" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 774 L588.8797515503987 839.5601242248006" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M576 342 L814.1540551539722 410.04401575827774" stroke="black" stroke-width="1px"/>
+<path  d="M828 414 L936 486" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M864 774 L661.6610394919275 841.4463201693575" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M864 774 L864 831.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 486 L792 543.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 558 L792 615.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 630 L792 687.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 702 L792 759.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 702 L853.8176623509137 763.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 702 L730.1823376490863 763.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 774 L730.1823376490863 835.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M792 774 L792 831.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 270 L216 327.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 270 L347.1202484496012 335.56012422480063" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 342 L216 399.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 342 L421.81766235091374 403.81766235091374" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 342 L360 399.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 414 L432 471.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 486 L432 543.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 558 L370.18233764908626 619.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M432 558 L432 615.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 414 L360 471.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 486 L298.18233764908626 547.8176623509137" stroke="black" stroke-width="1px"/>
+<path  d="M216 414 L144 486" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 486 L288 543.6" stroke="black" stroke-width="1px"/>
+<path  d="M288 558 L288 630" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 630 L360 687.6" stroke="black" stroke-width="1px"/>
+<path  d="M432 558 L504 630" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 702 L360 759.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 774 L360 831.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M360 846 L360 903.6" stroke="black" stroke-width="1px"/>
+<path  d="M288 414 L216 486" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M216 486 L277.81766235091374 547.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 486 L275.1202484496012 551.5601242248006" stroke="black" stroke-width="1px"/>
+<path  d="M720 486 L720 558" stroke="black" stroke-width="1px"/>
+<path  d="M720 558 L720 630" stroke="black" stroke-width="1px"/>
+<path  d="M720 630 L720 702" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M720 702 L720 759.6" stroke="black" stroke-width="1px"/>
+<path  d="M648 486 L648 558" stroke="black" stroke-width="1px"/>
+<path  d="M648 558 L648 630" stroke="black" stroke-width="1px"/>
+<path  d="M648 630 L648 702" stroke="black" stroke-width="1px"/>
+<path  d="M648 702 L648 774" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M648 774 L648 831.6" stroke="black" stroke-width="1px"/>
+<path  d="M936 486 L864 558" stroke="black" stroke-width="1px"/>
+<path  d="M864 558 L864 630" stroke="black" stroke-width="1px"/>
+<path  d="M864 630 L864 702" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M864 702 L864 759.6" stroke="black" stroke-width="1px"/>
+<path  d="M576 558 L576 630" stroke="black" stroke-width="1px"/>
+<path  d="M576 630 L576 702" stroke="black" stroke-width="1px"/>
+<path  d="M576 702 L576 774" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M576 774 L637.8176623509137 835.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M288 630 L349.81766235091374 691.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M504 630 L372.8797515503988 695.5601242248006" stroke="black" stroke-width="1px"/>
+<ellipse cx="180" cy="198" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="180" y="202" style="font-size:12; text-anchor: middle">"5th Edition"</text>
+<ellipse cx="144" cy="270" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="144" y="274" style="font-size:12; text-anchor: middle">"6th Edition"</text>
+<ellipse cx="216" cy="270" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="274" style="font-size:12; text-anchor: middle">"PWB 1.0"</text>
+<ellipse cx="72" cy="342" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="72" y="346" style="font-size:12; text-anchor: middle">"LSX"</text>
+<ellipse cx="576" cy="342" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="576" y="346" style="font-size:12; text-anchor: middle">"1 BSD"</text>
+<ellipse cx="0" cy="342" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="0" y="346" style="font-size:12; text-anchor: middle">"Mini Unix"</text>
+<ellipse cx="144" cy="342" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="144" y="346" style="font-size:12; text-anchor: middle">"Wollongong"</text>
+<ellipse cx="288" cy="342" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="288" y="346" style="font-size:12; text-anchor: middle">"Interdata"</text>
+<ellipse cx="288" cy="558" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="288" y="562" style="font-size:12; text-anchor: middle">"Unix/TS 3.0"</text>
+<ellipse cx="216" cy="414" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="418" style="font-size:12; text-anchor: middle">"PWB 2.0"</text>
+<ellipse cx="648" cy="414" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="648" y="418" style="font-size:12; text-anchor: middle">"7th Edition"</text>
+<ellipse cx="720" cy="774" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="720" y="778" style="font-size:12; text-anchor: middle">"8th Edition"</text>
+<ellipse cx="792" cy="486" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="792" y="490" style="font-size:12; text-anchor: middle">"32V"</text>
+<ellipse cx="576" cy="486" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="576" y="490" style="font-size:12; text-anchor: middle">"V7M"</text>
+<ellipse cx="648" cy="846" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="648" y="850" style="font-size:12; text-anchor: middle">"Ultrix-11"</text>
+<ellipse cx="504" cy="486" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="504" y="490" style="font-size:12; text-anchor: middle">"Xenix"</text>
+<ellipse cx="864" cy="486" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="864" y="490" style="font-size:12; text-anchor: middle">"UniPlus+"</text>
+<ellipse cx="576" cy="846" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="576" y="850" style="font-size:12; text-anchor: middle">"9th Edition"</text>
+<ellipse cx="828" cy="414" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="828" y="418" style="font-size:12; text-anchor: middle">"2 BSD"</text>
+<ellipse cx="864" cy="774" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="864" y="778" style="font-size:12; text-anchor: middle">"2.8 BSD"</text>
+<ellipse cx="864" cy="846" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="864" y="850" style="font-size:12; text-anchor: middle">"2.9 BSD"</text>
+<ellipse cx="792" cy="558" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="792" y="562" style="font-size:12; text-anchor: middle">"3 BSD"</text>
+<ellipse cx="792" cy="630" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="792" y="634" style="font-size:12; text-anchor: middle">"4 BSD"</text>
+<ellipse cx="792" cy="702" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="792" y="706" style="font-size:12; text-anchor: middle">"4.1 BSD"</text>
+<ellipse cx="792" cy="774" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="792" y="778" style="font-size:12; text-anchor: middle">"4.2 BSD"</text>
+<ellipse cx="720" cy="846" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="720" y="850" style="font-size:12; text-anchor: middle">"4.3 BSD"</text>
+<ellipse cx="792" cy="846" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="792" y="850" style="font-size:12; text-anchor: middle">"Ultrix-32"</text>
+<ellipse cx="216" cy="342" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="216" y="346" style="font-size:12; text-anchor: middle">"PWB 1.2"</text>
+<ellipse cx="360" cy="342" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="346" style="font-size:12; text-anchor: middle">"USG 1.0"</text>
+<ellipse cx="432" cy="414" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="418" style="font-size:12; text-anchor: middle">"CB Unix 1"</text>
+<ellipse cx="360" cy="414" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="418" style="font-size:12; text-anchor: middle">"USG 2.0"</text>
+<ellipse cx="432" cy="486" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="490" style="font-size:12; text-anchor: middle">"CB Unix 2"</text>
+<ellipse cx="432" cy="558" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="562" style="font-size:12; text-anchor: middle">"CB Unix 3"</text>
+<ellipse cx="360" cy="630" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="634" style="font-size:12; text-anchor: middle">"Unix/TS++"</text>
+<ellipse cx="432" cy="630" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="432" y="634" style="font-size:12; text-anchor: middle">"PDP-11 Sys V"</text>
+<ellipse cx="360" cy="486" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="490" style="font-size:12; text-anchor: middle">"USG 3.0"</text>
+<ellipse cx="288" cy="486" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="288" y="490" style="font-size:12; text-anchor: middle">"Unix/TS 1.0"</text>
+<ellipse cx="360" cy="702" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="706" style="font-size:12; text-anchor: middle">"TS 4.0"</text>
+<ellipse cx="360" cy="774" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="778" style="font-size:12; text-anchor: middle">"System V.0"</text>
+<ellipse cx="360" cy="846" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="850" style="font-size:12; text-anchor: middle">"System V.2"</text>
+<ellipse cx="360" cy="918" ry="14.4" rx="28.8" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="360" y="922" style="font-size:12; text-anchor: middle">"System V.3"</text>
+<circle cx="288" cy="414" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="216" cy="486" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="144" cy="486" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="720" cy="486" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="720" cy="558" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="720" cy="630" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="720" cy="702" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="648" cy="486" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="648" cy="558" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="648" cy="630" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="648" cy="702" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="648" cy="774" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="936" cy="486" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="864" cy="558" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="864" cy="630" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="864" cy="702" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="576" cy="558" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="576" cy="630" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="576" cy="702" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="576" cy="774" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="288" cy="630" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+<circle cx="504" cy="630" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+</svg>

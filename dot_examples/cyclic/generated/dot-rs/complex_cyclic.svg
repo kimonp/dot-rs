@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="216" height="306"
+                    viewBox="-36 -36 216 306"
+                    preserveAspectRatio="xMinYMin meet"
+                    >
+<defs>
+                    <marker
+                        id="arrow-head"
+                        orient="auto"
+                        viewBox="0 0 15 10"
+                        refX="15" refY="5"
+                        markerWidth="10" markerHeight="15"
+                    >
+                        <path d="M0,0 L15,5 L0,10 Z" fill="black"/>
+                    </marker>
+                </defs>
+<path marker-end="url(#arrow-head)" d="M144 18 L144 75.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M0 162 L61.817662350913714 223.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 90 L82.18233764908629 151.8176623509137" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M72 162 L72 219.6" stroke="black" stroke-width="1px"/>
+<path marker-end="url(#arrow-head)" d="M144 162 L144 104.4" stroke="black" stroke-width="1px"/>
+<path  d="M72 234 L144 162" stroke="black" stroke-width="1px"/>
+<circle cx="144" cy="18" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="144" y="26" style="font-size:24; text-anchor: middle">a</text>
+<circle cx="144" cy="90" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="144" y="98" style="font-size:24; text-anchor: middle">c</text>
+<circle cx="0" cy="162" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="0" y="170" style="font-size:24; text-anchor: middle">b</text>
+<circle cx="72" cy="234" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="72" y="242" style="font-size:24; text-anchor: middle">d</text>
+<circle cx="72" cy="162" r="14.4" style="fill: skyblue; stroke: black; stroke-width: 1px;"/>
+<text x="72" y="170" style="font-size:24; text-anchor: middle">e</text>
+<circle cx="144" cy="162" r="0" style="fill: lightgray; stroke: black; stroke-width: 1px;"/>
+</svg>
