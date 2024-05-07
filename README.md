@@ -16,4 +16,4 @@ This is not production quality because:
 
 dot | dot-rs | GraphViz
 --- | --- | --- |
-{ a -> b; b -> c} | <img src="dot_examples/basic/generated/dot_rs/a_to_b_and_c.svg"> | <img src="dot_examples/basic/generated/GraphViz/a_to_b_and_c.svg">
+{ a -> b; b -> c} | <img src="dot_examples/basic/generated/dot-rs/a_to_b_and_c.svg"> | <img src="dot_examples/basic/generated/GraphViz/a_to_b_and_c.svg">
