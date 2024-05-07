@@ -18,6 +18,6 @@ dot-rs | GraphViz
 --- | --- |
 <img src="dot_examples/basic/generated/dot-rs/a_to_b_and_c.svg"> | <img src="dot_examples/basic/generated/GraphViz/a_to_b_and_c.svg">
 <img src="dot_examples/basic/generated/dot-rs/a_to_c_and_b_to_a.svg"> | <img src="dot_examples/basic/generated/GraphViz/a_to_c_and_b_to_a.svg">
-<img src="dot_examples/basic/generated/dot-rs/t1_2_1.svg"> | <img src="dot_examples/basic/generated/GraphViz/t1_2_1.svg">
-<img src="dot_examples/basic/generated/dot-rs/t2_1_2.svg"> | <img src="dot_examples/basic/generated/GraphViz/t1_2_2.svg">
+<img src="dot_examples/basic/tse_paper/dot-rs/example_2_3.svg"> | <img src="dot_examples/tse_paper/GraphViz/example_2_3.svg">
+<img src="dot_examples/basic/tse_paper/dot-rs/example_2_3_extended.svg"> | <img src="dot_examples/tse_paper/GraphViz/example_2_3_extended.svg">
 <img src="dot_examples/layout/generated/dot-rs/large_example.svg"> | <img src="dot_examples/layout/generated/GraphViz/large_example.svg">
