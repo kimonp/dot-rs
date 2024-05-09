@@ -15,6 +15,7 @@ fn write_svg_to_example_file(test_title: &str, svg: &str) {
     file.write_all(svg.as_bytes()).unwrap();
 }
 
+#[allow(unused)]
 fn write_graphviz_svg_example(test_title: &str, dot_str: &str) {
     let graphviz_svg_file_path = get_svg_example_path(test_title, SvgGenerator::GraphViz);
 
@@ -35,7 +36,7 @@ fn system_call_dot_to_svg_file(dot_str: &str, svg_path: &str) {
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn();
-    
+
     if let Ok(mut dot_child) = result {
         let mut stdin = dot_child.stdin.take().expect("Failed to open stdin");
         std::thread::spawn(move || {
@@ -81,5 +82,7 @@ fn test_dot_to_svg(test_title: &str) {
     let svg = dot_to_svg(&dot);
 
     write_svg_to_example_file(test_title, &svg);
-    write_graphviz_svg_example(test_title, &dot)
+
+    // Only enable if you want to re-generate GraphViz examples.
+    // write_graphviz_svg_example(test_title, &dot)
 }

@@ -1,6 +1,6 @@
 //! Top level api methods for dot-rs.
 
-use crate::{graph::{Graph, Snapshots}, svg::{SvgStyle, SVG}};
+use crate::{graph::{snapshot::Snapshots, Graph}, svg::{SvgStyle, SVG}};
 
 /// Given a valid dot string, return an svg string.
 /// 
@@ -21,6 +21,7 @@ pub fn dot_to_svg(dot: &str) -> String {
 pub fn dot_to_svg_debug_snapshots(dot: &str) -> Snapshots {
     let mut graph = Graph::from(dot);
     
+    graph.enable_snapshots();
     graph.layout_nodes();
     graph.get_debug_svg_snapshots()
 }

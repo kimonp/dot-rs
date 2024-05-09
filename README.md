@@ -11,8 +11,6 @@ This is not production quality because:
 * Does not implement subgraphs, nor most other exotic options
   in dot files.
 * Draws straight lines for edges, not splines.
-* Runs quite a bit slower, but this can likely be easily fixed
-  with some investigation.
   
 Some side by size comparison examples:
 

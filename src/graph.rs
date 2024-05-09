@@ -9,6 +9,7 @@ mod edge;
 mod network_simplex;
 pub mod node;
 mod rank_orderings;
+pub mod snapshot;
 
 use rank_orderings::RankOrderings;
 use std::{
@@ -28,7 +29,7 @@ use self::{
     },
     network_simplex::SimplexNodeTarget::{VerticalRank, XCoordinate},
     node::{Node, NodeType, Point, Rect, NODE_MIN_SEP_X, NODE_START_HEIGHT},
-    rank_orderings::AdjacentRank,
+    rank_orderings::AdjacentRank, snapshot::Snapshots,
 };
 
 /// Simplest possible representation of a graph until more is needed.
@@ -61,82 +62,10 @@ pub struct Graph {
     /// Snapshots are grouped into lists so the can be scrolled through
     /// somewhat hierarchically.
     svg_debug_snapshots: RefCell<Snapshots>,
+    /// Must be true to enable snapshots.  False by default for performance reasons.
+    snapshots_enabled: bool,
     /// Attributes for nodes.  For example, label="my_node_label"
     node_attr: HashMap<String, HashMap<String, String>>,
-}
-
-type SnapShotVec = Vec<(String, String)>;
-
-#[derive(Debug, Clone, Default)]
-pub struct Snapshots {
-    total: usize,
-    groups: Vec<(String, SnapShotVec)>,
-}
-
-impl Snapshots {
-    fn new() -> Snapshots {
-        Snapshots {
-            total: 0,
-            groups: Vec::new(),
-        }
-    }
-
-    /// Add a new group to save snapshots to.
-    ///
-    /// New snapshots can only be added to the current group
-    pub fn new_group(&mut self, group_title: &str) {
-        self.groups.push((group_title.to_string(), Vec::new()));
-    }
-
-    /// Add a new snapshot to the current group.
-    pub fn add(&mut self, title: &str, snap: &str) {
-        if let Some(last) = self.groups.last_mut() {
-            last.1.push((title.to_string(), snap.to_string()));
-        } else {
-            panic!("No snapshot group set!")
-        }
-        self.total += 1;
-    }
-
-    pub fn get(&self, frame: usize) -> Option<(String, String, String)> {
-        let mut cur_frame = 0_usize;
-        for (title, group) in self.groups.iter() {
-            if cur_frame + group.len() > frame {
-                let index = frame - cur_frame;
-                let snapshot = group.get(index).expect("element not present");
-
-                return Some((title.clone(), snapshot.0.clone(), snapshot.1.clone()));
-            }
-            cur_frame += group.len();
-        }
-        None
-    }
-
-    pub fn group_count(&self) -> usize {
-        self.groups.len()
-    }
-
-    pub fn total_count(&self) -> usize {
-        self.total
-    }
-
-    pub fn steps(&self, frame: usize) -> (usize, usize) {
-        let mut cur_frame = 0_usize;
-        let mut prev_frame = 0_usize;
-        for (_title, group) in self.groups.iter() {
-            if cur_frame + group.len() > frame {
-                let start_frame = if frame == cur_frame {
-                    prev_frame
-                } else {
-                    cur_frame
-                };
-                return (start_frame, cur_frame + group.len());
-            }
-            prev_frame = cur_frame;
-            cur_frame += group.len();
-        }
-        (0, self.total_count())
-    }
 }
 
 impl Default for Graph {
@@ -154,6 +83,7 @@ impl Graph {
             horizontal_node_separation: NODE_MIN_SEP_X as u32,
             first_virtual_idx: None,
             svg_debug_snapshots: RefCell::new(Snapshots::new()),
+            snapshots_enabled: false,
             node_attr: HashMap::new(),
         }
     }
@@ -178,16 +108,18 @@ impl Graph {
     ///  * rank_orderings has been set in self.
     #[allow(unused)]
     pub(super) fn take_svg_snapshot(&self, title: &str, rank_orderings: Option<&RankOrderings>) {
-        let mut snapshot_graph = self.clone();
-        if let Some(rank_orderings) = rank_orderings {
-            snapshot_graph.set_coordinates_from_rank_orderings(rank_orderings);
+        if self.snapshots_enabled {
+            let mut snapshot_graph = self.clone();
+            if let Some(rank_orderings) = rank_orderings {
+                snapshot_graph.set_coordinates_from_rank_orderings(rank_orderings);
+            }
+
+            let svg = SVG::new(snapshot_graph, SvgStyle::MinCross);
+
+            self.svg_debug_snapshots
+                .borrow_mut()
+                .add(title, &svg.to_string());
         }
-
-        let svg = SVG::new(snapshot_graph, SvgStyle::MinCross);
-
-        self.svg_debug_snapshots
-            .borrow_mut()
-            .add(title, &svg.to_string());
     }
 
     #[allow(unused)]
@@ -198,14 +130,20 @@ impl Graph {
     pub fn get_debug_svg_snapshots(&self) -> Snapshots {
         self.svg_debug_snapshots.borrow().clone()
     }
-    
+
+    /// Enables debug snapshots.  On complex graphs, this
+    /// can slow things down quite a bit.
+    pub(super) fn enable_snapshots(&mut self) {
+        self.snapshots_enabled = true;
+    }
+
     /// Gives a HashMap of node names and attributes, assign them.
     pub fn set_node_attr(&mut self, attr: HashMap<String, HashMap<String, String>>) {
         for (name, attrs) in attr.iter() {
             self.node_attr.insert(name.clone(), attrs.clone());
         }
     }
-    
+
     // fn get_node_name_map(&self) -> HashMap<String, usize> {
     //     let mut name_map = HashMap::new();
 
@@ -214,10 +152,12 @@ impl Graph {
     //     }
     //     name_map
     // }
-    
+
     /// Return the label of a node, if there is any.
     pub fn get_node_label(&self, node_name: &str) -> Option<&String> {
-        self.node_attr.get(node_name).and_then(|attr| attr.get("label"))
+        self.node_attr
+            .get(node_name)
+            .and_then(|attr| attr.get("label"))
     }
 
     fn set_coordinates_from_rank_orderings(&mut self, rank_orderings: &RankOrderings) {
