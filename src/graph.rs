@@ -61,6 +61,8 @@ pub struct Graph {
     /// Snapshots are grouped into lists so the can be scrolled through
     /// somewhat hierarchically.
     svg_debug_snapshots: RefCell<Snapshots>,
+    /// Must be true to enable snapshots.  False by default for performance reasons.
+    snapshots_enabled: bool,
     /// Attributes for nodes.  For example, label="my_node_label"
     node_attr: HashMap<String, HashMap<String, String>>,
 }
@@ -154,6 +156,7 @@ impl Graph {
             horizontal_node_separation: NODE_MIN_SEP_X as u32,
             first_virtual_idx: None,
             svg_debug_snapshots: RefCell::new(Snapshots::new()),
+            snapshots_enabled: false,
             node_attr: HashMap::new(),
         }
     }
@@ -178,16 +181,18 @@ impl Graph {
     ///  * rank_orderings has been set in self.
     #[allow(unused)]
     pub(super) fn take_svg_snapshot(&self, title: &str, rank_orderings: Option<&RankOrderings>) {
-        let mut snapshot_graph = self.clone();
-        if let Some(rank_orderings) = rank_orderings {
-            snapshot_graph.set_coordinates_from_rank_orderings(rank_orderings);
+        if self.snapshots_enabled {
+            let mut snapshot_graph = self.clone();
+            if let Some(rank_orderings) = rank_orderings {
+                snapshot_graph.set_coordinates_from_rank_orderings(rank_orderings);
+            }
+
+            let svg = SVG::new(snapshot_graph, SvgStyle::MinCross);
+
+            self.svg_debug_snapshots
+                .borrow_mut()
+                .add(title, &svg.to_string());
         }
-
-        let svg = SVG::new(snapshot_graph, SvgStyle::MinCross);
-
-        self.svg_debug_snapshots
-            .borrow_mut()
-            .add(title, &svg.to_string());
     }
 
     #[allow(unused)]
@@ -198,14 +203,20 @@ impl Graph {
     pub fn get_debug_svg_snapshots(&self) -> Snapshots {
         self.svg_debug_snapshots.borrow().clone()
     }
-    
+
+    /// Enables debug snapshots.  On complex graphs, this
+    /// can slow things down quite a bit.
+    pub(super) fn enable_snapshots(&mut self) {
+        self.snapshots_enabled = true;
+    }
+
     /// Gives a HashMap of node names and attributes, assign them.
     pub fn set_node_attr(&mut self, attr: HashMap<String, HashMap<String, String>>) {
         for (name, attrs) in attr.iter() {
             self.node_attr.insert(name.clone(), attrs.clone());
         }
     }
-    
+
     // fn get_node_name_map(&self) -> HashMap<String, usize> {
     //     let mut name_map = HashMap::new();
 
@@ -214,10 +225,12 @@ impl Graph {
     //     }
     //     name_map
     // }
-    
+
     /// Return the label of a node, if there is any.
     pub fn get_node_label(&self, node_name: &str) -> Option<&String> {
-        self.node_attr.get(node_name).and_then(|attr| attr.get("label"))
+        self.node_attr
+            .get(node_name)
+            .and_then(|attr| attr.get("label"))
     }
 
     fn set_coordinates_from_rank_orderings(&mut self, rank_orderings: &RankOrderings) {

@@ -21,6 +21,7 @@ pub fn dot_to_svg(dot: &str) -> String {
 pub fn dot_to_svg_debug_snapshots(dot: &str) -> Snapshots {
     let mut graph = Graph::from(dot);
     
+    graph.enable_snapshots();
     graph.layout_nodes();
     graph.get_debug_svg_snapshots()
 }
