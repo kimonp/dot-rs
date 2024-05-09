@@ -1,6 +1,6 @@
 //! Top level api methods for dot-rs.
 
-use crate::{graph::{Graph, Snapshots}, svg::{SvgStyle, SVG}};
+use crate::{graph::{snapshot::Snapshots, Graph}, svg::{SvgStyle, SVG}};
 
 /// Given a valid dot string, return an svg string.
 /// 
